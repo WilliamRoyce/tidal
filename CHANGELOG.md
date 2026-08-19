@@ -14,6 +14,71 @@ retroactively covered; see `git log` for the full history.
 
 ### Fixed
 
+- **Marginal D_KL is now computed in the space where each prior is uniform
+  (#420)**. `compute_parameter_importance` transformed only `log_uniform`
+  columns; `arctan_uniform`, `normal` and `radial_angular` were histogrammed
+  in linear space against a uniform reference, so a posterior *identical to
+  its prior* scored up to ~2.4 nats — near the estimator's own ceiling
+  `log(40) ≈ 3.69`. Roughly half of all recorded priors, across 31 chains,
+  were on that path. Every kind now has an explicit uniformizing transform
+  (arctan, Gaussian CDF, and an empirical reference for the cubed-sphere
+  joint prior, which has no closed-form 1-D marginal CDF).
+  `uniform`/`log_uniform` results are bit-identical to earlier releases by
+  construction. The correction changes rankings, not just magnitudes: 19 of
+  26 chain-directions change dominant coupling (#432), because the broken
+  estimator saturated arctan marginals near its ceiling and compressed
+  exactly the differences the rankings relied on. Corrected values and
+  per-claim status live in `docs/RESULTS_AMENDMENTS.md`; the evidence base
+  is `docs/dkl_recompute_report.md`. **Marginal D_KL from any pre-v0.48.8
+  `importance.json` must not be quoted** — such files have no `consistency`
+  block, which is the staleness tell.
+- **The marginal estimator now self-checks and refuses to fail silently
+  (#420, #433)**. `importance.json` gained a `schema_version: 2`
+  `consistency` block recording superadditivity against the joint D_KL
+  (exact for a product prior), Kish `n_eff`, per-parameter noise floors
+  `(n_bins − 1)/(2·n_eff)`, histogram-ceiling saturation, `fallback_params`,
+  and `range_clipped`. Posterior mass falling outside the recorded prior
+  range is flagged rather than renormalized into a plausible small number;
+  degenerate weights raise; the superadditivity check reports when it has
+  no statistical power instead of returning a vacuous "ok". The B.5-rescue
+  chains turned out to have `n_eff` 6–248, so their per-coupling values are
+  estimator noise before *or* after the #420 fix; every consumer that ranks
+  marginals — the CLI table, the bar chart, the TeX emitters, and the
+  figure-selection scripts — now excludes floor-dominated parameters.
+- **A prior's sampled support has one source of truth (#425, #451)**.
+  `arctan_uniform` ignores its `low`/`high` entirely (support fixed at
+  ±tan(π/2 − 0.05) ≈ ±19.98), so any module deriving a range from the
+  recorded bounds derived it from nothing. Two did: the #420 estimator read
+  them as a histogram range, and `--full-prior-bounds` corner plots read
+  them as *degrees* and drew ±tan(89°) ≈ ±57.3 panels — ~2.9× too wide,
+  making every posterior look correspondingly more concentrated. No
+  committed figure script or campaign template passes that flag, so no
+  recorded figure was affected. `tidal.inference._prior.effective_support`
+  is now the only place that answers "what range was sampled"; archived
+  chains have it reconstructed on read, and new chains record
+  `effective_low`/`effective_high` per scalar prior. Constructing an
+  `arctan_uniform` prior with bounds that differ from its true support
+  warns (`0:0` is the sanctioned "unused" sentinel). The bounds themselves
+  are deliberately still ignored — honoring them would silently redefine
+  the prior for every archived chain.
+- **Priors missing from a saved chain are now audible (#434)**. Six
+  pre-schema campaign chains saved with no `priors` block, and the post-hoc
+  recompute fabricated an all-arctan prior set for them — wrong for the runs
+  that used a log-uniform ξ, producing a spurious dominant 1.66 nats.
+  Saving a nested result without priors now warns and names the
+  consequence; prior provenance is derived from file *content* rather than
+  file existence; positional prior/column misalignment raises instead of
+  silently misassigning; and live `Prior` objects serialize on save instead
+  of raising "not JSON serializable" at the last step of a finished run.
+- **Modal refuses position-dependent kinetic coefficients on its per-mode
+  engines instead of failing deep or silently (#421)**. #382 taught
+  `build_inverse_kinetic_diag` to evaluate `kinetic_coefficient_symbolic`
+  on a grid and wired it into the four time-domain backends, but not into
+  modal, so such specs hit a grid-less `ValueError` on some paths and a
+  silent `M = 1` fallback on the generalized-eigenvalue path — including
+  inside the inference stability probe. Plain `solve_modal` gained full
+  M(x) support shortly afterwards (#427); the refusal now survives only on
+  the strictly per-mode engines, where no per-mode mass matrix exists.
 - **Pass-1 cross-block guard is now purely scale-relative (#429)**. The
   floored-relative threshold `max(1e-14, max|M_src|·1e-10)` introduced for
   #275 (recorded below under v0.33.x) let the absolute floor dominate
