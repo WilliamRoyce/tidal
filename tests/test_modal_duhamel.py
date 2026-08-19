@@ -546,6 +546,143 @@ class TestCrossBlockCouplingRaises:
         with pytest.raises(NotImplementedError, match="[Cc]ross-block"):
             _evolve_duhamel_per_mode(eigendata, m_src_by_order, t_eval, layout, grid)
 
+    def test_cross_block_guard_not_masked_by_tiny_source_scale(self) -> None:
+        """GH #429: a tiny source scale must not mask physical coupling.
+
+        The pre-#429 threshold ``max(1e-14, max|M_src|·1e-10)`` had an
+        absolute floor that dominated whenever ``max|M_src| < 1e-4``,
+        silently passing (and then discarding) cross-block entries that
+        are a large FRACTION of the source — the EH dual-Gaussian at
+        Phase E geometry had ``max|M_src| ≈ 8e-15`` with cross-block
+        coupling at 3% of that norm. The threshold is now purely
+        scale-relative, so the same ratio refuses at any overall scale.
+        """
+        from tidal.solver.modal import (
+            _evolve_duhamel_per_mode,
+        )
+
+        base_data = copy.deepcopy(_CROSS_BLOCK_SPEC)
+        phi_eq = base_data["equations"][0]  # type: ignore[index]
+        phi_eq["rhs"]["terms"] = [  # type: ignore[index]
+            t
+            for t in phi_eq["rhs"]["terms"]  # type: ignore[reportUnknownVariableType]
+            if t.get("order_in_eps", 0) == 0
+        ]
+        base_spec = _make_spec(base_data)
+        n_grid = 16
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n_grid,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(base_spec, grid.num_points)
+
+        x = np.linspace(0.0, length, n_grid, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:n_grid] = np.sin(x)  # phi_0
+        y0[2 * n_grid : 3 * n_grid] = 0.5 * np.sin(x)  # chi_0
+
+        pass0 = cast(
+            "dict[str, Any]",
+            solve_modal(
+                base_spec,
+                grid,
+                y0,
+                t_span=(0.0, 0.5),
+                parameters={"mPhi2": 1.0, "mChi2": 2.0},
+                num_snapshots=3,
+                return_eigendata=True,
+            ),
+        )
+        eigendata = pass0["eigendata"]
+        n_slots = layout.num_slots
+        rfft_last = grid.shape[-1] // 2 + 1
+        n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
+        m_src = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
+        blocks = eigendata["blocks"]
+        assert len(blocks) >= 2
+        b0_idx = int(blocks[0]["slot_indices"][0])
+        b1_idx = int(blocks[1]["slot_indices"][0])
+        # EH-like magnitudes: source scale 8e-15, cross entries 3% of it.
+        # Both sit far below the old absolute floor (1e-14), which passed
+        # them silently; the relative threshold (8e-25) must refuse.
+        m_src[:, b0_idx, b0_idx] = 8e-15
+        m_src[:, b0_idx, b1_idx] = 2.5e-16
+
+        with pytest.raises(NotImplementedError, match="[Cc]ross-block"):
+            _evolve_duhamel_per_mode(eigendata, {0: m_src}, pass0["t"], layout, grid)
+
+
+class TestGH429EHDualGaussianRefusal:
+    """GH #429: the EH dual-Gaussian spec refuses Pass 1 at ANY rho.
+
+    The cross-block coupling (O(ε) sources linking the a_0 and a_3
+    sectors at ~3% of the source norm, ratio independent of rho) is
+    physical, so the refusal must not depend on the overall source
+    scale. Pre-#429 the absolute floor made the verdict a function of
+    rho (refusing only for rho ≳ 1e-9 at this geometry).
+    """
+
+    EH_SPEC = "examples/data/euler_heisenberg_e_dual_gaussian.json"
+    SMALL = ["rho", "sigma"]
+
+    def _params(self, rho: float) -> dict[str, float]:
+        return {
+            "Bpeak": 0.01,
+            "rho": rho,
+            "sigma": 1e-6,
+            "sigB": 0.4,
+            "zc1": -1.5,
+            "zc2": 1.5,
+        }
+
+    @pytest.mark.parametrize("rho", [1e-9, 1.0])
+    def test_pass1_refuses_at_any_rho(self, rho: float) -> None:
+        import json
+        from pathlib import Path
+
+        raw = json.loads(Path(self.EH_SPEC).read_text(encoding="utf-8"))
+        spec = EquationSystem.from_dict(raw)
+        canon = spec.canonicalize_kinetic_for_perturbation(self.SMALL)
+        base = canon.base_spec(self.SMALL)
+        correction = canon.filter_by_order(1)
+
+        grid = GridInfo(shape=(32,), bounds=((-2.0, 2.0),), periodic=(True,))
+        layout = StateLayout.from_spec(base, grid.num_points)
+        params = self._params(rho)
+
+        # Excite every field slot so no block is pruned by the zero-IC
+        # skip (the guard verdict is IC-dependent, GH #440); the refusal
+        # must be structural, not an artifact of which blocks survive.
+        rng = np.random.default_rng(429)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        for name, slot in layout.field_slot_map.items():
+            del name
+            sl = layout.slot_slice(slot)
+            y0[sl] = 1e-3 * rng.standard_normal(grid.num_points)
+
+        pass0 = cast(
+            "dict[str, Any]",
+            solve_modal(
+                base,
+                grid,
+                y0,
+                t_span=(0.0, 1.0),
+                parameters=params,
+                num_snapshots=3,
+                return_eigendata=True,
+            ),
+        )
+        with pytest.raises(NotImplementedError, match="[Cc]ross-block") as excinfo:
+            solve_modal_pass1(
+                pass0["eigendata"],
+                correction,
+                grid,
+                pass0["t"],
+                parameters=params,
+            )
+        # The message names the coupled sectors.
+        msg = str(excinfo.value)
+        assert "a_0" in msg
+        assert "a_3" in msg
+
 
 class TestPass1NearDegeneracy:
     """R5.3 / #282: Pass 1 Duhamel kernel in the Taylor-branch regime.
