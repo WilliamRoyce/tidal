@@ -81,11 +81,16 @@ def plot_corner(
       posterior.
 
     The ``full_prior_bounds`` flag (v3 architecture) overrides the
-    anesthetic per-panel auto-scale with the full prior range, so that
-    compactified ``arctan_uniform`` priors visibly span their full
-    ±tan(89°) ≈ ±57.3 sample range.  Useful when the user needs to
-    confirm posterior compactness rather than read marginal shape.
-    Only supported by the anesthetic backend.
+    anesthetic per-panel auto-scale with the full range each prior
+    actually sampled (:func:`tidal.inference._prior.effective_support`),
+    so a compactified ``arctan_uniform`` parameter spans its full
+    ±19.98 support.  Useful when the user needs to confirm posterior
+    compactness rather than read marginal shape.  Only supported by the
+    anesthetic backend.
+
+    (Before v0.49.2 this docstring and the implementation both claimed
+    ±tan(89°) ≈ ±57.3, reading the recorded bounds as degrees — bounds
+    that ``arctan_uniform`` ignores entirely.  See GH #451/#425.)
     """
     try:
         _plot_corner_anesthetic(

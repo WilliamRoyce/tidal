@@ -1,5 +1,12 @@
 # D2.0 Bahamonde sup: v2 vs v3 comparison
 
+> **Correction (2026-08-19, additive — the tables below are preserved as written):**
+> the `arctan_uniform` prior columns describe the range as degrees mapped through
+> `tan`, giving ±57.3. The sampler never did that: `low`/`high` are ignored
+> entirely and the support is fixed at ±tan(π/2 − 0.05) ≈ **±19.98** (GH #425).
+> Read every ±57.3 in this file as ±19.98. Marginal D_KL values quoted here also
+> pre-date the GH #420 estimator fix — see `docs/RESULTS_AMENDMENTS.md`.
+
 **Status:** Truncated result — supervisor-approved 1-INTR-session policy (2026-05-15).
 The v3 chain was canceled after 7 INTR sessions (job 29271186 canceled at session 8 boundary,
 last completed checkpoint from job 29269357 session 7). Not converged; logZ still changing.
