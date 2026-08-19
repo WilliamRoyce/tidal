@@ -31,10 +31,12 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `gertsenshtein_formula.tex` | `docs/tex/gertsenshtein_formula.tex` | Conversion formula derivation, literature comparison |
 | `gertsenshtein_localized.tex` | `docs/tex/gertsenshtein_localized.tex` | Boccaletti formula, localized B-field scattering |
 | `background_validity.tex` | `docs/tex/background_validity.tex` | Background validity, B₀→0 argument, EFT structure, sweep methodology |
-| `critical_field.tex` | `docs/tex/critical_field.tex` | Critical field analysis, amplification factor |
 | `torsion.tex` | `docs/tex/torsion.tex` | Poincare gauge theory, torsion implementation |
 | `pgt_stability_priors.tex` | `docs/tex/pgt_stability_priors.tex` | D2 stability priors with TIDAL/Blagojević/Barker cross-check |
 | `chern_simons.tex` | `docs/tex/chern_simons.tex` | Chern-Simons 2+1D implementation |
+| `amplification_mechanism.tex` | `docs/tex/amplification_mechanism.tex` | Light-mediator amplification at the stability boundary |
+| `dark_photon_torsion.tex` | `docs/tex/dark_photon_torsion.tex` | Dark-photon torsion analogue |
+| `gertsenshtein_plasma.tex` | `docs/tex/gertsenshtein_plasma.tex` | Plasma-mass Gertsenshtein conversion |
 
 ### Architecture
 
@@ -49,6 +51,10 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `solver_optimizations.tex` | `docs/tex/solver_optimizations.tex` | FD stencils, Yoshida, spectral, component E-L |
 | `adaptive_timestepping.tex` | `docs/tex/adaptive_timestepping.tex` | Tolerance-controlled solvers |
 | `kinetic_matrix.tex` | `docs/tex/kinetic_matrix.tex` | Non-diagonal kinetic matrix handling |
+| `modal_jax.tex` | `docs/tex/modal_jax.tex` | JAX modal backend |
+| `stability_probe.tex` | `docs/tex/stability_probe.tex` | Pre-flight tachyonic stability probe |
+| `plane_wave_ic.tex` | `docs/tex/plane_wave_ic.tex` | Plane-wave IC mode-snapping |
+| `perturbative_reduction_constraint_barrier.tex` | `docs/tex/perturbative_reduction_constraint_barrier.tex` | Constraint-promotion barrier analysis |
 
 ### Features
 
@@ -67,7 +73,6 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `troubleshooting.tex` | `docs/tex/troubleshooting.tex` | Error encyclopedia |
 | `cli_reference.tex` | `docs/tex/cli_reference.tex` | CLI subcommand reference |
 | `pipeline.tex` | `docs/tex/pipeline.tex` | Two-stage data flow |
-| `examples.tex` | `docs/tex/examples.tex` | Working examples catalog |
 | `derivation_performance.tex` | `docs/tex/derivation_performance.tex` | Wolfram bottleneck analysis, component E-L timings |
 | `adr_disk_storage.tex` | `docs/tex/adr_disk_storage.tex` | ADR: mmap NumPy storage |
 | `volume_element_fix.tex` | `docs/tex/volume_element_fix.tex` | sqrt|g| volume element fix |
@@ -85,7 +90,30 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `COMMUNITY.md` | Support channels |
 | `references.md` | Curated bibliography (browsable) |
 | `next-features.md` | Sweep framework features |
-| `torsion_implementation_checklist.md` | PGT implementation tracking |
+| `PERTURBATIVE_REDUCTION_IMPLEMENTATION.md` | v6 perturbative reduction implementation log |
+| `MODAL_TEMPLATE_CACHE_RETROSPECTIVE.md` | Reverted template-cache experiment record |
+| `AMPLIFICATION_INVESTIGATION.md` | Amplification-mechanism investigation log |
+| `PHASE_6_COMPARISON.md` | Phase 6 comparison notes |
+
+## Campaign & Results Records (Markdown)
+
+These are internal bookkeeping for the survey campaign — the thesis
+(`manuscript/`, frozen archive) is the authoritative record of results, and
+`docs/RESULTS_AMENDMENTS.md` is the living record of what has since been
+superseded.
+
+| File | Purpose |
+| ---- | ------- |
+| `RESULTS_AMENDMENTS.md` | **Living corrected-results record**: claim-by-claim status of the archived thesis numbers (start here) |
+| `dkl_recompute_report.md` | GH #420 marginal D_KL recompute: old-vs-new evidence for all publication chains |
+| `campaign_plan.md` | Campaign stages and success thresholds (see its amendment pointer) |
+| `V3_ARCHITECTURE.md` | v3 inference architecture reference (see its amendment banner) |
+| `V3_PHASE_TRACKER.md` | v3 phase status tracker |
+| `V3_2_DESIGN_INVESTIGATION.md` | v3.2 design investigation |
+| `V3_D1_REPLAY_NOTES.md` | D1 replay notes |
+| `PHASE_E_TRACKER.md` | Phase E (localized geometry) tracker |
+| `PHASE_E_ATLAS_TRACKER.md` | Phase E cubed-sphere atlas tracker |
+| `lagrangian_depruning_audit.md` | Lagrangian de-pruning audit |
 
 ## Research (`research/`)
 
@@ -115,4 +143,4 @@ Auto-generated API documentation via Sphinx (`.rst` files). Build with `make htm
 
 ---
 
-Last updated: 2026-04-02
+Last updated: 2026-08-19

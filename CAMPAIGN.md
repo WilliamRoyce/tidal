@@ -514,3 +514,36 @@ superseded and where the corrected ones live.** Full evidence:
   per-chain `prior_overrides`.
 - **Issues**: #420 #425 #427 #428 #429 #432 #433 #434 (see also the
   GitHub Issues table above — not edited, per append-only policy).
+
+---
+
+## 2026-08-19 Erratum to the 2026-08-18 correction entry (post-merge review)
+
+An independent review of the #420-family fixes (three findings verified against
+the chain JSONs; nothing above this line is edited):
+
+- **The coherence claim above was overstated.** "Corrected marginals now agree
+  with the (unaffected) D₊‖₋ rankings" holds for several flagship cases (EM-RC
+  δ₁, Bahamonde ξ) but NOT universally: Barker amp's top marginal is χ (its top
+  cross is ξ) and Shapiro amp's is ζ₂ (top cross β₁). Marginal and cross
+  rankings answer different questions; only claims keyed on D₊‖₋ carry over
+  unconditionally. `docs/RESULTS_AMENDMENTS.md` now states this per claim.
+- **The floor inventory omitted the worst chain.** "T7/T9/NP-ceven … N_eff
+  21–248" missed **T6-full (parity_odd_full): N_eff = 6.0 amp / 13.8 sup,
+  floors 3.25/1.42 nats, 20/20 parameters floor-dominated both directions**
+  (the report's own summary table listed it). Corrected range: 6–248; the
+  Euler-Heisenberg chain is likewise floor-limited (N_eff ≈ 104), consistent
+  with its null.
+- **A seventh fabricated-prior chain (#434)**: the Barker amp chain's
+  inference.json has no `priors` key (`reconstructed: true`), so its ξ marginal
+  had been scored against a fabricated arctan prior (0.92); under the true
+  log-uniform prior (sup chain record + sbatch template) ξ = 0.83 — χ stays
+  the top marginal, so no ranking changes. `d_kl_chains.toml` now carries the
+  override; `parameter_importance.json` records `priors_provenance` per
+  direction and the recompute warns on every fabrication. A latent T8 override
+  was staged for the same reason.
+
+The estimator itself was hardened in the same review round (range-coverage
+guards, machine-readable fallback/floor markers, `schema_version: 2`,
+floor-aware bar chart and TeX emitters, prior-kind coverage enforced by test) —
+see the review PR referenced from GH #432's comment thread.

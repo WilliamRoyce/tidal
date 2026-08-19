@@ -20,6 +20,24 @@ if TYPE_CHECKING:
     from tidal.measurement._sweep_results import SweepResults
 
 
+def _json_sanitize(obj: Any) -> Any:
+    """Replace non-finite floats with ``None`` for strict-JSON output.
+
+    ``json.dump`` writes bare ``NaN``/``Infinity`` by default, which
+    strict parsers (``jq``, ``JSON.parse``) reject — and
+    ``marginal_d_kl`` legitimately contains NaN for failed columns.
+    ``None`` round-trips as ``null`` and reads back as "not computed",
+    which is what a NaN marginal means.
+    """
+    if isinstance(obj, dict):
+        return {k: _json_sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_sanitize(v) for v in obj]
+    if isinstance(obj, float) and not np.isfinite(obj):
+        return None
+    return obj
+
+
 @dataclass
 class InferenceResult:
     """Container for inference samples and diagnostics.
@@ -409,7 +427,15 @@ class InferenceResult:
         if self.method == "nested":
             try:
                 importance = self.parameter_importance()
-                summary["parameter_importance"] = {
+                # Shared core between inference.json's block and the
+                # standalone importance.json — one source, two sinks, so a
+                # new field cannot be added to only one of them.
+                # schema_version 2 = post-#420 estimator with the
+                # consistency self-check block; bump on any change to the
+                # marginal estimator or block contents (the
+                # presence-of-consistency staleness tell only worked once).
+                importance_core: dict[str, Any] = {
+                    "schema_version": 2,
                     "d_kl": importance.d_kl,
                     "d_kl_err": importance.d_kl_err,
                     "d_g": importance.d_g,
@@ -417,28 +443,32 @@ class InferenceResult:
                     "marginal_d_kl": importance.marginal_d_kl,
                     "consistency": importance.consistency,
                 }
+                summary["parameter_importance"] = _json_sanitize(importance_core)
                 # Also save as standalone file
                 with (output_dir / "importance.json").open("w") as f:
                     json.dump(
-                        {
-                            "param_names": importance.param_names,
-                            "d_kl": importance.d_kl,
-                            "d_kl_err": importance.d_kl_err,
-                            "d_g": importance.d_g,
-                            "d_g_err": importance.d_g_err,
-                            "marginal_d_kl": importance.marginal_d_kl,
-                            "log_evidence": importance.log_evidence,
-                            "log_evidence_err": importance.log_evidence_err,
-                            "consistency": importance.consistency,
-                        },
+                        _json_sanitize(
+                            {
+                                **importance_core,
+                                "param_names": importance.param_names,
+                                "log_evidence": importance.log_evidence,
+                                "log_evidence_err": importance.log_evidence_err,
+                            }
+                        ),
                         f,
                         indent=2,
                     )
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 import logging
 
-                logging.getLogger("tidal.inference").debug(
-                    "Parameter importance computation skipped during save",
+                # WARNING, not debug: a silently-absent importance.json is
+                # the failure mode the #420 campaign was about — runs whose
+                # headline metric quietly vanishes must announce themselves.
+                logging.getLogger("tidal.inference").warning(
+                    "Parameter importance computation FAILED during save — "
+                    "importance.json will not be written (%s: %s)",
+                    type(exc).__name__,
+                    exc,
                     exc_info=True,
                 )
 

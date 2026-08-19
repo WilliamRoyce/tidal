@@ -112,7 +112,7 @@ effective sample size `n_eff` — surfaced as WARNING lines in the CLI table.
 
 ### dark_photon_plasma (29205968+29205982, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **recorded**, sup = **recorded**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 7.015; N_eff ≈ 7443 (per-param noise floor ≈ 0.00 nats); sum of marginals 4.776 → 2.179 (raw superadditivity ok → ok)
 
@@ -138,7 +138,7 @@ Ranking (most→least constrained): old `deltam > mA2 > xi > alpha3` → new `de
 
 ### ricci_em (29189748+29189761, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **recorded**, sup = **recorded**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 4.645; N_eff ≈ 5694 (per-param noise floor ≈ 0.00 nats); sum of marginals 7.557 → 2.533 (raw superadditivity violated → restored)
 
@@ -164,7 +164,7 @@ Ranking (most→least constrained): old `delta1 > beta1 > beta2 > beta3` → new
 
 ### ym_pgt_bahamonde (29507332, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **recorded**, sup = **recorded**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 6.015; N_eff ≈ 1063 (per-param noise floor ≈ 0.02 nats); sum of marginals 12.636 → 3.050 (raw superadditivity violated → restored)
 
@@ -192,16 +192,16 @@ Ranking (most→least constrained): old `delta1 > beta1 > beta2 > beta3 > xi` �
 
 ### ym_pgt_barker (29507332, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **fabricated+overrides**, sup = **recorded+overrides**; overrides: {'xi': 'log_uniform:1e-3:1e3'}. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
-**amp** — joint D_KL 8.144; N_eff ≈ 1340 (per-param noise floor ≈ 0.01 nats); sum of marginals 16.739 → 3.479 (raw superadditivity violated → restored)
+**amp** — joint D_KL 8.144; N_eff ≈ 1340 (per-param noise floor ≈ 0.01 nats); sum of marginals 16.739 → 3.392 (raw superadditivity violated → restored)
 
 | param | prior | old | new | Δ | verdict old → new |
 |---|---|---|---|---|---|
 | beta1 | arctan_uniform | 2.364 | 0.419 | -1.945 | STRONG → moderate **FLIP** |
 | beta2 | arctan_uniform | 2.664 | 0.108 | -2.556 | STRONG → moderate **FLIP** |
 | beta3 | arctan_uniform | 2.973 | 0.246 | -2.727 | STRONG → moderate **FLIP** |
-| xi | arctan_uniform | 2.647 | 0.920 | -1.727 | STRONG → moderate **FLIP** |
+| xi | log_uniform | 2.647 | 0.833 | -1.813 | STRONG → moderate **FLIP** |
 | delta1 | arctan_uniform | 3.091 | 0.764 | -2.327 | STRONG → moderate **FLIP** |
 | chi | arctan_uniform | 3.000 | 1.022 | -1.978 | STRONG → STRONG |
 
@@ -214,7 +214,7 @@ Ranking (most→least constrained): old `delta1 > chi > beta3 > beta2 > xi > bet
 | beta1 | arctan_uniform | 2.832 | 0.160 | -2.671 | STRONG → moderate **FLIP** |
 | beta2 | arctan_uniform | 2.653 | 0.076 | -2.577 | STRONG → weak **FLIP** |
 | beta3 | arctan_uniform | 2.546 | 0.008 | -2.538 | STRONG → weak **FLIP** |
-| xi | arctan_uniform | 1.592 | 1.592 | +0.000 | STRONG → STRONG |
+| xi | log_uniform | 1.592 | 1.592 | +0.000 | STRONG → STRONG |
 | delta1 | arctan_uniform | 2.982 | 0.606 | -2.376 | STRONG → moderate **FLIP** |
 | chi | arctan_uniform | 3.112 | 1.919 | -1.193 | STRONG → STRONG |
 
@@ -222,7 +222,7 @@ Ranking (most→least constrained): old `chi > delta1 > beta1 > beta2 > beta3 > 
 
 ### ym_pgt_shapiro (29468763, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **recorded**, sup = **recorded**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 4.541; N_eff ≈ 1341 (per-param noise floor ≈ 0.01 nats); sum of marginals 18.751 → 0.829 (raw superadditivity violated → restored)
 
@@ -256,7 +256,7 @@ Ranking (most→least constrained): old `beta1 > zeta2 > delta1 > beta2 > zeta3 
 
 ### ym_pgt_full_nonminimal (29468763, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **recorded**, sup = **recorded**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 3.916; N_eff ≈ 1297 (per-param noise floor ≈ 0.02 nats); sum of marginals 21.219 → 0.853 (raw superadditivity violated → restored)
 
@@ -292,7 +292,7 @@ Ranking (most→least constrained): old `chi > zeta2 > beta1 > zeta3 > delta1 > 
 
 ### np_t5 (29700462, plane_wave)
 
-Priors: **no inference.json** — reconstructed from the campaign sbatch template (all arctan ±89). Verify against scripts/hpc_templates before quoting.
+Priors (from `priors_provenance`, per direction): amp = **fabricated**, sup = **fabricated**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 6.204; N_eff ≈ 1146 (per-param noise floor ≈ 0.02 nats); sum of marginals 21.154 → 2.548 (raw superadditivity violated → restored)
 
@@ -326,7 +326,7 @@ Ranking (most→least constrained): old `chi > beta3 > delta1 > beta1 > zeta1 > 
 
 ### chi_closure (29682868, plane_wave)
 
-Priors: **no inference.json** — reconstructed from the campaign sbatch template (all arctan ±89; overrides: {'xi': 'log_uniform:1e-3:1e3'}). Verify against scripts/hpc_templates before quoting.
+Priors (from `priors_provenance`, per direction): amp = **fabricated+overrides**, sup = **fabricated+overrides**; overrides: {'xi': 'log_uniform:1e-3:1e3'}. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 3.749; N_eff ≈ 118 (per-param noise floor ≈ 0.17 nats — **floor-dominated, marginals below the floor are noise**); sum of marginals 44.527 → 3.778 (raw superadditivity raw-violated (within N_eff bias allowance))
 
@@ -335,7 +335,7 @@ Priors: **no inference.json** — reconstructed from the campaign sbatch templat
 | beta1 | arctan_uniform | 2.594 | 0.222 | -2.372 | STRONG → moderate **FLIP** |
 | beta2 | arctan_uniform | 2.666 | 0.176 | -2.491 | STRONG → moderate **FLIP** |
 | beta3 | arctan_uniform | 2.677 | 0.162 | -2.515 | STRONG → moderate **FLIP** |
-| xi | arctan_uniform | 2.447 | 0.180 | -2.267 | STRONG → moderate **FLIP** |
+| xi | log_uniform | 2.447 | 0.180 | -2.267 | STRONG → moderate **FLIP** |
 | delta1 | arctan_uniform | 2.550 | 0.203 | -2.347 | STRONG → moderate **FLIP** |
 | zeta1 | arctan_uniform | 2.720 | 0.202 | -2.517 | STRONG → moderate **FLIP** |
 | zeta2 | arctan_uniform | 2.505 | 0.119 | -2.386 | STRONG → moderate **FLIP** |
@@ -360,7 +360,7 @@ Ranking (most→least constrained): old `chi5 > zeta1 > beta3 > beta2 > beta1 > 
 | beta1 | arctan_uniform | 2.733 | 0.098 | -2.634 | STRONG → weak **FLIP** |
 | beta2 | arctan_uniform | 2.725 | 0.086 | -2.639 | STRONG → weak **FLIP** |
 | beta3 | arctan_uniform | 2.608 | 0.053 | -2.555 | STRONG → weak **FLIP** |
-| xi | arctan_uniform | 2.382 | 0.089 | -2.294 | STRONG → weak **FLIP** |
+| xi | log_uniform | 2.382 | 0.089 | -2.294 | STRONG → weak **FLIP** |
 | delta1 | arctan_uniform | 2.528 | 0.066 | -2.461 | STRONG → weak **FLIP** |
 | zeta1 | arctan_uniform | 2.598 | 0.075 | -2.523 | STRONG → weak **FLIP** |
 | zeta2 | arctan_uniform | 2.379 | 0.081 | -2.298 | STRONG → weak **FLIP** |
@@ -380,7 +380,7 @@ Ranking (most→least constrained): old `chi1 > chi7 > beta1 > beta2 > chi9 > ch
 
 ### np_chi_closure (29705560, plane_wave)
 
-Priors: **no inference.json** — reconstructed from the campaign sbatch template (all arctan ±89). Verify against scripts/hpc_templates before quoting.
+Priors (from `priors_provenance`, per direction): amp = **fabricated**, sup = **fabricated**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 3.918; N_eff ≈ 80 (per-param noise floor ≈ 0.24 nats — **floor-dominated, marginals below the floor are noise**); sum of marginals 42.123 → 4.504 (raw superadditivity raw-violated (within N_eff bias allowance))
 
@@ -432,7 +432,7 @@ Ranking (most→least constrained): old `chi1 > chi7 > chi2 > beta1 > chi9 > bet
 
 ### xi_kinetic_closure (29694142, plane_wave)
 
-Priors: **no inference.json** — reconstructed from the campaign sbatch template (all arctan ±89). Verify against scripts/hpc_templates before quoting.
+Priors (from `priors_provenance`, per direction): amp = **fabricated**, sup = **fabricated**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 4.129; N_eff ≈ 21 (per-param noise floor ≈ 0.94 nats — **floor-dominated, marginals below the floor are noise**); sum of marginals 83.767 → 24.253 (raw superadditivity raw-violated (within N_eff bias allowance))
 
@@ -514,7 +514,7 @@ Ranking (most→least constrained): old `chi7 > chi2 > chi5 > chi1 > beta3 > xi1
 
 ### parity_odd_minimal (29515407, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **recorded**, sup = **recorded**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 8.441; N_eff ≈ 944 (per-param noise floor ≈ 0.02 nats); sum of marginals 10.409 → 2.880 (raw superadditivity violated → restored)
 
@@ -540,7 +540,7 @@ Ranking (most→least constrained): old `beta2 > beta1 > d21 > beta3` → new `b
 
 ### parity_odd_full (29687506, plane_wave)
 
-Priors: **no inference.json** — reconstructed from the campaign sbatch template (all arctan ±89; overrides: {'xi': 'log_uniform:1e-3:1e3'}). Verify against scripts/hpc_templates before quoting.
+Priors (from `priors_provenance`, per direction): amp = **fabricated+overrides**, sup = **fabricated+overrides**; overrides: {'xi': 'log_uniform:1e-3:1e3'}. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 5.933; N_eff ≈ 6 (per-param noise floor ≈ 3.25 nats — **floor-dominated, marginals below the floor are noise**); sum of marginals 56.854 → 32.260 (raw superadditivity raw-violated (within N_eff bias allowance))
 
@@ -549,7 +549,7 @@ Priors: **no inference.json** — reconstructed from the campaign sbatch templat
 | beta1 | arctan_uniform | 2.871 | 1.623 | -1.248 | STRONG → STRONG |
 | beta2 | arctan_uniform | 2.634 | 1.543 | -1.091 | STRONG → STRONG |
 | beta3 | arctan_uniform | 2.679 | 1.821 | -0.858 | STRONG → STRONG |
-| xi | arctan_uniform | 3.256 | 1.608 | -1.648 | STRONG → STRONG |
+| xi | log_uniform | 3.256 | 1.608 | -1.648 | STRONG → STRONG |
 | delta1 | arctan_uniform | 3.127 | 1.497 | -1.630 | STRONG → STRONG |
 | chi | arctan_uniform | 3.040 | 1.812 | -1.229 | STRONG → STRONG |
 | zeta1 | arctan_uniform | 2.422 | 1.720 | -0.702 | STRONG → STRONG |
@@ -576,7 +576,7 @@ Ranking (most→least constrained): old `xi > delta1 > tildezeta6 > chi > zeta3 
 | beta1 | arctan_uniform | 2.863 | 0.889 | -1.974 | STRONG → moderate **FLIP** |
 | beta2 | arctan_uniform | 2.025 | 1.217 | -0.808 | STRONG → STRONG |
 | beta3 | arctan_uniform | 2.608 | 0.954 | -1.653 | STRONG → moderate **FLIP** |
-| xi | arctan_uniform | 2.919 | 1.029 | -1.890 | STRONG → STRONG |
+| xi | log_uniform | 2.919 | 1.029 | -1.890 | STRONG → STRONG |
 | delta1 | arctan_uniform | 2.680 | 1.046 | -1.633 | STRONG → STRONG |
 | chi | arctan_uniform | 2.414 | 1.076 | -1.337 | STRONG → STRONG |
 | zeta1 | arctan_uniform | 2.916 | 0.987 | -1.929 | STRONG → moderate **FLIP** |
@@ -602,7 +602,7 @@ Skipped — no recomputed file (chain never converged).
 
 ### eh_gertsenshtein (29700083, plane_wave)
 
-Priors: recorded in inference.json.
+Priors (from `priors_provenance`, per direction): amp = **recorded**, sup = **recorded**. Fabricated entries are reconstructed from the campaign sbatch templates — verify against scripts/hpc_templates before quoting.
 
 **amp** — joint D_KL 0.010; N_eff ≈ 104 (per-param noise floor ≈ 0.19 nats — **floor-dominated, marginals below the floor are noise**); sum of marginals 5.055 → 0.344 (raw superadditivity raw-violated (within N_eff bias allowance))
 
@@ -621,7 +621,6 @@ Ranking (most→least constrained): old `rho > sigma` → new `sigma > rho` — 
 | sigma | arctan_uniform | 2.635 | 0.338 | -2.298 | STRONG → moderate **FLIP** |
 
 Ranking (most→least constrained): old `rho > sigma` → new `sigma > rho` — **dominant coupling changed**
-
 
 ## Where pre-fix numbers are recorded (inventory only — nothing edited)
 
@@ -651,9 +650,15 @@ Ranking (most→least constrained): old `rho > sigma` → new `sigma > rho` — 
   estimator and must not be quoted. (`tidal analyze <dir> --inference
   --importance` recomputes live with the fixed estimator; the joint D_KL,
   log Z and d_G in the same file were always correct.) Audited consumers:
-  the corner-plot headline quotes only the joint `d_kl` (safe), the
+  the corner-plot headline quotes only the joint `d_kl` (unaffected), and
+  `tidal/inference/_atlas.py` does not read marginals at all. The
   `plot_importance` bar chart always receives a freshly-computed result
-  (safe), and `tidal/inference/_atlas.py` does not read marginals at all.
+  (never stale) — and since the post-merge review hardening it is also
+  floor-aware (grey hatched bars + noise-floor line for
+  `floor_dominated_params`), as is `scripts/analysis/extract_d_kl.py`
+  (floor-dominated cells daggered and excluded from rankings; note the
+  original review found both consumers floor-blind — "not stale" had been
+  conflated with "not misleading").
 
 ## Caveats
 

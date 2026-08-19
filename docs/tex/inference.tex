@@ -52,18 +52,27 @@ Distribution & CLI name & Parameters & Support \\
 Uniform              & \texttt{uniform}         & $a$, $b$     & $[a,\, b]$ \\
 Log-uniform          & \texttt{log\_uniform}    & $a$, $b$ ($a>0$) & $[a,\, b]$ \\
 Normal               & \texttt{normal}          & $\mu$, $\sigma$  & $(-\infty,+\infty)$ \\
-Arctan-uniform       & \texttt{arctan\_uniform} & (none used) & $(-\infty,+\infty)$ \\
+Arctan-uniform       & \texttt{arctan\_uniform} & (ignored --- warns; use \texttt{0:0}) & $(-19.98,+19.98)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{Arctan-uniform prior}
-The \texttt{arctan\_uniform} distribution covers the full real line including
-sign changes --- useful for coupling constants where the sign is physically
-significant.  It draws $\theta$ uniformly in
+The \texttt{arctan\_uniform} distribution covers a broad symmetric range
+including sign changes --- useful for coupling constants where the sign is
+physically significant.  It draws $\theta$ uniformly in
 $(-\pi/2 + \epsilon,\, \pi/2 - \epsilon)$ and returns $x = \tan(\theta)$,
-which maps to approximately $(-30, +30)$ with $\epsilon = 0.05$.  The
-log-probability is the truncated Cauchy density $-\log(1+x^2) - \log(\Delta\theta)$.
+giving the fixed support $|x| \le \tan(\pi/2 - \epsilon) \approx 19.98$ with
+$\epsilon = 0.05$.  The log-probability is the truncated Cauchy density
+$-\log(1+x^2) - \log(\Delta\theta)$.
+
+\textbf{The CLI bounds are ignored for this family} (GH \#425): the support
+above is fixed regardless of the \texttt{LO:HI} arguments, and constructing
+a prior with bounds that differ from it emits a \texttt{UserWarning}.  Use
+the sanctioned sentinel \texttt{0:0} to declare the bounds deliberately
+unused.  (Campaign metadata that records \texttt{arctan\_uniform:-89:89}
+describes bounds that were never sampled --- this mismatch was one of the
+two mechanisms behind the GH \#420 marginal-$D_\mathrm{KL}$ inflation.)
 
 Each prior implements three operations required by the sampling pipeline:
 \texttt{sample(rng, n)} for Monte Carlo, \texttt{log\_prob(x)} for posterior
@@ -79,8 +88,8 @@ weighting, and \texttt{transform(u)} for nested sampling's unit-cube protocol.
 # Normal near known value
 --prior "delta=normal:0.0:1.0"
 
-# Full real line including sign changes
---prior "g=arctan_uniform:0:0"   # args unused for this family
+# Broad symmetric range (+-19.98) including sign changes
+--prior "g=arctan_uniform:0:0"   # 0:0 = sanctioned "bounds unused" sentinel
 \end{lstlisting}
 
 \subsection{Hard Constraints}
@@ -420,19 +429,39 @@ appropriate.
 \subsection{Parameter Importance via KL Divergence}
 \label{sec:inference-importance}
 
-Nested sampling produces weighted posterior samples from which anesthetic
-computes three key diagnostics:
+Nested sampling produces weighted posterior samples.  The \emph{joint}
+diagnostics are computed by anesthetic; the \emph{per-parameter marginals}
+are computed by \textsc{tidal}'s own histogram estimator
+(\texttt{tidal.inference.\_importance}, rewritten for GH \#420):
 
 \begin{description}
-  \item[$D_\mathrm{KL}$] Kullback--Leibler divergence from prior to
-    posterior (nats).  Measures total information gained.
-  \item[$d_G$] Bayesian model dimensionality: the effective number of
-    parameters constrained by the likelihood.  If $d_G \ll n_\mathrm{params}$,
-    most parameters are prior-dominated.
-  \item[Marginal $D_\mathrm{KL}$] Per-parameter KL divergence.  A
-    parameter with high marginal $D_\mathrm{KL}$ is strongly constrained;
-    one near zero is irrelevant to the likelihood.
+  \item[$D_\mathrm{KL}$] (anesthetic) Kullback--Leibler divergence from
+    prior to posterior (nats).  Measures total information gained.
+  \item[$d_G$] (anesthetic) Bayesian model dimensionality: the effective
+    number of parameters constrained by the likelihood.  If
+    $d_G \ll n_\mathrm{params}$, most parameters are prior-dominated.
+  \item[Marginal $D_\mathrm{KL}$] (\textsc{tidal}) Per-parameter KL
+    divergence against that parameter's own prior.  Each posterior column
+    is first mapped into the space where its prior is uniform ---
+    identity (uniform), $\log x$ (log-uniform), $\arctan x$ on the fixed
+    $\epsilon$-truncated range (arctan-uniform; the recorded bounds are
+    ignored, matching the sampler), the Gaussian CDF (normal) --- and
+    histogrammed there against the uniform reference.  Cubed-sphere
+    (\texttt{radial\_angular}) couplings have no closed-form 1-D marginal
+    CDF and are scored against a fixed-seed empirical prior sample binned
+    in $\operatorname{asinh}$ space.
 \end{description}
+
+Every computation also emits a \texttt{consistency} self-check block
+(recorded in \texttt{importance.json}, \texttt{schema\_version} 2):
+superadditivity of marginals against the joint (exact for product priors),
+the Kish effective sample size $N_\mathrm{eff}$, the per-parameter noise
+floor $(n_\mathrm{bins}-1)/(2N_\mathrm{eff})$ with the
+\texttt{floor\_dominated\_params} that sit at or below it, plus
+\texttt{fallback\_params} and \texttt{range\_clipped} markers for columns
+whose prior record was missing or did not match the samples.  A
+\texttt{importance.json} without this block predates v0.48.8 and its
+marginals must not be quoted.
 
 \textbf{Usage:}
 \begin{verbatim}
@@ -444,7 +473,11 @@ tidal analyze ns_output/ --inference --importance
 \end{verbatim}
 
 Interpretation thresholds: $D_\mathrm{KL} > 1$~nat = strong,
-$0.1$--$1$~nat = moderate, $< 0.1$~nat = weak.
+$0.1$--$1$~nat = moderate, $< 0.1$~nat = weak --- \emph{subject to the
+noise floor}: a marginal at or below its
+$(n_\mathrm{bins}-1)/(2N_\mathrm{eff})$ floor is estimator bias, not
+constraint, and must not be ranked (GH \#433; the CLI table, the
+importance bar chart and the TeX emitters all annotate such values).
 
 \subsection{Finding Extreme Physics}
 \label{sec:inference-extremize}

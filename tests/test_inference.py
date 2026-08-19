@@ -94,7 +94,8 @@ class TestPrior:
     def test_arctan_uniform_sample(self) -> None:
         from tidal.inference._prior import Prior
 
-        p = Prior("x", "arctan_uniform", -30.0, 30.0)
+        with pytest.warns(UserWarning, match="ignores its bounds"):
+            p = Prior("x", "arctan_uniform", -30.0, 30.0)
         rng = np.random.default_rng(42)
         samples = p.sample(rng, 1000)
         # Should have samples in a wide range including negative
@@ -104,7 +105,8 @@ class TestPrior:
     def test_arctan_uniform_transform(self) -> None:
         from tidal.inference._prior import Prior
 
-        p = Prior("x", "arctan_uniform", -30.0, 30.0)
+        with pytest.warns(UserWarning, match="ignores its bounds"):
+            p = Prior("x", "arctan_uniform", -30.0, 30.0)
         # u=0.5 maps to theta=0, tan(0)=0
         assert p.transform(0.5) == pytest.approx(0.0)
         # u=0 and u=1 should be at the extremes
@@ -128,6 +130,7 @@ class TestPrior:
         with _warnings.catch_warnings():
             _warnings.simplefilter("error")
             Prior("x", "arctan_uniform", -support, support)
+            Prior("x", "arctan_uniform", 0.0, 0.0)  # sanctioned sentinel
             Prior("x", "uniform", -89.0, 89.0)  # other kinds never warn
 
     def test_invalid_distribution(self) -> None:
@@ -1183,7 +1186,8 @@ class TestMarginalDKLPriorTransforms:
         transform = _uniformizing_transform(kind, lo, hi)
         assert transform is not None, f"no transform for supported kind {kind}"
         fn, a, b = transform
-        kl = _hist_kl_vs_uniform(fn(samples), np.full(n, 1.0 / n), a, b)
+        kl, coverage = _hist_kl_vs_uniform(fn(samples), np.full(n, 1.0 / n), a, b)
+        assert coverage == pytest.approx(1.0), "prior samples must lie in range"
         assert kl < self.NULL_TOL, f"{kind}: null D_KL {kl:.4f} not ~0"
 
     def test_positive_control_uniform(self) -> None:
@@ -1201,7 +1205,9 @@ class TestMarginalDKLPriorTransforms:
         transform = _uniformizing_transform("uniform", lo, hi)
         assert transform is not None
         fn, a, b = transform
-        kl = _hist_kl_vs_uniform(fn(post), np.full(len(post), 1.0 / len(post)), a, b)
+        kl, _coverage = _hist_kl_vs_uniform(
+            fn(post), np.full(len(post), 1.0 / len(post)), a, b
+        )
         analytic = math.log((hi - lo) / (sigma * math.sqrt(2 * math.pi * math.e)))
         assert kl > 0.5
         assert kl == pytest.approx(analytic, abs=0.15)
@@ -1270,7 +1276,7 @@ class TestMarginalDKLPriorTransforms:
 
         vec = _sample_radial_angular(record, 100, _FixedRng())  # type: ignore[arg-type]
         ref = np.array([prior.transform(u) for u in u_test])
-        np.testing.assert_allclose(vec, ref, atol=1e-12)
+        np.testing.assert_allclose(vec, ref, rtol=0, atol=1e-12)
 
     def test_radial_angular_null(self) -> None:
         """Posterior drawn from the radial_angular prior → D_KL ≈ 0 per
@@ -1434,6 +1440,368 @@ class TestMarginalDKLPriorTransforms:
         assert imp.consistency
         assert imp.consistency["superadditivity_ok"]
         assert imp.consistency["saturated_params"] == []
+
+    # -- prevention devices (post-merge review hardening) ---------------
+
+    def test_every_valid_kind_has_uniformizing_transform(self) -> None:
+        """#420-recurrence insurance: adding a distribution kind to
+        VALID_DISTRIBUTIONS without teaching _uniformizing_transform about
+        it must fail the suite, not silently fall back to the
+        sample-range reference.
+        """
+        from tidal.inference._importance import _uniformizing_transform
+        from tidal.inference._prior import VALID_DISTRIBUTIONS
+
+        # Representative valid hyperparameters per kind.
+        args = {
+            "uniform": (-1.0, 1.0),
+            "log_uniform": (1e-3, 1e3),
+            "arctan_uniform": (0.0, 0.0),
+            "normal": (0.0, 1.0),
+        }
+        assert set(args) == set(VALID_DISTRIBUTIONS), (
+            "a prior kind was added or removed: extend this mapping AND "
+            "_uniformizing_transform (see tidal/inference/_prior.py "
+            "VALID_DISTRIBUTIONS)"
+        )
+        for kind in VALID_DISTRIBUTIONS:
+            lo, hi = args[kind]
+            assert _uniformizing_transform(kind, lo, hi) is not None, (
+                f"no uniformizing transform for supported prior kind "
+                f"'{kind}' — this reintroduces #420"
+            )
+
+    def test_superadditivity_check_fires_on_mis_referenced_prior(self) -> None:
+        """Behavior test for the self-check itself: a deliberately wrong
+        prior record (uniform over (-89, 89) claimed for arctan-shaped
+        samples — the literal pre-#420 configuration) must produce
+        superadditivity_ok == False at healthy n_eff.  Weakening the check
+        (e.g. tolerance = inf) now fails a test instead of only deleting it.
+        """
+        pytest.importorskip("anesthetic")
+        from tidal.inference._importance import compute_parameter_importance
+        from tidal.inference._prior import Prior
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(31)
+        n, nlive = 6000, 1000
+        with pytest.warns(UserWarning, match="ignores its bounds"):
+            arctan = Prior("a", "arctan_uniform", -89.0, 89.0)
+        cols = [arctan.sample(rng, n) for _ in range(3)]
+        samples = np.column_stack(cols)
+        result = InferenceResult(
+            samples=samples,
+            log_likelihood=np.zeros(n),
+            log_prior=np.zeros(n),
+            param_names=["a1", "a2", "a3"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={
+                "sampler": "test",
+                "nlive": nlive,
+                # WRONG on purpose: claims uniform(-89, 89) for arctan
+                # samples — each marginal then reads ~2.4 nats while the
+                # joint stays ~0, the exact pre-#420 signature.
+                "priors": [
+                    {
+                        "kind": "scalar",
+                        "name": nm,
+                        "distribution": "uniform",
+                        "low": -89.0,
+                        "high": 89.0,
+                    }
+                    for nm in ("a1", "a2", "a3")
+                ],
+            },
+        )
+        imp = compute_parameter_importance(result, n_bootstrap=10)
+        cons = imp.consistency
+        assert cons["superadditivity_applicable"] is True
+        assert cons["superadditivity_ok"] is False
+        assert cons["sum_marginals"] > cons["joint_d_kl"] + 1.0
+
+    def test_range_clipped_prior_is_flagged(self) -> None:
+        """A recorded prior range narrower than the samples (mis-assigned
+        record, the #434 class) must be flagged, not silently renormalized
+        over the retained subset.
+        """
+        pytest.importorskip("anesthetic")
+        from tidal.inference._importance import (
+            compute_parameter_importance,
+            format_importance_table,
+        )
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(33)
+        n, nlive = 6000, 1000
+        x = rng.uniform(-2.0, 2.0, n)  # true support (-2, 2)
+        result = InferenceResult(
+            samples=x[:, None],
+            log_likelihood=np.zeros(n),
+            log_prior=np.zeros(n),
+            param_names=["x"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={
+                "sampler": "test",
+                "nlive": nlive,
+                # Recorded range covers only half the samples.
+                "priors": [
+                    {
+                        "kind": "scalar",
+                        "name": "x",
+                        "distribution": "uniform",
+                        "low": 0.0,
+                        "high": 2.0,
+                    }
+                ],
+            },
+        )
+        imp = compute_parameter_importance(result, n_bootstrap=10)
+        clipped = imp.consistency["range_clipped"]
+        assert "x" in clipped
+        assert clipped["x"] == pytest.approx(0.5, abs=0.1)
+        assert "outside the recorded prior range" in format_importance_table(imp)
+
+    def test_zero_coverage_returns_nan_not_zero(self) -> None:
+        """All posterior mass outside the recorded range must yield NaN,
+        never a silent 0.0 (review finding H1).
+        """
+        from tidal.inference._importance import _hist_kl_vs_uniform
+
+        w = np.full(100, 0.01)
+        kl, coverage = _hist_kl_vs_uniform(np.full(100, 5.0), w, 0.0, 1.0)
+        assert coverage == 0.0
+        assert math.isnan(kl)
+
+    def test_empirical_kl_degenerate_inputs_nan(self) -> None:
+        """r_lo <= 0 (unvalidated dict records) and zero weight must yield
+        NaN from the empirical estimator, never 0.0.
+        """
+        from tidal.inference._importance import _marginal_dkl_empirical
+
+        col = np.linspace(-1, 1, 100)
+        prior = np.linspace(-2, 2, 100)
+        w = np.full(100, 0.01)
+        assert math.isnan(_marginal_dkl_empirical(col, w, prior, 0.0))
+        assert math.isnan(_marginal_dkl_empirical(col, w, prior, -1.0))
+        assert math.isnan(_marginal_dkl_empirical(col, np.zeros(100), prior, 1e-3))
+
+    def test_degenerate_weights_raise(self) -> None:
+        """Non-finite or zero-sum weights must raise an actionable error
+        instead of NaN-propagating into every marginal (review M7).
+        """
+        pytest.importorskip("anesthetic")
+        import tidal.inference._importance as imp_mod
+
+        class _BadNS:
+            def get_weights(self):
+                return np.zeros(100)
+
+            def stats(self, nsamples: int):
+                import pandas as pd
+
+                return pd.DataFrame(
+                    {
+                        "D_KL": np.ones(nsamples),
+                        "d_G": np.ones(nsamples),
+                        "logZ": np.zeros(nsamples),
+                    }
+                )
+
+        class _StubResult:
+            method = "nested"
+            param_names = ["x"]
+            metadata = {}
+
+        original = imp_mod.to_anesthetic_samples
+        try:
+            imp_mod.to_anesthetic_samples = lambda _r: _BadNS()  # type: ignore[assignment]
+            with pytest.raises(ValueError, match="degenerate"):
+                imp_mod.compute_parameter_importance(_StubResult(), n_bootstrap=5)  # type: ignore[arg-type]
+        finally:
+            imp_mod.to_anesthetic_samples = original
+
+    def test_malformed_prior_record_degrades_not_aborts(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A schema-drifted radial_angular record (missing keys) must warn
+        and fall back for its own parameters, not abort the computation
+        (review M1: the abort was swallowed by save() at debug level,
+        silently producing runs with no importance.json).
+        """
+        pytest.importorskip("anesthetic")
+        import logging
+
+        from tidal.inference._importance import compute_parameter_importance
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(37)
+        n, nlive = 3000, 500
+        x = rng.uniform(-1.0, 1.0, n)
+        result = InferenceResult(
+            samples=x[:, None],
+            log_likelihood=np.zeros(n),
+            log_prior=np.zeros(n),
+            param_names=["c1"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={
+                "sampler": "test",
+                "nlive": nlive,
+                # radial_angular record with every required key missing
+                # except the discriminator.
+                "priors": [{"kind": "radial_angular"}],
+            },
+        )
+        with caplog.at_level(logging.WARNING, logger="tidal.inference"):
+            imp = compute_parameter_importance(result, n_bootstrap=10)
+        assert math.isfinite(imp.marginal_d_kl["c1"])  # fallback, not crash
+        assert "malformed prior record" in caplog.text
+        assert imp.consistency["fallback_params"] == ["c1"]
+        assert imp.consistency["product_prior"] is False
+
+    def test_importance_json_roundtrip_strict(self, tmp_path: Path) -> None:
+        """The on-disk contract: importance.json must carry schema_version
+        and the consistency block, parse under strict JSON (no bare NaN),
+        and survive from_directory (review L6/L7).
+        """
+        pytest.importorskip("anesthetic")
+        import json
+
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(41)
+        n, nlive = 3000, 500
+        x = rng.uniform(-1.0, 1.0, n)
+        result = InferenceResult(
+            samples=x[:, None],
+            log_likelihood=-0.5 * (x / 0.2) ** 2,
+            log_prior=np.zeros(n),
+            param_names=["x"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={
+                "sampler": "test",
+                "nlive": nlive,
+                "priors": [
+                    {
+                        "kind": "scalar",
+                        "name": "x",
+                        "distribution": "uniform",
+                        "low": -1.0,
+                        "high": 1.0,
+                    }
+                ],
+            },
+        )
+        out = tmp_path / "run"
+        result.save(out)
+
+        def _reject_constant(_s: str) -> float:
+            msg = f"non-strict JSON constant: {_s}"
+            raise ValueError(msg)
+
+        raw = (out / "importance.json").read_text()
+        data = json.loads(raw, parse_constant=_reject_constant)  # strict
+        assert data["schema_version"] == 2
+        assert "consistency" in data
+        assert "n_eff" in data["consistency"]
+        loaded = InferenceResult.from_directory(out)
+        pi = loaded.metadata["parameter_importance"]
+        assert pi["schema_version"] == 2
+        assert "consistency" in pi
+
+    def test_plot_importance_floor_aware(self, tmp_path: Path) -> None:
+        """The bar chart must visually distinguish floor-dominated bars
+        (gray + hatched, floor line drawn) — it is the only artifact of
+        `tidal sample --importance` and previously carried zero caveats
+        (#433 review gap).
+        """
+        pytest.importorskip("matplotlib")
+        from tidal.inference._importance import ParameterImportanceResult
+        from tidal.inference._visualize import plot_importance
+
+        floored = ParameterImportanceResult(
+            param_names=["a", "b"],
+            d_kl=1.0,
+            d_kl_err=0.1,
+            d_g=1.0,
+            d_g_err=0.1,
+            marginal_d_kl={"a": 0.8, "b": 0.2},
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            consistency={
+                "n_eff": 21.0,
+                "noise_floor": {"a": 0.93, "b": 0.93},
+                "floor_dominated_params": ["a", "b"],
+            },
+        )
+        out = tmp_path / "floored.png"
+        plot_importance(floored, out)
+        assert out.exists()
+        assert out.stat().st_size > 0
+
+        healthy = ParameterImportanceResult(
+            param_names=["a"],
+            d_kl=1.0,
+            d_kl_err=0.1,
+            d_g=1.0,
+            d_g_err=0.1,
+            marginal_d_kl={"a": 0.8},
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            consistency={
+                "n_eff": 5000.0,
+                "noise_floor": {"a": 0.004},
+                "floor_dominated_params": [],
+            },
+        )
+        out2 = tmp_path / "healthy.png"
+        plot_importance(healthy, out2)
+        assert out2.exists()
+        assert out2.stat().st_size > 0
+        # The floor-annotated figure carries strictly more ink (hatching,
+        # extra line, two-line title) — a cheap structural discriminator
+        # that fails if the annotations are dropped.
+        assert out.stat().st_size != out2.stat().st_size
+
+    def test_posdep_probe_marker_and_single_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When the GH #421 guard makes the stability probe unavailable,
+        the likelihood path must record an explicit stability_profile
+        marker and warn exactly once per process — not swallow the guard
+        at debug level and silently drop the stability columns
+        (review H4).
+        """
+        import logging
+
+        import tidal.inference._likelihood as lk
+
+        original = lk._posdep_probe_warned
+        lk._posdep_probe_warned = False
+        try:
+            with caplog.at_level(logging.WARNING, logger="tidal.inference"):
+                meta1 = lk._posdep_probe_unavailable_meta(
+                    NotImplementedError("posdep kinetic")
+                )
+                meta2 = lk._posdep_probe_unavailable_meta(
+                    NotImplementedError("posdep kinetic")
+                )
+        finally:
+            lk._posdep_probe_warned = original
+        assert meta1 == {"stability_profile": "unavailable-posdep-kinetic"}
+        assert meta2 == meta1
+        assert caplog.text.count("WITHOUT the stability gate") == 1
 
     # -- consistency self-checks ---------------------------------------
 

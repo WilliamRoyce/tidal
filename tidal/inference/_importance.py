@@ -79,6 +79,9 @@ class ParameterImportanceResult:
         ``sum_marginals``, ``superadditivity_ok`` (for a product prior
         the chain rule gives ``D_KL(joint) >= sum of marginals`` exactly,
         so a violating sum means the estimator is broken),
+        ``superadditivity_applicable`` (``False`` when the low-``n_eff``
+        bias allowance dwarfs the signal and "ok" would be vacuous),
+        ``bias_allowance`` / ``tolerance`` (the check's actual power),
         ``product_prior`` (whether the bound is exact for this run),
         ``saturated_params`` (marginals within 90% of the histogram
         ceiling ``log(n_bins)`` — resolution-limited values), ``n_eff``
@@ -86,8 +89,12 @@ class ParameterImportanceResult:
         ``noise_floor`` (per-parameter estimator bias
         ``(n_bins - 1)/(2 n_eff)`` — a marginal at or below its floor is
         noise, not constraint), ``floor_dominated_params`` (the names
-        that fail that test), and ``note``.  Empty dict when marginals
-        could not be computed.
+        that fail that test), ``fallback_params`` (names scored against
+        an empirical sample-range reference instead of their prior —
+        unreliable), ``range_clipped`` (names with posterior mass outside
+        the recorded prior range, mapped to the clipped weight fraction —
+        the prior record does not describe the samples), and ``note``.
+        Empty dict when marginals could not be computed.
     """
 
     param_names: list[str]
@@ -240,19 +247,37 @@ def _hist_kl_vs_uniform(
     a: float,
     b: float,
     n_bins: int = _MARGINAL_BINS,
-) -> float:
+) -> tuple[float, float]:
     """Discrete KL of a weighted histogram of ``x`` against uniform on ``(a, b)``.
 
-    This is the pre-#420 estimator body verbatim, so uniform/log_uniform
-    marginals are unchanged by the #420 fix.
+    The estimator body is the pre-#420 one verbatim, so uniform/log_uniform
+    marginals are unchanged by the #420 fix when all mass lies inside the
+    range.
+
+    Returns
+    -------
+    ``(kl, coverage)`` where ``coverage`` is the fraction of the total
+    weight that fell inside ``(a, b)``.  ``np.histogram`` silently DROPS
+    out-of-range samples; renormalizing over the retained subset would
+    report a plausible small KL for a posterior that partly (or entirely)
+    lies outside the recorded prior range — the signature of a
+    mis-assigned prior record (#434 class).  The caller must inspect
+    ``coverage`` and refuse/flag when it is materially below 1.
+    ``coverage == 0`` returns ``(nan, 0.0)``.
     """
     hist, edges = np.histogram(x, bins=n_bins, weights=weights, range=(a, b))
-    p_post = hist / hist.sum() / (edges[1] - edges[0])
+    total = float(np.sum(weights))
+    inside = float(hist.sum())
+    coverage = inside / total if total > 0 else 0.0
+    if inside <= 0:
+        return float("nan"), coverage
+    p_post = hist / inside / (edges[1] - edges[0])
     q_prior = 1.0 / (b - a)
     mask = p_post > 0
-    return float(
+    kl = float(
         np.sum(p_post[mask] * np.log(p_post[mask] / q_prior) * (edges[1] - edges[0])),
     )
+    return kl, coverage
 
 
 def _ra_field(record: Any, key: str) -> Any:
@@ -330,7 +355,14 @@ def _marginal_dkl_empirical(
     collapsing every KL toward 0) while staying smooth through zero for
     sign-crossing tiles.  Zero prior bins are floored as in
     :func:`compute_cross_kl` so the estimate stays finite.
+
+    Degenerate inputs return ``nan`` rather than a silent ``0.0``:
+    ``r_lo <= 0`` (dict-sourced records bypass
+    ``RadialAngularPrior.__post_init__`` validation, so a malformed
+    metadata record can reach here) and zero total posterior weight.
     """
+    if r_lo <= 0 or not np.isfinite(r_lo):
+        return float("nan")
     x_post = np.arcsinh(np.asarray(col, dtype=np.float64) / r_lo)
     x_prior = np.arcsinh(np.asarray(prior_col, dtype=np.float64) / r_lo)
     lo = float(min(x_post.min(), x_prior.min()))
@@ -341,8 +373,14 @@ def _marginal_dkl_empirical(
     dx = edges[1] - edges[0]
     p_hist, _ = np.histogram(x_post, bins=edges, weights=weights)
     q_hist, _ = np.histogram(x_prior, bins=edges)
-    p = p_hist / max(p_hist.sum(), 1e-300) / dx
-    q = q_hist / max(q_hist.sum(), 1e-300) / dx
+    p_sum, q_sum = float(p_hist.sum()), float(q_hist.sum())
+    if p_sum <= 0 or q_sum <= 0:
+        return float("nan")
+    p = p_hist / p_sum / dx
+    q = q_hist / q_sum / dx
+    # Floored but deliberately NOT renormalized (matches compute_cross_kl):
+    # the floor only prevents log(0) on posterior mass in empty prior bins,
+    # so the value slightly overestimates a proper KL there.
     q_floor = max(q[q > 0].min() if np.any(q > 0) else 1e-12, 1e-12) / n_bins
     q = np.where(q > 0, q, q_floor)
     mask = p > 0
@@ -434,7 +472,18 @@ def compute_parameter_importance(
     marginal_d_kl: dict[str, float] = {}
     weights_arr = np.asarray(
         ns.get_weights() if hasattr(ns, "get_weights") else ns.weights,
+        dtype=np.float64,
     )
+    # Degenerate weights would silently propagate NaN through every
+    # histogram (each marginal becomes 0.0/NaN and the consistency check
+    # then fires for the wrong reason) — fail honestly instead.
+    if not np.all(np.isfinite(weights_arr)) or float(weights_arr.sum()) <= 0:
+        msg = (
+            "posterior weights are degenerate (non-finite entries or zero "
+            "total); marginal D_KL cannot be computed. Check the chain "
+            "files / logL column feeding to_anesthetic_samples."
+        )
+        raise ValueError(msg)
     weights_arr = weights_arr / weights_arr.sum()  # noqa: PLR6104
 
     # Map each parameter name to its prior config, if available, so each
@@ -451,39 +500,63 @@ def compute_parameter_importance(
         priors_iter = (result.metadata or {}).get("priors")
     if priors_iter:
         for rec_idx, p in enumerate(priors_iter):
-            is_joint = (
-                p.get("kind") == "radial_angular"
-                if isinstance(p, dict)
-                else getattr(p, "names", None) is not None
-            )
-            if is_joint:
-                for j, joint_name in enumerate(_ra_field(p, "names")):
-                    ra_map[str(joint_name)] = (rec_idx, p, j)
-                continue
-            if isinstance(p, dict):
-                pname = p.get("name")
-                pdist = p.get("distribution") or p.get("dist") or p.get("kind")
-                plo = p.get("low") if "low" in p else p.get("lo")
-                phi = p.get("high") if "high" in p else p.get("hi")
-            else:
-                pname = getattr(p, "name", None)
-                pdist = getattr(p, "distribution", None) or getattr(p, "dist", None)
-                # Explicit None checks: `or`-chaining drops a legitimate
-                # low == 0.0 (e.g. uniform:0:X, normal:0:1) into the
-                # empirical fallback (#420).
-                plo = getattr(p, "low", None)
-                if plo is None:
-                    plo = getattr(p, "lo", None)
-                phi = getattr(p, "high", None)
-                if phi is None:
-                    phi = getattr(p, "hi", None)
-            if pname and pdist and plo is not None and phi is not None:
-                prior_map[str(pname)] = (str(pdist), float(plo), float(phi))
+            # One malformed record must degrade to the (warned) fallback for
+            # its own parameter(s), not abort the whole computation — an
+            # exception escaping here would be swallowed by
+            # InferenceResult.save, silently producing runs with no
+            # importance.json at all.
+            try:
+                is_joint = (
+                    p.get("kind") == "radial_angular"
+                    if isinstance(p, dict)
+                    else getattr(p, "names", None) is not None
+                )
+                if is_joint:
+                    for j, joint_name in enumerate(_ra_field(p, "names")):
+                        ra_map[str(joint_name)] = (rec_idx, p, j)
+                    continue
+                if isinstance(p, dict):
+                    pname = p.get("name")
+                    pdist = p.get("distribution") or p.get("dist") or p.get("kind")
+                    plo = p.get("low") if "low" in p else p.get("lo")
+                    phi = p.get("high") if "high" in p else p.get("hi")
+                else:
+                    pname = getattr(p, "name", None)
+                    pdist = getattr(p, "distribution", None) or getattr(p, "dist", None)
+                    # Explicit None checks: `or`-chaining drops a legitimate
+                    # low == 0.0 (e.g. uniform:0:X, normal:0:1) into the
+                    # empirical fallback (#420).
+                    plo = getattr(p, "low", None)
+                    if plo is None:
+                        plo = getattr(p, "lo", None)
+                    phi = getattr(p, "high", None)
+                    if phi is None:
+                        phi = getattr(p, "hi", None)
+                if pname and pdist and plo is not None and phi is not None:
+                    prior_map[str(pname)] = (str(pdist), float(plo), float(phi))
+            except (KeyError, TypeError, ValueError, AttributeError) as exc:
+                logger.warning(
+                    "malformed prior record %d: %s — its parameter(s) fall "
+                    "back to the empirical sample-range reference",
+                    rec_idx,
+                    exc,
+                )
+    else:
+        # No priors metadata at all (pre-schema chains): every marginal uses
+        # the empirical sample-range reference, which is only meaningful for
+        # uniform priors.  Say so once, visibly but not alarmingly.
+        logger.info(
+            "no priors metadata on this result: marginal D_KL uses empirical "
+            "sample-range references for every parameter (unreliable for "
+            "non-uniform priors; see #420)"
+        )
 
     # One reference draw per radial_angular record, shared by its names.
     ra_samples: dict[int, NDArray[np.float64]] = {}
 
     saturated: list[str] = []
+    fallback_params: list[str] = []  # names scored against the sample range
+    range_clipped: dict[str, float] = {}  # name -> weight fraction OUTSIDE range
     bias_numerator = 0.0  # accumulates (n_bins - 1) / 2 per finite marginal
     bins_by_param: dict[str, int] = {}  # bins used per finite marginal (#433)
     for i, name in enumerate(result.param_names):
@@ -504,6 +577,13 @@ def compute_parameter_importance(
                     ra_samples[rec_idx][:, j],
                     float(_ra_field(record, "r_lo")),
                 )
+                if not np.isfinite(kl):
+                    logger.warning(
+                        "marginal D_KL for '%s': degenerate radial_angular "
+                        "record or weights (r_lo <= 0, or zero histogram "
+                        "mass) — reporting NaN",
+                        name,
+                    )
                 bins_used = _RA_BINS
             else:
                 entry = prior_map.get(name)
@@ -516,6 +596,8 @@ def compute_parameter_importance(
                     # when priors metadata exists but this parameter fell
                     # through — that is a schema mismatch, the failure mode
                     # that silently mis-scored radial_angular runs (#420).
+                    # Either way the name is recorded in fallback_params so
+                    # the unreliability is machine-readable, not log-only.
                     if priors_iter:
                         logger.warning(
                             "marginal D_KL for '%s': no usable prior record "
@@ -524,18 +606,44 @@ def compute_parameter_importance(
                             name,
                             entry[0] if entry is not None else None,
                         )
+                    fallback_params.append(name)
                     fn, a, b = _identity, float(col.min()), float(col.max())
                 else:
                     fn, a, b = transform
-                kl = _hist_kl_vs_uniform(fn(col), weights_arr, a, b)
+                kl, coverage = _hist_kl_vs_uniform(fn(col), weights_arr, a, b)
+                if coverage < 0.999:
+                    # Posterior mass outside the recorded prior range: the
+                    # record does not describe these samples (mis-assigned
+                    # or mis-transcribed prior, the #434 class).  The KL was
+                    # computed on the retained subset only.
+                    range_clipped[name] = 1.0 - coverage
+                    logger.warning(
+                        "marginal D_KL for '%s': %.1f%% of posterior weight "
+                        "lies OUTSIDE the recorded prior range — the prior "
+                        "record does not match the samples; value covers "
+                        "the in-range subset only and is unreliable",
+                        name,
+                        100.0 * (1.0 - coverage),
+                    )
                 bins_used = _MARGINAL_BINS
             marginal_d_kl[name] = kl
             if np.isfinite(kl):
                 bias_numerator += (bins_used - 1) / 2.0
                 bins_by_param[name] = bins_used
+                # Ceiling check: log(n_bins) is exact for the uniform-
+                # reference estimator; for the floored empirical (RA)
+                # estimator it is only approximate (the q-floor lets KL
+                # exceed it), so RA saturation may under-report.
                 if kl > 0.9 * float(np.log(bins_used)):
                     saturated.append(name)
-        except (ValueError, ZeroDivisionError, AttributeError, IndexError) as exc:
+        except (
+            ValueError,
+            ZeroDivisionError,
+            AttributeError,
+            IndexError,
+            KeyError,
+            TypeError,
+        ) as exc:
             logger.warning(
                 "marginal D_KL failed for '%s' (col %d): %s",
                 name,
@@ -553,7 +661,11 @@ def compute_parameter_importance(
     # self-reports instead of waiting to be noticed in a table.
     finite_marginals = [v for v in marginal_d_kl.values() if np.isfinite(v)]
     sum_marginals = float(sum(finite_marginals))
-    product_prior = not ra_map  # radial_angular is not a product across names
+    # The chain-rule bound only applies when every marginal was scored
+    # against its true prior AND the joint prior factorizes: radial_angular
+    # is not a product across its names, and a fallback (sample-range)
+    # reference is not the prior at all.
+    product_prior = not ra_map and not fallback_params
     # Each histogram marginal is biased UP by ~(n_bins - 1) / (2 N_eff)
     # (chi-square mean of the multinomial KL estimator), and these biases
     # add across parameters while the joint (anesthetic) estimate does
@@ -564,6 +676,10 @@ def compute_parameter_importance(
     bias_allowance = 2.0 * bias_numerator / n_eff
     tolerance = 3.0 * d_kl_err + bias_allowance + 0.05
     superadditivity_ok = sum_marginals <= d_kl + tolerance
+    # At low n_eff the allowance dwarfs any realistic D_KL and the check
+    # loses all power (e.g. 32 params at n_eff = 21 -> ~59 nats allowance):
+    # report that honestly instead of a hollow "ok".
+    superadditivity_applicable = bias_allowance <= max(1.0, d_kl)
     # Per-parameter noise floor (#433): the histogram marginal is biased up
     # by ~(n_bins - 1)/(2 n_eff), so a marginal at or below its floor is
     # estimator noise, not evidence the parameter is constrained.  This is
@@ -581,6 +697,12 @@ def compute_parameter_importance(
         "sum_marginals": sum_marginals,
         "joint_d_kl": d_kl,
         "superadditivity_ok": bool(superadditivity_ok),
+        # bias_allowance/tolerance let a reader judge how much power the
+        # bound had; applicable=False means the allowance dwarfed the
+        # signal and "ok" carries no information (#433 review follow-up).
+        "superadditivity_applicable": bool(superadditivity_applicable),
+        "bias_allowance": bias_allowance,
+        "tolerance": tolerance,
         "product_prior": product_prior,
         "saturated_params": saturated,
         # Kish effective sample size of the posterior weights: the marginal
@@ -591,15 +713,27 @@ def compute_parameter_importance(
         "n_eff": n_eff,
         "noise_floor": noise_floor,
         "floor_dominated_params": floor_dominated,
+        # Names scored against a fallback (empirical sample-range) reference
+        # rather than their prior — unreliable, machine-readable (was
+        # log-only pre-review).
+        "fallback_params": fallback_params,
+        # Names whose posterior mass partly lies OUTSIDE the recorded prior
+        # range (value = clipped weight fraction): the record does not
+        # describe the samples (#434 misassignment class).
+        "range_clipped": range_clipped,
         "note": (
             "sum(marginals) <= joint D_KL is exact for product priors; "
-            "approximate when a radial_angular joint prior is present. "
-            "Saturated marginals are within 90% of the histogram ceiling "
-            "log(n_bins) and are resolution-limited. Marginals at or below "
-            "their noise_floor entry are estimator noise, not constraint."
+            "approximate when a radial_angular joint prior is present, and "
+            "inapplicable when fallback_params is non-empty or "
+            "superadditivity_applicable is false. Saturated marginals are "
+            "within 90% of the histogram ceiling log(n_bins) (approximate "
+            "for radial_angular columns) and are resolution-limited. "
+            "Marginals at or below their noise_floor entry are estimator "
+            "noise, not constraint. range_clipped names had posterior mass "
+            "outside their recorded prior range and are unreliable."
         ),
     }
-    if not superadditivity_ok:
+    if not superadditivity_ok and superadditivity_applicable:
         logger.warning(
             "marginal D_KL consistency: sum of marginals (%.3f) exceeds "
             "joint D_KL (%.3f) beyond tolerance (%.3f)%s — the marginal "
@@ -609,6 +743,15 @@ def compute_parameter_importance(
             d_kl,
             tolerance,
             "" if product_prior else " [bound approximate: joint prior present]",
+        )
+    elif not superadditivity_applicable:
+        logger.warning(
+            "marginal D_KL consistency: superadditivity check has no power "
+            "at n_eff = %.0f (bias allowance %.1f nats vs joint %.3f) — "
+            "'ok' would be vacuous; treat every marginal as floor-limited",
+            n_eff,
+            bias_allowance,
+            d_kl,
         )
     if saturated:
         logger.warning(
@@ -747,13 +890,18 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
         reverse=True,
     )
 
+    # Importance column is left-aligned and wide enough for the longest
+    # annotated label ("moderate (<= floor)") so annotated rows keep the
+    # column grid instead of overflowing it.
     lines.extend(
         (
-            f"  {'Parameter':<20} {'D_KL (nats)':>12}  {'Importance':>12}",
-            f"  {'─' * 20} {'─' * 12}  {'─' * 12}",
+            f"  {'Parameter':<20} {'D_KL (nats)':>12}  {'Importance':<20}",
+            f"  {'─' * 20} {'─' * 12}  {'─' * 20}",
         ),
     )
 
+    fallback = set(consistency.get("fallback_params") or [])
+    clipped = consistency.get("range_clipped") or {}
     for name, dkl in ranked:
         if not math.isfinite(dkl):
             importance = "N/A"
@@ -766,7 +914,11 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
         floor = noise_floor.get(name)
         if floor is not None and math.isfinite(dkl) and dkl <= floor:
             importance = f"{importance} (<= floor)"
-        lines.append(f"  {name:<20} {dkl:>12.4f}  {importance:>12}")
+        elif name in fallback:
+            importance = f"{importance} (fallback)"
+        elif name in clipped:
+            importance = f"{importance} (clipped)"
+        lines.append(f"  {name:<20} {dkl:>12.4f}  {importance:<20}")
 
     lines.extend(
         (
@@ -780,13 +932,45 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
 
     # Consistency self-checks (#420/#433): make a broken or under-sampled
     # estimator visible in the table itself, not just in the log.
-    if consistency and not consistency.get("superadditivity_ok", True):
+    applicable = consistency.get("superadditivity_applicable", True)
+    if consistency and not consistency.get("superadditivity_ok", True) and applicable:
         lines.extend(
             (
                 f"  WARNING: sum of marginals ({consistency['sum_marginals']:.3f}) "
                 f"exceeds joint D_KL ({consistency['joint_d_kl']:.3f})",
                 "           — impossible for a product prior; marginals are "
                 "unreliable (see #420)",
+                "",
+            ),
+        )
+    elif consistency and not applicable:
+        lines.extend(
+            (
+                f"  WARNING: superadditivity check not applicable at "
+                f"n_eff = {consistency.get('n_eff', float('nan')):.0f} "
+                f"(bias allowance "
+                f"{consistency.get('bias_allowance', float('nan')):.1f} nats)",
+                "           — treat every marginal as floor-limited",
+                "",
+            ),
+        )
+    fallback_list = consistency.get("fallback_params") or []
+    if fallback_list:
+        lines.extend(
+            (
+                f"  WARNING: {', '.join(fallback_list)} scored against the "
+                "empirical sample range, not a recorded prior — unreliable",
+                "",
+            ),
+        )
+    clipped_map = consistency.get("range_clipped") or {}
+    if clipped_map:
+        worst = max(clipped_map.values())
+        lines.extend(
+            (
+                f"  WARNING: {', '.join(sorted(clipped_map))} had posterior "
+                f"mass outside the recorded prior range (up to "
+                f"{100 * worst:.0f}%) — prior record does not match samples",
                 "",
             ),
         )

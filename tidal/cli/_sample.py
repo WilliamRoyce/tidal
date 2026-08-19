@@ -489,6 +489,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             print(f"Trace plot: {trace_path}")
 
     if getattr(args, "importance", False):
+        from tidal.inference._importance import format_importance_table
         from tidal.inference._visualize import plot_importance
 
         importance_path = output_path / "importance.png"
@@ -496,6 +497,11 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             imp = result.parameter_importance()
             plot_importance(imp, importance_path)
             if not quiet:
+                # Print the annotated table alongside the chart: the chart
+                # alone carried none of the consistency warnings (floor,
+                # fallback, superadditivity) — the #433 review gap where
+                # `--importance` was the one surface with zero caveats.
+                print(format_importance_table(imp))
                 print(f"Importance plot: {importance_path}")
         except (ImportError, ValueError) as e:
             if not quiet:
