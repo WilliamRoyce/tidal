@@ -1926,11 +1926,13 @@ def _resolve_scheme(  # noqa: C901, PLR0912
     #
     # GH #421: build the eligibility spec the way PerturbativeSolver
     # actually will — canonicalize kinetics FIRST, then take the base.
-    # Plain base_spec() keeps a position-dependent kinetic whose
-    # non-constant part is entirely O(ε) (e.g. the Euler-Heisenberg
-    # dual-Gaussian spec), which would wrongly fail can_use_modal's
-    # kinetic check and silently de-select modal for a flow the
-    # perturbative driver handles fine.
+    # This mirrors the driver's construction order (perturbative_driver
+    # canonicalizes before base_spec), so eligibility is judged on the
+    # spec the driver will actually solve. (Post-GH #427 modal is
+    # eligible for position-dependent kinetics either way, so the order
+    # is no longer load-bearing for the kinetic check specifically, but
+    # judging eligibility on a spec the driver won't solve would still
+    # be wrong for any future can_use_modal criterion.)
     if spec.has_corrections():
         pert_meta = spec.metadata.get("perturbation", {}) or {}
         small = list(pert_meta.get("small_parameters", []))
@@ -1949,8 +1951,7 @@ def _resolve_scheme(  # noqa: C901, PLR0912
                 msg = (
                     f"--scheme {scheme} requested but system is not eligible. "
                     "Modal solver requires: flat metric, all-periodic BCs, "
-                    "time-independent coefficients, constant (non-position-"
-                    "dependent) kinetic coefficients, and supported spatial "
+                    "time-independent coefficients, and supported spatial "
                     "operators.  Use 'auto' or another solver."
                 )
                 raise RuntimeError(msg)

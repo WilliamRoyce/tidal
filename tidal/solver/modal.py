@@ -49,13 +49,17 @@ to date:
    NOT call :func:`velocity_row_scale`.
 
 3. **Position-dependent convolution path** — :func:`_build_convolution_matrix`
-   (called when any RHS term is ``position_dependent`` and *no* algebraic
-   constraints are present). Builds
+   (called when the spec has position-dependent coefficients — RHS *or*
+   kinetic, GH #427 — and *no* algebraic constraints). Builds
    ``A[m, m'] = ĉ(m − m') · op_mult(k_{m'})`` over the full Fourier-mode
    block, threading ``M⁻¹`` through both the constant-coefficient and the
-   convolution-coupling paths via :func:`velocity_row_scale`. Rejects (via
-   assertion) systems with ``time_derivative_order == 0`` equations to make
-   the GH #379 bug class a static error.
+   convolution-coupling paths via :func:`velocity_row_scale`. A
+   position-dependent kinetic yields an ndarray scale — a REAL-SPACE
+   ``M⁻¹(x)`` profile folded into the coefficient before the FFT
+   (:func:`_conv_block_with_kinetic`); it must never multiply a k-space
+   block. Rejects (via assertion) systems with
+   ``time_derivative_order == 0`` equations to make the GH #379 bug class
+   a static error.
 
 4. **Position-dependent + constraint convolution path** —
    :func:`_build_convolution_matrix_with_constraints` (called when both
@@ -408,25 +412,33 @@ def can_use_modal(
             if term.time_dependent:
                 return False
 
-    # 6. No position-dependent kinetic coefficients (GH #421).  Note this
-    # is checked on the ELIGIBILITY spec: for perturbative flows the CLI
-    # passes the canonicalized base spec, whose kinetics are constant even
-    # when the full spec's are position-dependent (GH #380) — so the EH
-    # dual-Gaussian campaign flow stays modal-eligible.
-    return not spec.has_position_dependent_kinetic()
+    # Position-dependent kinetic coefficients are supported (GH #427): the
+    # kinetics-aware routing predicate sends such specs to the convolution
+    # builders, which fold M⁻¹(x) into the real-space coefficients. The
+    # former requirement 6 (GH #421 refusal) is retired.
+    return True
 
 
 def _raise_position_dependent_kinetic(spec: EquationSystem, where: str) -> None:
-    """Raise the GH #421 refusal for a position-dependent kinetic coefficient.
+    """Raise the per-mode-regime refusal for a position-dependent kinetic coefficient.
 
-    Shared by the entry guards in :func:`solve_modal`,
-    :func:`solve_modal_pass1` and :func:`_build_evolution_matrices` so
-    every modal path (including the stability probe in
-    :mod:`tidal.measurement._stability`, which reaches
-    ``_build_evolution_matrices`` directly on every likelihood
-    evaluation) fails loudly with the same actionable message instead of
-    evaluating the kinetic without a grid (deep ValueError) or silently
-    falling back to M = 1 (the pre-guard genEig behavior).
+    Post-GH #427, plain :func:`solve_modal` supports M(x) — the routing
+    predicate sends such specs to the convolution builders, which fold the
+    per-grid-point M⁻¹(x) into the real-space coefficients. This guard
+    remains only on the strictly PER-MODE engines, where a position-
+    dependent M has no per-k representation:
+
+    * :func:`_build_evolution_matrices` — the genEig/Schur engine writes M
+      onto the per-mode generalized-eigenvalue problem ``(K − λM)v = 0``,
+      which ceases to exist when M(x) couples modes. Reached directly by
+      the stability probe (:mod:`tidal.measurement._stability`, every
+      gated sweep point / likelihood evaluation) and :mod:`modal_jax`.
+    * :func:`solve_modal_pass1` — the per-mode Duhamel correction path
+      (no eigendata exists on the convolution route).
+
+    Failing loudly here replaces the pre-GH #421 behaviors: a grid-less
+    ``evaluate_coefficient`` ValueError on some paths, and a silent
+    ``M = 1`` fallback on the genEig path.
     """
     posdep_fields = [
         eq.field_name
@@ -434,21 +446,18 @@ def _raise_position_dependent_kinetic(spec: EquationSystem, where: str) -> None:
         if eq.time_derivative_order > 0 and eq.kinetic_position_dependent
     ]
     msg = (
-        f"{where} cannot handle a position-dependent kinetic coefficient "
-        f"(field(s) {posdep_fields}). A position-dependent M(x) is a "
-        "k-space convolution — the mass matrix becomes a mode-coupling "
-        "block M̂(k−k′), which the modal solver does not implement "
-        "(GH #427 tracks the feature; GH #421 is this guard). "
-        "Alternatives: (a) use --scheme cvode or --scheme ida — the "
-        "time-domain solvers evaluate position-dependent kinetics on the "
-        "grid (GH #382); (b) if the position-dependence is proportional "
-        "to a small parameter, declare it in [perturbation]."
-        "small_parameters so kinetic canonicalization moves it into O(ε) "
-        "RHS corrections and the base spec stays constant-coefficient "
-        "(GH #380, the Euler-Heisenberg flow); (c) if this spec has a "
-        "[perturbation] block but you passed --perturbative-order 0, the "
-        "full un-canonicalized spec is being solved on the plain modal "
-        "path — drop the override or use a time-domain scheme."
+        f"{where} operates per k-mode and cannot represent a position-"
+        f"dependent kinetic coefficient (field(s) {posdep_fields}): "
+        "M(x) couples Fourier modes, so no per-mode mass matrix exists "
+        "(GH #421 is this guard; GH #441 tracks a mode-coupling-aware "
+        "stability gate). Alternatives: (a) plain solve_modal / "
+        "auto-selection — the convolution modal path supports M(x) "
+        "(GH #427); (b) --scheme cvode or --scheme ida — the time-domain "
+        "solvers evaluate position-dependent kinetics on the grid "
+        "(GH #382); (c) for perturbative flows, declare the position-"
+        "dependence's small parameter in [perturbation].small_parameters "
+        "so kinetic canonicalization keeps the base spec constant-"
+        "coefficient (GH #380, the Euler-Heisenberg flow)."
     )
     raise NotImplementedError(msg)
 
@@ -517,6 +526,57 @@ def _ifft_slots(
     return y_out
 
 
+def _fft_slots_full(
+    y: NDArray[np.float64],
+    layout: StateLayout,
+    grid: GridInfo,
+) -> NDArray[np.complex128]:
+    """Transform each slot to Fourier space over the FULL complex spectrum.
+
+    GH #445: the position-dependent convolution paths operate in the full
+    fftn basis (all N frequencies per axis, ``n_modes = prod(grid.shape)``)
+    because pointwise multiplication by c(x) is exactly C-linear there,
+    whereas the rfft half-spectrum basis has no imaginary degree of
+    freedom at the DC/Nyquist bins and misrepresents sin-phase content that the
+    coefficient's harmonics fold onto them. The constant-coefficient
+    per-mode paths keep the cheaper rfft basis (:func:`_fft_slots`) — a
+    constant coefficient is diagonal in k, so no folding occurs.
+    """
+    n_slots = layout.num_slots
+    n_pts = layout.num_points
+    shape = grid.shape
+    n_modes = int(np.prod(shape))
+
+    y_hat = np.zeros((n_slots, n_modes), dtype=np.complex128)
+    for slot_idx in range(n_slots):
+        start = slot_idx * n_pts
+        field_data = y[start : start + n_pts].reshape(shape)
+        y_hat[slot_idx] = np.fft.fftn(field_data).ravel()
+    return y_hat
+
+
+def _ifft_slots_full(
+    y_hat: NDArray[np.complex128],
+    layout: StateLayout,
+    grid: GridInfo,
+) -> NDArray[np.float64]:
+    """Inverse of :func:`_fft_slots_full`; discards residual imaginary parts.
+
+    Real coefficients and real/conjugate-symmetric operators keep the
+    evolution conjugate-symmetric, so the imaginary residue is roundoff.
+    """
+    n_slots = layout.num_slots
+    n_pts = layout.num_points
+    shape = grid.shape
+
+    y_out = np.zeros(n_slots * n_pts)
+    for slot_idx in range(n_slots):
+        hat_data = y_hat[slot_idx].reshape(shape)
+        physical = np.fft.ifftn(hat_data)
+        y_out[slot_idx * n_pts : (slot_idx + 1) * n_pts] = physical.real.ravel()
+    return y_out
+
+
 # ---------------------------------------------------------------------------
 # Wavenumber grid construction
 # ---------------------------------------------------------------------------
@@ -544,6 +604,44 @@ def _build_k_axes(grid: GridInfo) -> list[NDArray[np.float64]]:
         k_axes.append(k)
 
     return k_axes
+
+
+def _zero_nyquist_full(
+    y_hat: NDArray[np.complex128],
+    grid: GridInfo,
+) -> None:
+    """Zero the Nyquist bin(s) of full-fftn slot spectra, in place.
+
+    Same rationale as the rfft-basis zeroing in :func:`solve_modal`
+    (Boyd 2001 §11.5): the Nyquist mode aliases with its conjugate and
+    cannot represent physical content; complex evolution entries would
+    otherwise create imaginary Nyquist components that the real-part
+    projection silently drops, losing energy. In the full basis the
+    Nyquist bin is the single ``fftfreq`` index ``n // 2`` per even axis.
+    """
+    shape = grid.shape
+    spectral = y_hat.reshape(y_hat.shape[0], *shape)
+    for ax, n in enumerate(shape):
+        if n % 2 == 0:
+            idx: list[Any] = [slice(None)] * (len(shape) + 1)
+            idx[ax + 1] = n // 2
+            spectral[tuple(idx)] = 0.0
+
+
+def _build_k_axes_full(grid: GridInfo) -> list[NDArray[np.float64]]:
+    """Wavenumber arrays with the FULL fft convention on every axis.
+
+    GH #445: companion to :func:`_fft_slots_full` for the position-
+    dependent convolution paths — ``k = 2π · fftfreq(N, d=dx)`` on all
+    axes, matching ``np.fft.fftn`` bin ordering.
+    """
+    return [
+        np.asarray(
+            2.0 * np.pi * np.fft.fftfreq(grid.shape[ax], d=grid.dx[ax]),
+            dtype=np.float64,
+        )
+        for ax in range(grid.ndim)
+    ]
 
 
 def _build_k_grid(
@@ -1567,13 +1665,35 @@ def _resolve_constant_coeff(
     """Resolve a constant (non-position-dependent) coefficient to a scalar.
 
     Uses CoefficientEvaluator.resolve() which returns a float for constant
-    coefficients or an ndarray for position-dependent ones (the latter should
-    not reach this function).
+    coefficients or an ndarray for position-dependent ones. An ndarray
+    reaching this function means a position-dependent coefficient reached a
+    per-mode (constant-coefficient) builder — refuse loudly (GH #438).
+    Before this guard the array was silently collapsed to
+    ``resolved.ravel()[0]``, i.e. the coefficient's value at the FIRST grid
+    point: the stability probe evaluated localized backgrounds at the
+    domain edge (near-vacuum) on every gated sweep point / likelihood
+    evaluation, and Pass-1 source matrices corner-collapsed O(ε)
+    correction coefficients. NotImplementedError deliberately does not
+    match the probe's ``(LinAlgError, ValueError)`` handler — same choice
+    as the GH #421 kinetic guard — so the refusal propagates instead of
+    being converted into a fabricated "tachyonic" verdict.
     """
     resolved = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
     if isinstance(resolved, np.ndarray):
-        # Position-dependent — should not happen for constant-coeff path
-        return complex(resolved.ravel()[0])
+        msg = (
+            f"Position-dependent coefficient (field {term.field!r}, "
+            f"operator {term.operator!r}) reached a per-mode builder that "
+            "requires constant coefficients. Per-mode engines (genEig/"
+            "Schur, per-mode Duhamel, the stability probe) have no per-k "
+            "representation of a position-dependent coefficient — refusing "
+            "instead of silently evaluating it at the first grid point "
+            "(GH #438). Alternatives: plain solve_modal / auto-selection "
+            "route position-dependent specs to the convolution builders "
+            "(GH #427); time-domain schemes (--scheme cvode/ida) evaluate "
+            "coefficients on the grid; a mode-coupling-aware stability "
+            "gate is tracked in GH #441."
+        )
+        raise NotImplementedError(msg)
     return complex(resolved)
 
 
@@ -1657,9 +1777,12 @@ def _build_convolution_matrix(
         velocity_row_scale,
     )
 
+    # GH #427: pass `grid` so a position-dependent kinetic evaluates to a
+    # per-grid-point M⁻¹(x) profile (GH #382 machinery) instead of raising.
     m_inv = build_inverse_kinetic_diag(
         spec,
         coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+        grid,
     )
 
     for _eq_idx, eq in enumerate(spec.equations):
@@ -1684,8 +1807,11 @@ def _build_convolution_matrix(
                     continue
                 mult = multiplier_cache[term.operator]
 
-                if not term.position_dependent:
-                    # Constant coefficient: diagonal in mode space
+                if not term.position_dependent and not isinstance(scale, np.ndarray):
+                    # Constant coefficient AND constant kinetic: diagonal in
+                    # mode space. An ndarray scale means M⁻¹(x) makes even a
+                    # constant RHS coefficient effectively position-dependent
+                    # (GH #427) — routed to the convolution branch below.
                     coeff = _resolve_constant_coeff(
                         term,
                         coeff_eval,
@@ -1697,7 +1823,8 @@ def _build_convolution_matrix(
                         col = target_slot * n_modes + m
                         A[row, col] += scale * coeff * mult[m]
                 else:
-                    # Position-dependent: convolution coupling
+                    # Position-dependent coefficient and/or kinetic:
+                    # convolution coupling
                     _add_convolution_coupling(
                         A,
                         vel_slot,
@@ -1785,12 +1912,33 @@ def _add_convolution_coupling(
     to apply the inverse-kinetic factor `M⁻¹` for 2nd-order equations with
     `kinetic_coefficient_symbolic != 1` (Gertsenshtein h-modes, etc.). See
     `_build_convolution_matrix` (modal.py) for the rationale (GH #367 fix).
+    A scalar ``scale`` multiplies the k-space block; an ndarray ``scale``
+    is a REAL-SPACE ``M⁻¹(x)`` profile (GH #427) and is folded into the
+    physical-space coefficient before the FFT — it must never multiply a
+    k-space block (wrong semantics, and a shape mismatch: n_points vs
+    n_modes).
 
     GH #384 Phase A′: for BSM-separable terms the block of size
     (n_modes × n_modes) is independent of the BSM scalar and reusable
     across PolyChord likelihood calls. The cache layer in
     ``tidal/solver/_conv_block_cache.py`` memoizes it.
     """
+    row_start = row_slot * n_modes
+    col_start = col_slot * n_modes
+    if isinstance(scale, np.ndarray):
+        block = _conv_block_with_kinetic(
+            term,
+            operator_mult,
+            scale,
+            coeff_eval,
+            grid,
+            rfft_shape,
+            n_modes,
+            eq_idx=eq_idx,
+            term_idx=term_idx,
+        )
+        A[row_start : row_start + n_modes, col_start : col_start + n_modes] += block
+        return
     block = _compute_conv_block_cached_or_fresh(
         term,
         operator_mult,
@@ -1802,8 +1950,6 @@ def _add_convolution_coupling(
         term_idx=term_idx,
     )
     # Accumulate: A[row_block, col_block] += scale * block
-    row_start = row_slot * n_modes
-    col_start = col_slot * n_modes
     A[row_start : row_start + n_modes, col_start : col_start + n_modes] += scale * block
 
 
@@ -1811,7 +1957,7 @@ def _compute_conv_block_uncached(
     coeff_array: NDArray[np.float64] | float,
     operator_mult: NDArray[np.complex128],
     grid_shape: tuple[int, ...],
-    rfft_shape: tuple[int, ...],
+    spectral_shape: tuple[int, ...],
     n_modes: int,
 ) -> NDArray[np.complex128]:
     """Build the (n_modes × n_modes) convolution-matrix block at scale=1.
@@ -1821,10 +1967,20 @@ def _compute_conv_block_uncached(
     nested inside ``_build_convolution_matrix_with_constraints``).
 
     For constant coefficients, returns a diagonal block ``diag(c · mult)``.
-    For position-dependent coefficients, runs the probe-vector loop:
-    for each input mode ``m'``, irfft the unit impulse, multiply by
-    ``coeff_array`` in physical space, rfft, and write the resulting
-    column into ``block[:, m']`` multiplied by ``mult[m']``.
+    For position-dependent coefficients (GH #445), the block is the exact
+    circulant of pointwise multiplication in the FULL fftn basis::
+
+        block[k, k'] = ĉ[(k − k') mod N] / N_tot · mult[k']
+
+    with ``ĉ = fftn(c)``, representing ``fftn(c(x) · op(y))`` for
+    ``op(y) = ifftn(mult · ŷ)``. This replaces the former probe-vector
+    loop over the rfft HALF-spectrum, which was only R-linear-correct:
+    the DC/Nyquist bins carry no imaginary degree of freedom there, so
+    sin-phase content folding onto them was misrepresented (7–25% per-mode
+    action errors — see GH #445 for the repro). The circulant needs one
+    FFT of ``c`` instead of ``n_modes`` FFT pairs, and is exact for every
+    mode. ``spectral_shape`` must equal ``grid_shape`` on this path (the
+    pos-dep dispatch passes the full-basis shape).
 
     GH #384 Phase A′: this function is the cache target. Its output for
     a BSM-separable term is identical across PolyChord likelihood calls.
@@ -1836,19 +1992,66 @@ def _compute_conv_block_uncached(
             block[m, m] = scaled * operator_mult[m]
         return block
 
-    block = np.zeros((n_modes, n_modes), dtype=np.complex128)
-    for m_prime in range(n_modes):
-        probe_hat = np.zeros(n_modes, dtype=np.complex128)
-        probe_hat[m_prime] = 1.0
-        probe_physical = np.fft.irfftn(
-            probe_hat.reshape(rfft_shape),
-            s=grid_shape,
-            axes=list(range(len(grid_shape))),
+    if spectral_shape != grid_shape:
+        msg = (
+            "position-dependent convolution blocks require the full fftn "
+            f"basis (spectral_shape {spectral_shape} != grid_shape "
+            f"{grid_shape}); the rfft half-spectrum basis misrepresents "
+            "DC/Nyquist-fold coupling (GH #445)"
         )
-        product = coeff_array * probe_physical
-        result_hat = np.fft.rfftn(product).ravel()
-        block[:, m_prime] = result_hat * operator_mult[m_prime]
+        raise ValueError(msg)
+
+    n_tot = int(np.prod(grid_shape))
+    chat = np.fft.fftn(np.asarray(coeff_array, dtype=np.float64).reshape(grid_shape))
+    # Per-axis index differences (k − k') mod N_axis, raveled over modes.
+    axis_indices = np.unravel_index(np.arange(n_tot), grid_shape)
+    diff = tuple(
+        (idx[:, None] - idx[None, :]) % grid_shape[a]
+        for a, idx in enumerate(axis_indices)
+    )
+    block = (chat[diff] / float(n_tot)).astype(np.complex128)
+    block *= operator_mult[None, :]
     return block
+
+
+def _conv_block_with_kinetic(
+    term: OperatorTerm,
+    operator_mult: NDArray[np.complex128],
+    m_inv_profile: NDArray[np.float64],
+    coeff_eval: CoefficientEvaluator,
+    grid: GridInfo,
+    rfft_shape: tuple[int, ...],
+    n_modes: int,
+    *,
+    eq_idx: int = -1,
+    term_idx: int = -1,
+) -> NDArray[np.complex128]:
+    """Build a term's convolution block with a position-dependent ``M⁻¹(x)`` folded in.
+
+    GH #427: a position-dependent kinetic coefficient makes the velocity-row
+    scale a real-space profile. Dividing pointwise in real space BEFORE the
+    forward FFT is mathematically identical to applying the ``M̂⁻¹(k−k′)``
+    convolution in k-space, and the resulting effective coefficient
+    ``M⁻¹(x)·c(x)`` is exactly what the existing ĉ(k−k′) probe-vector
+    machinery handles. This applies equally when the RHS coefficient is
+    constant — ``M⁻¹(x)·c`` is position-dependent regardless, which is why
+    the constant-coefficient diagonal branches must route here too.
+
+    Bypasses the GH #384 BSM block cache: the cached block is keyed on the
+    RHS geometry alone and would not include the kinetic profile. Extending
+    the cache key with a kinetic identity is a possible future optimization;
+    the inference-relevant canonicalized flows have constant-kinetic base
+    specs and never reach this path, so nothing hot is de-cached.
+    """
+    coeff = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
+    profile = np.asarray(m_inv_profile, dtype=np.float64).reshape(grid.shape)
+    # `coeff` is a float for constant terms and a grid-shaped array for
+    # position-dependent ones; either way the product is the grid-shaped
+    # effective coefficient.
+    coeff_eff = profile * coeff
+    return _compute_conv_block_uncached(
+        coeff_eff, operator_mult, grid.shape, rfft_shape, n_modes
+    )
 
 
 def _compute_conv_block_cached_or_fresh(
@@ -2028,9 +2231,12 @@ def _build_convolution_matrix_with_constraints(
     n_dyn_slots = len(orig_to_reduced)
 
     # ---- M⁻¹ for kinetic-coefficient handling on dynamical rows ----
+    # GH #427: pass `grid` so a position-dependent kinetic evaluates to a
+    # per-grid-point M⁻¹(x) profile (GH #382 machinery) instead of raising.
     m_inv = build_inverse_kinetic_diag(
         spec,
         coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+        grid,
     )
 
     # ---- Multiplier cache ----
@@ -2055,7 +2261,7 @@ def _build_convolution_matrix_with_constraints(
         term_idx: int = -1,
     ) -> None:
         """Emit a term's contribution to a (row_block, col_block) of out_matrix."""
-        if not term.position_dependent:
+        if not term.position_dependent and not isinstance(scale, np.ndarray):
             coeff = _resolve_constant_coeff(
                 term,
                 coeff_eval,
@@ -2069,6 +2275,9 @@ def _build_convolution_matrix_with_constraints(
                     col_block * n_modes + m,
                 ] += scaled * mult[m]
         else:
+            # Position-dependent coefficient and/or M⁻¹(x) kinetic (GH
+            # #427) — _add_convolution_coupling folds an ndarray scale
+            # into the real-space coefficient before the FFT.
             _add_convolution_coupling(
                 out_matrix,
                 row_block,
@@ -2099,6 +2308,22 @@ def _build_convolution_matrix_with_constraints(
         ``tidal.solver._conv_block_cache`` keyed on the geometry and is
         reused across PolyChord likelihood calls.
         """
+        if isinstance(scale, np.ndarray):
+            # M⁻¹(x) kinetic (GH #427): fold the real-space profile into
+            # the coefficient before the FFT — never scale a k-space block
+            # by a real-space array. Covers constant RHS coefficients too
+            # (M⁻¹(x)·c is position-dependent regardless).
+            return _conv_block_with_kinetic(
+                term,
+                mult,
+                scale,
+                coeff_eval,
+                grid,
+                rfft_shape,
+                n_modes,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
+            )
         if not term.position_dependent:
             block = np.zeros((n_modes, n_modes), dtype=np.complex128)
             coeff = _resolve_constant_coeff(
@@ -2468,7 +2693,11 @@ def _build_convolution_matrix_with_constraints(
 
     # If A_dc_vel is non-trivial (first-order eq RHS → v_c), its contribution is
     # A_dc_vel @ v_c = A_dc_vel @ recovery · A_reduced → folded into vel_coupling.
-    if np.max(np.abs(A_dc_vel)) > 1e-15:
+    # A_dc_vel is zero-size when the spec has no constraint fields (n_c == 0,
+    # reachable post-GH #427: pos-dep kinetics + time-derivative RHS ops but
+    # no algebraic constraints route here) — np.max on a zero-size array
+    # raises, and there is nothing to fold.
+    if A_dc_vel.size > 0 and np.max(np.abs(A_dc_vel)) > 1e-15:
         vel_coupling_mat += A_dc_vel @ recovery
         has_vel_coupling = True
 
@@ -2588,19 +2817,26 @@ def find_independent_blocks(
 
 
 def _has_position_dependent_terms(spec: EquationSystem) -> bool:
-    """Check if any RHS term has a position-dependent coefficient.
+    """Check if the spec has any position-dependent coefficient — RHS or kinetic.
 
-    Deliberately RHS-only: this is the ROUTING predicate that selects the
-    ĉ(k−k′) convolution builders over the constant-coefficient ones, and
-    those builders convolve RHS coefficients only.  Do NOT extend it to
-    ``kinetic_coefficient_symbolic`` — a position-dependent kinetic needs
-    the mass-side convolution M̂(k−k′) (GH #427), which no current path
-    implements, so routing on it would just move the failure into a
-    different builder.  Position-dependent kinetics are instead refused
-    up front by the GH #421 guards (see
-    :func:`_raise_position_dependent_kinetic`) and excluded from modal
-    eligibility by :func:`can_use_modal`.
+    This is the ROUTING predicate that selects the ĉ(k−k′) convolution
+    builders over the constant-coefficient per-mode ones. Position
+    dependence is a REGIME property: whether it lives in an RHS
+    coefficient c(x) or in the kinetic coefficient M(x), the k-space
+    object is a mode-coupling matrix and only the convolution builders
+    represent it. The kinetic case (GH #427) is handled by folding the
+    per-grid-point M⁻¹(x) profile into each velocity-row coefficient in
+    real space before the FFT (see :func:`_conv_block_with_kinetic`) —
+    mathematically identical to the mass-side M̂⁻¹(k−k′) convolution, so
+    no separate mass-side machinery is needed.
+
+    Callers outside :func:`solve_modal` use this for eligibility:
+    ``modal_jax`` bails to the scipy modal path on ``True`` (the JAX
+    per-mode path is constant-coefficient), which is the correct verdict
+    for position-dependent kinetics too.
     """
+    if spec.has_position_dependent_kinetic():
+        return True
     for eq in spec.equations:
         for term in eq.rhs_terms:
             if term.position_dependent:
@@ -3213,11 +3449,17 @@ def _evolve_full_matrix(
     grid: GridInfo,
     snapshot_callback: Callable[[float, NDArray[np.float64]], None] | None,
     progress: SimulationProgress | None,
+    *,
+    full_spectrum: bool = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Evolve system with full coupled matrix (position-dependent coefficients).
 
     A_full has shape (n_total, n_total) where n_total = n_slots x n_modes.
     y0_hat has shape (n_slots, n_modes).
+
+    ``full_spectrum`` selects the snapshot inverse transform: True for the
+    full fftn basis (GH #445, the pos-dep convolution paths), False for
+    the rfft half-spectrum basis.
 
     Uses ``scipy.sparse.linalg.expm_multiply`` (Al-Mohy & Higham 2011) to compute
     exp(A·t)·y₀ at each output time without eigendecomposition.
@@ -3318,10 +3560,11 @@ def _evolve_full_matrix(
             dtype=np.complex128,
         )
         # y_all has shape (n_snapshots, n_total)
+        inverse_transform = _ifft_slots_full if full_spectrum else _ifft_slots
         for ti in range(n_snapshots):
             t = float(t_eval[ti])
             y_hat_t = y_all[ti].reshape(n_slots, n_modes)
-            y_physical = _ifft_slots(y_hat_t, layout, grid)
+            y_physical = inverse_transform(y_hat_t, layout, grid)
             snapshots[ti] = y_physical
             times[ti] = t
 
@@ -3331,6 +3574,7 @@ def _evolve_full_matrix(
                 progress.update(t)
     else:
         # Single time point or t0 == t_end
+        inverse_transform = _ifft_slots_full if full_spectrum else _ifft_slots
         for ti, t in enumerate(t_eval):
             if t == t0:
                 y_evolved = y0_flat.copy()
@@ -3340,7 +3584,7 @@ def _evolve_full_matrix(
                     dtype=np.complex128,
                 )
             y_hat_t = y_evolved.reshape(n_slots, n_modes)
-            y_physical = _ifft_slots(y_hat_t, layout, grid)
+            y_physical = inverse_transform(y_hat_t, layout, grid)
             snapshots[ti] = y_physical
             times[ti] = t
 
@@ -3488,13 +3732,13 @@ def solve_modal(
         )
         raise ValueError(msg)
 
-    # GH #421: refuse position-dependent kinetics before any matrices are
-    # built.  Redundant with the _build_evolution_matrices guard for the
-    # genEig path, but the per-mode/convolution builders would otherwise
-    # fail later with a grid-less evaluate_coefficient ValueError that
-    # names neither the cause nor a way out.
-    if spec.has_position_dependent_kinetic():
-        _raise_position_dependent_kinetic(spec, "solve_modal")
+    # GH #427: position-dependent kinetics are supported here — the
+    # kinetics-aware _has_position_dependent_terms routes such specs to the
+    # convolution builders, which fold M⁻¹(x) into the real-space
+    # coefficients (see _conv_block_with_kinetic). The former GH #421 entry
+    # guard remains only in _build_evolution_matrices (the per-mode genEig
+    # engine, reached directly by the stability probe and modal_jax) and in
+    # solve_modal_pass1 (per-mode Duhamel).
 
     layout = StateLayout.from_spec(spec, grid.num_points)
     coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
@@ -3595,6 +3839,15 @@ def solve_modal(
             )
             raise NotImplementedError(msg)
 
+        # GH #445: the convolution paths operate in the FULL fftn basis —
+        # pointwise multiplication by c(x) is exactly C-linear there,
+        # unlike the rfft half-spectrum (see _fft_slots_full).
+        k_grid_full = _build_k_grid(_build_k_axes_full(grid))
+        full_shape = tuple(grid.shape)
+        y0_hat_full = _fft_slots_full(y0, layout, grid)
+        if _zero_nyquist:
+            _zero_nyquist_full(y0_hat_full, grid)
+
         (
             A_reduced_2d,
             recovery_2d,
@@ -3605,14 +3858,14 @@ def solve_modal(
             layout,
             grid,
             coeff_eval,
-            k_grid,
-            rfft_shape,
+            k_grid_full,
+            full_shape,
         )
         recovery_matrix = recovery_2d
         c_names = c_names_list
         orig_to_reduced = orig_to_reduced_map
 
-        n_modes = y0_hat.shape[1]
+        n_modes = y0_hat_full.shape[1]
         n_pts = layout.num_points
         n_dyn_slots = len(orig_to_reduced)
         n_c_count = len(c_names)
@@ -3639,7 +3892,7 @@ def solve_modal(
         # Extract dynamical IC in reduced ordering, as (n_dyn_slots, n_modes)
         y0_hat_dyn = np.zeros((n_dyn_slots, n_modes), dtype=np.complex128)
         for orig_si, red_pos in orig_to_reduced.items():
-            y0_hat_dyn[red_pos] = y0_hat[orig_si]
+            y0_hat_dyn[red_pos] = y0_hat_full[orig_si]
 
         # Evolve the reduced matrix via Krylov expm_multiply
         times, dyn_snapshots = _evolve_full_matrix(
@@ -3650,6 +3903,7 @@ def solve_modal(
             grid,
             None,  # callback handled below with full state
             progress,
+            full_spectrum=True,
         )
 
         # Reconstruct full state (dyn slots + constraint slots)
@@ -3659,16 +3913,16 @@ def solve_modal(
         for c_name in c_names:
             constraint_vel_arrays[c_name] = np.zeros((len(t_eval), *grid.shape))
 
-        rfft_shape_tuple = tuple(rfft_shape)
         for ti in range(len(t_eval)):
             dyn_phys = dyn_snapshots[ti]
-            # FFT each dynamical slot back to k-space to apply recovery
+            # FFT each dynamical slot back to k-space (full basis, GH #445)
+            # to apply recovery
             y_hat_dyn_t = np.zeros((n_dyn_slots, n_modes), dtype=np.complex128)
             for red_si in range(n_dyn_slots):
                 field_data = dyn_phys[red_si * n_pts : (red_si + 1) * n_pts].reshape(
                     grid.shape
                 )
-                y_hat_dyn_t[red_si] = np.fft.rfftn(field_data).ravel()
+                y_hat_dyn_t[red_si] = np.fft.fftn(field_data).ravel()
 
             # Flatten and apply recovery (q_c_hat = recovery @ y_d_hat)
             y_hat_dyn_flat = y_hat_dyn_t.ravel()
@@ -3686,17 +3940,9 @@ def solve_modal(
                 ]
             for ci, c_name in enumerate(c_names):
                 c_slot = layout.field_slot_map[c_name]
-                c_phys = np.fft.irfftn(
-                    c_hat[ci].reshape(rfft_shape_tuple),
-                    s=grid.shape,
-                    axes=list(range(len(grid.shape))),
-                ).ravel()
+                c_phys = np.fft.ifftn(c_hat[ci].reshape(grid.shape)).ravel()
                 full_state[c_slot * n_pts : (c_slot + 1) * n_pts] = np.real(c_phys)
-                v_c_phys = np.fft.irfftn(
-                    v_c_hat[ci].reshape(rfft_shape_tuple),
-                    s=grid.shape,
-                    axes=list(range(len(grid.shape))),
-                )
+                v_c_phys = np.fft.ifftn(v_c_hat[ci].reshape(grid.shape))
                 constraint_vel_arrays[c_name][ti] = np.real(v_c_phys)
 
             snapshots[ti] = full_state
@@ -3854,14 +4100,21 @@ def solve_modal(
         )
         method_desc = "per-mode eigendecomposition (constant coefficients)"
     else:
-        # Position-dependent coefficients: full convolution matrix
+        # Position-dependent coefficients: full convolution matrix in the
+        # FULL fftn basis (GH #445; see _fft_slots_full).
+        k_grid_full = _build_k_grid(_build_k_axes_full(grid))
+        full_shape = tuple(grid.shape)
+        y0_hat_full = _fft_slots_full(y0, layout, grid)
+        if _zero_nyquist:
+            _zero_nyquist_full(y0_hat_full, grid)
+
         A_full = _build_convolution_matrix(
             spec,
             layout,
             grid,
             coeff_eval,
-            k_grid,
-            rfft_shape,
+            k_grid_full,
+            full_shape,
         )
         if return_eigendata:
             msg = (
@@ -3873,12 +4126,13 @@ def solve_modal(
             raise NotImplementedError(msg)
         times, snapshots = _evolve_full_matrix(
             A_full,
-            y0_hat,
+            y0_hat_full,
             t_eval,
             layout,
             grid,
             snapshot_callback,
             progress,
+            full_spectrum=True,
         )
         n_total = A_full.shape[0]
         method_desc = f"expm_multiply ({n_total}x{n_total}, position-dependent)"
@@ -3939,6 +4193,7 @@ def solve_modal(
 def _build_source_matrix_k(
     correction_spec: EquationSystem,
     layout: StateLayout,
+    grid: GridInfo,
     coeff_eval: CoefficientEvaluator,
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
@@ -4050,9 +4305,15 @@ def _build_source_matrix_k(
         velocity_row_scale,
     )
 
+    # GH #427: `grid` is threaded through for consistency with the
+    # convolution builders. The solve_modal_pass1 entry guard still refuses
+    # position-dependent correction kinetics (per-mode Duhamel has no
+    # convolution route), so array-valued entries cannot legitimately
+    # appear here — the eq_scale check below enforces that invariant.
     m_inv_src = build_inverse_kinetic_diag(
         correction_spec,
         coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+        grid,
     )
 
     def _get_m_src(n: int) -> NDArray[np.complex128]:
@@ -4135,6 +4396,18 @@ def _build_source_matrix_k(
         # docstring; regression guard:
         # tests.test_solver_kinetic_consistency::TestAllModalPathsRespectKinetic).
         eq_scale = velocity_row_scale(field_name, m_inv_src)
+        if isinstance(eq_scale, np.ndarray):
+            # Invariant enforcement: the solve_modal_pass1 entry guard
+            # refuses position-dependent correction kinetics before this
+            # builder runs. A real-space M⁻¹(x) profile must never scale
+            # the k-diagonal source (wrong semantics, n_points vs n_modes).
+            msg = (
+                f"Pass 1 source builder received a position-dependent "
+                f"kinetic profile for field {field_name!r}; the per-mode "
+                "Duhamel path requires constant kinetics (guard in "
+                "solve_modal_pass1, GH #421/#427)."
+            )
+            raise NotImplementedError(msg)
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
                 term,
@@ -4466,6 +4739,7 @@ def solve_modal_pass1(
     M_src_k_by_order, correction_drops = _build_source_matrix_k(
         correction_spec,
         layout,
+        grid,
         coeff_eval,
         k_grid,
         rfft_shape,
