@@ -59,7 +59,7 @@
 ### Stage 1 — Wolfram derivations (interleaved with Stage 2+)
 
 - [x] 1.1 E.cal `gertsenshtein/theory_ungauged_e_dual_gaussian.toml` (~5 min — DONE; 14 components, 73KB JSON; PASS verdict on stability diagnostics, P/h0² ≈ 0.0036 matches Boccaletti sin²(0.063) ≈ 0.0039 within ~10%)
-- [x] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — **UNBLOCKED**: derivation (#378) and modal-perturbative simulation (#380) both fixed. Wolfram now keeps the small-param-bearing kinetic coefficient un-normalized (ExportJSON.wl), letting Python's existing `canonicalize_kinetic_for_perturbation` split M = M₀ + εM₁ and synthesize Pass-1 corrections. Modal Pass 0 + Pass 1 complete end-to-end. Tachyonic eigenvalue at t≥10 is a pre-existing physics property of Maxwell in this dual-Gaussian B background (present at ρ=σ=0); separate from the solver blocker. Non-blocking for the PGT roster.
+- [x] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — derivation (#378) fixed; Wolfram keeps the small-param-bearing kinetic coefficient un-normalized (ExportJSON.wl), letting Python's existing `canonicalize_kinetic_for_perturbation` split M = M₀ + εM₁ and synthesize Pass-1 corrections (#380). **RETRACTED (2026-08-19, #429): the earlier "Modal Pass 0 + Pass 1 complete end-to-end" claim was wrong.** Those runs passed the cross-block guard only because its absolute 1e-14 floor exceeded the entire source norm (max|M_src| ≈ 8e-15 at Phase E geometry) — the O(ε) a_0↔a_3 coupling (~3% of the source norm) was silently discarded, and the pos-dep Gaussian correction coefficients were corner-collapsed (#438). Post-#429 the perturbative route refuses honestly at all ρ (cross-block support tracked in #439). Tachyonic eigenvalue at t≥10 remains a pre-existing physics property of Maxwell in this dual-Gaussian B background (present at ρ=σ=0). E.EH stays DEFERRED; the order-0 (non-perturbative) modal route depends on #427.
 - [x] 1.2 E.T1 `dark_photon_plasma/theory_e_dual_gaussian.toml` — DONE (26 fields, 86 H terms)
 - [x] 1.3 E.T2 `torsion_gertsenshtein/theory_einstein_cartan_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms; smoke PASS)
 - [x] 1.4 E.T4 `torsion_gertsenshtein/theory_nonminimal_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms)
@@ -122,7 +122,7 @@ Stability column: `PASS` / `SOFT-PENALIZED` / `CATASTROPHIC`.
 | Stage | Theory | Derivation | Corner amp | Corner sup | Atlas | Stability | Verdict |
 |-------|--------|------------|------------|------------|-------|-----------|---------|
 | E.cal | gertsenshtein_ungauged | ☑ (2026-05-24) | ☑ local (no free params) | n/a | n/a (positive control) | PASS | calibration ✓ |
-| E.EH  | Euler-Heisenberg + EM (σ, ρ) | ☑ (derived but solver-blocked) | n/a | n/a | n/a | DEFERRED | DEFERRED — see #378 |
+| E.EH  | Euler-Heisenberg + EM (σ, ρ) | ☑ (derived but solver-blocked) | n/a | n/a | n/a | DEFERRED | DEFERRED — Pass 1 refuses honestly (#429; support: #439); order-0 modal needs #427 |
 | E.T1  | DP-plasma | ☑ (26 fields) | ☐ jobid | ☐ jobid | ☐ jobid | — | — |
 | E.T2  | Einstein-Cartan minimal | ☑ (38 fields) | ☐ **29640051** running | ☐ jobid | ☐ jobid | — | — |
 | E.T4  | Ricci-EM nonminimal (δ₁) | ☑ (38 fields) | ☐ jobid | ☐ jobid | n/a (1D) | — | — |

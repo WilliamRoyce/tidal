@@ -325,8 +325,12 @@ The remediation plan (`.claude/plans/flickering-gathering-orbit.md`, approved
   surfaced on `PerturbativeResult.validity["correction_drops"]` (#272);
   `order >= 2` raises `NotImplementedError` with #273 reference;
   `base_spec`/`filter_by_order`/`normalize_kinetic_coefficients` recompute
-  mass/coupling matrices (#274); cross-block threshold is scale-relative
-  `max(1e-14, max|M|·1e-10)` (#275).
+  mass/coupling matrices (#274); cross-block threshold made floored-relative
+  `max(1e-14, max|M|·1e-10)` (#275 — note: the threshold work is #275, not
+  #274; the adjacency here caused a mis-citation in #429). The absolute
+  1e-14 floor was later found to mask physical cross-block coupling whenever
+  `max|M_src| < 1e-4` (the EH dual-Gaussian regime) and was removed in #429 —
+  the threshold is now purely scale-relative `max|M_src|·1e-10`.
 - **R2 (typed contracts)** bd8f3ae: `PerturbativePass1Result` TypedDict
   replaces `# type: ignore` smuggling (#279); `PerturbativeResult` carries
   `spec` + `full_spec`, CLI reads `pert_result.spec` instead of rebinding
