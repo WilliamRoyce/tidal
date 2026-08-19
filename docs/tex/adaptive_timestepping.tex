@@ -104,8 +104,10 @@ Constraint systems (e.g., Proca $A_0$) are handled via Fourier Schur complement
 elimination --- 9.5$\times$ speedup over IDA on \texttt{coupled\_proca\_3d}.
 
 \textbf{Requires:} Flat metric, all-periodic BCs, time-independent coefficients,
-supported Fourier operators. Position-dependent coefficients are handled via
-$k$-space convolution.
+supported Fourier operators. Position-dependent coefficients --- RHS $c(x)$ and
+kinetic $M(x)$ alike --- are handled via $k$-space convolution in the full FFT
+basis (GH \#427/\#445); the per-mode engines used by the stability probe and
+the Pass-1 correction path still require a constant $M$.
 
 \subsubsection{\texttt{--scheme ida}: SUNDIALS IDA (Adaptive DAE)}
 \label{sec:scheme-ida}

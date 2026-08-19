@@ -260,7 +260,17 @@ The modal solver is auto-selected (step~2 in \texttt{\_resolve\_scheme()}) when 
   \item \textbf{No time-dependent coefficients} --- \texttt{term.time\_dependent} all \texttt{False}
 \end{enumerate}
 
-Position-dependent coefficients are OK (handled via convolution). The full auto-selection hierarchy:
+Position-dependent coefficients are OK --- RHS coefficients $c(x)$ and
+kinetic coefficients $M(x)$ alike --- because such specs route to the
+convolution paths, which build the mode-coupling matrix in the full FFT
+basis and fold $M^{-1}(x)$ into the coefficients in real space
+(GH \#427/\#445; \cref{par:modal-posdep}).  The carve-out is internal, not
+an eligibility criterion: the strictly per-mode engines (the
+generalized-eigenvalue builder reached by the stability probe and
+\texttt{modal\_jax}, and the Pass-1 Duhamel path) refuse a
+position-dependent $M(x)$ because no per-$k$ mass matrix exists for it ---
+see \cref{sec:troubleshooting-posdep-kinetic-modal}.  The full
+auto-selection hierarchy:
 
 \begin{lstlisting}[style=bash]
 1. Modal eligible (flat+periodic+time-independent+supported operators)
@@ -541,7 +551,7 @@ File & Purpose \\
 \texttt{tidal/solver/modal.py} & Core solver (${\sim}1{,}400$ lines) \\
 \texttt{tidal/cli/\_simulate.py} & Auto-selection + dispatch \\
 \texttt{tidal/cli/\_\_init\_\_.py} & \texttt{"modal"} in \texttt{--scheme} choices \\
-\texttt{tests/test\_solver\_modal.py} & 35 tests (12 eligibility + 14 correctness + 4 stability + 5 constraint) \\
+\texttt{tests/test\_solver\_modal.py} & 83 tests (eligibility, correctness, stability, constraint, and the GH \#421/\#427 position-dependent-kinetic suites) \\
 \bottomrule
 \end{tabular}
 \end{table}
