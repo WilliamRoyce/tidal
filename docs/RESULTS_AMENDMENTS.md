@@ -61,7 +61,7 @@ that rested on marginal-to-marginal comparisons (see the claim table).
 | :203-207 | δ₁ an order of magnitude above the other couplings (D₊‖₋ = 20.8) | cross | stands |
 | :238-242 (`KLTableEMRCParityPair`) | D+/D− cells | marginal | superseded — corrected table below |
 | :278-284 | parity-even concentrates on δ₁ (20.8); parity-odd vertex drops to 8.8 and β₁/β₂ become comparable (5.44/4.35) | cross | stands |
-| :336-342 | each YM truncation concentrates D on a different operator: ξ (Bahamonde, Barker), β₁ (Shapiro), χ (union) | cross | stands; corrected marginals now agree (ξ tops Bahamonde/Barker amp) |
+| :336-342 | each YM truncation concentrates D on a different operator: ξ (Bahamonde, Barker), β₁ (Shapiro), χ (union) | cross | stands (the claim keys on D₊‖₋, which is unchanged); corrected amp marginals agree for Bahamonde (ξ tops, 1.20) but NOT for Barker (χ tops at 1.02, ξ second at 0.83 under its true log-uniform prior — see the provenance note below) or Shapiro (ζ₂ tops) — marginal and cross rankings are different questions and only the cross one is claimed |
 | :422-430 (`KLTableYMUnified`) | D+/D− cells | marginal | superseded — corrected table below |
 | :457-465 | χ₁ dominant axis, largest D₊‖₋ = 4.2 | cross | stands (D+/D− cells floor-limited, see below) |
 | :536-541 | NP control matches YM union "within the bootstrap uncertainty of the per-coupling marginal D in every operator direction" | **marginal** | **superseded** — corrected marginals differ by up to 1.27 nats (sup χ: 1.43 propagating vs 0.17 NP; amp β₁: 0.05 vs 0.64), far beyond floor at N_eff ≈ 1100–2900. The qualitative control conclusion (amplification without propagating torsion) is separately supported by the corner overlays and log Z and is NOT withdrawn here, but this quantitative support line no longer holds; a future campaign should re-examine it |
@@ -125,7 +125,7 @@ Top-3 by D+ (amp marginal): archived `delta1 > beta1 > beta3` → corrected `xi 
 | beta1 | 2.36 | 0.42 | 2.83 | 0.16 | 1.30 |
 | beta2 | 2.66 | 0.11 | 2.65 | 0.08 | 0.21 |
 | beta3 | 2.97 | 0.25 | 2.55 | 0.01 | 0.22 |
-| xi | 2.65 | 0.92 | 1.59 | 1.59 | 4.87 |
+| xi | 2.65 | 0.83 | 1.59 | 1.59 | 4.87 |
 | delta1 | 3.09 | 0.76 | 2.98 | 0.61 | 0.52 |
 | chi | 3.00 | 1.02 | 3.11 | 1.92 | 0.64 |
 
@@ -254,16 +254,28 @@ Top-3 by D+ (amp marginal): archived `rho > sigma` → corrected `sigma > rho`.
 
 ### Rescue-chain status (GH #433)
 
-T7 (chi_closure), T9 (xi_kinetic_closure) and the 17D NP control have effective
-sample sizes of 21–248, i.e. per-parameter noise floors of ~0.08–0.93 nats: **no
-per-coupling marginal from these chains is quotable as signal**, before or after
-the #420 fix. This sharpens the archive's own hedges (T9 was already marked "not
+T7 (chi_closure), T9 (xi_kinetic_closure), the 17D NP control, **and T6-full
+(parity_odd_full — the worst case, omitted from the first revision of this
+record: N_eff = 6.0 amp / 13.8 sup, floors 3.25/1.42 nats, all 20 of 20
+parameters floor-dominated in both directions)** have effective sample sizes of
+6–248, i.e. per-parameter noise floors of ~0.08–3.25 nats: **no per-coupling
+marginal from these chains is quotable as signal**, before or after the #420
+fix. (The Euler-Heisenberg chain is also floor-limited at N_eff ≈ 104 — floors
+≈ 0.19 — which is consistent with, and part of, its null verdict.) This sharpens the archive's own hedges (T9 was already marked "not
 quantitatively meaningful"). Re-runs with the overflow mitigations are explicitly
 deferred to a future campaign; the fixed pipeline now flags the condition
 automatically (`floor_dominated_params` in the consistency block, `(≤ floor)`
 annotations in the CLI table).
 
 ### Provenance notes
+
+- **Barker amp** (`29507332/d21_barker_amp_v3_pub`): its `inference.json` has NO
+  `priors` key (`reconstructed: true`), so the first revision of this record
+  scored ξ against a fabricated arctan prior (0.92); under the true log-uniform
+  prior (sup chain's recorded priors + the campaign sbatch template) ξ = 0.83.
+  Rankings unaffected (χ stays top). `parameter_importance.json` now records
+  `priors_provenance` per direction, and the recompute warns on every
+  fabrication (post-merge review, #434 follow-up).
 
 - Chains without recorded priors (pre-schema) are scored against priors
   reconstructed from the committed sbatch templates (T7/T6: log-uniform ξ); a

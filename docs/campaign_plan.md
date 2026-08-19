@@ -148,6 +148,15 @@ plan file).
 | D3 | any D_KL | > 0.1 nats | Parity-odd survey complete |
 | E1 | D_KL(any χ₂+ or α₂+) | > 0.1 nats | Combined χ+R×R measurable |
 
+> **Amendment pointer (2026-08-19, additive):** per-parameter D_KL values
+> recorded before v0.48.8 were computed with a broken estimator (GH #420), and
+> several chains have noise floors *above* these thresholds (T6-full: 3.25
+> nats; T7/T9/NP-ceven: 0.08–0.93 nats — a threshold below the floor cannot be
+> judged from that chain). Re-judge any verdict keyed on this table through
+> `docs/RESULTS_AMENDMENTS.md`; the corrected per-chain values live in
+> `docs/dkl_recompute_report.md` and each chain's `parameter_importance.json`
+> `consistency` block (N_eff, `noise_floor`, `floor_dominated_params`).
+
 ---
 
 ## Non-Propagating / Constraint Torsion Theories

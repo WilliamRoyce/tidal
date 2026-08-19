@@ -8,6 +8,20 @@
 
 This document is the canonical architecture reference for the v3 era. It survives context loss / session boundaries so any future agent or person picking up the campaign has a complete picture from the repository alone.
 
+> **Amendment (2026-08-19, additive — original text below is preserved as
+> written):** the per-coupling marginal D_KL this document makes the campaign's
+> headline metric was computed with a broken estimator until v0.48.8 (GH #420:
+> only `log_uniform` priors were uniformized; arctan marginals saturated near
+> log(40) ≈ 3.69 nats). Corrected values and per-claim status:
+> [`docs/RESULTS_AMENDMENTS.md`](RESULTS_AMENDMENTS.md); full evidence:
+> [`docs/dkl_recompute_report.md`](dkl_recompute_report.md). Note also that the
+> compactified-prior table below misstates the `arctan_uniform` support: the
+> bounds `-89:89` are **ignored by the sampler** (GH #425) and the support is
+> fixed at ±tan(π/2 − 0.05) ≈ **±19.98**, not "degrees → tan(±89°) ≈ ±57".
+> Post-v0.48.8, `importance.json` carries a `consistency` block (N_eff, noise
+> floors, superadditivity); marginals below their floor must not be ranked
+> (GH #433).
+
 ## Why v3?
 
 The 8-May-2026 supervisor meeting (notes [§3](meetings/2026-05-08_supervisor.md#3-stability-filtering-in-the-linearized-regime)) explicitly raised whether the v2 hard tachyonic rejection (τ=0.15 probe gate) is over-conservative. In conversation the supervisor went further and asked for three coupled architectural changes that supersede the canonical-probe direction:
