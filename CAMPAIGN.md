@@ -474,3 +474,43 @@ _(Filled in as results arrive)_
 | ----- | ------------------------------------------------------------------------------------- |
 | #296  | Euler-Heisenberg F⁴ extension (#271 resolved, defer EH theory to future)              |
 | #297  | Non-propagating/constraint torsion theories (single irreducible sector investigation) |
+
+---
+
+## 2026-08-18 Correction: marginal D_KL estimator (GH #420) — append-only amendment
+
+**Nothing above this line is edited; this entry records which earlier numbers are
+superseded and where the corrected ones live.** Full evidence:
+`docs/dkl_recompute_report.md`; living claim-status record:
+`docs/RESULTS_AMENDMENTS.md`; fixed in v0.48.8 (PR #426), chains recomputed
+(PR #431), estimator self-checks added (PR #435).
+
+- **Defect**: `compute_parameter_importance` only uniformized `log_uniform`
+  priors. Every **arctan_uniform** marginal D_KL recorded in this log's v3-era
+  entries (May 2026 onward: D1/Stage-A `*_v3`/`*_v3_pub`, T5–T9, NP controls,
+  EH+Gert) is inflated and saturated toward the log(40) ≈ 3.69 ceiling;
+  `radial_angular` (atlas) marginals fell to a self-referential fallback. The
+  **cross divergence D₊‖₋, joint D_KL, log Z, Bayes factors, d_G and all
+  uniform/log_uniform marginals are unaffected** — in particular the April-era
+  Stage-B/D2 entries above (uniform priors, e.g. "β₁ = 0.242 nats") are
+  mechanically unaffected by this bug.
+- **Corrected values**: per-chain old-vs-new tables (amp and sup) in
+  `docs/dkl_recompute_report.md`; claim-level status against the thesis tables in
+  `docs/RESULTS_AMENDMENTS.md`. Headline: 19 of 26 chain-directions change their
+  top-marginal coupling; corrected marginals now agree with the (unaffected)
+  D₊‖₋ rankings.
+- **Verdict-line status**: v3-era lines in this log quoting per-coupling marginal
+  D_KL against the 0.05/0.005 thresholds (`docs/campaign_plan.md:140-149`) should
+  be read through `docs/RESULTS_AMENDMENTS.md` rather than at face value. Lines
+  quoting log Z, Bayes factors, or D₊‖₋ stand as written.
+- **Floor caveat (GH #433)**: T7/T9/NP-ceven rescue chains have N_eff 21–248 →
+  per-parameter noise floors 0.08–0.93 nats; their per-coupling marginals are
+  estimator noise in both the original and corrected analyses. Re-runs deferred
+  to a future campaign; the pipeline now flags the condition
+  (`floor_dominated_params`).
+- **Prior provenance (GH #434)**: pre-schema chains (T5-NP, T6, T7, T9, NP-ceven)
+  were originally scored against fabricated all-arctan(±89) priors; T6/T7 in
+  fact used `xi = log_uniform:1e-3:1e3` (sbatch templates). Recompute now honors
+  per-chain `prior_overrides`.
+- **Issues**: #420 #425 #427 #428 #429 #432 #433 #434 (see also the
+  GitHub Issues table above — not edited, per append-only policy).
