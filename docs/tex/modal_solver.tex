@@ -91,7 +91,7 @@ When a coefficient $c(x)$ multiplies a field, the product in $k$-space becomes a
   \label{eq:modal-convolution}
 \end{equation}
 
-This couples different $k$-modes, creating a full $(N_\text{modes} \times N_\text{slots})^2$ matrix. Built via probe vectors (unit impulse per mode): reconstruct to physical space, multiply by coefficient, FFT back. For Gaussian $c(x)$, the kernel $\hat{c}(q)$ decays exponentially $\to$ banded matrix.
+This couples different $k$-modes, creating a full $(N_\text{modes} \times N_\text{slots})^2$ matrix. The convolution paths operate in the \textbf{full complex FFT basis} (all $N$ frequencies per axis, \texttt{numpy.fft.fftn}), where pointwise multiplication by $c(x)$ is exactly $\mathbb{C}$-linear and the block is the circulant $\hat{c}[(k-k') \bmod N]/N_\text{tot}$, built from a single FFT of $c$ (GH \#445). The earlier probe-vector construction over the rfft half-spectrum was retired there: the DC/Nyquist bins carry no imaginary degree of freedom in that basis, so sine-phase content that $c$'s harmonics fold onto them was mismapped (7--25\% per-mode action errors). Position-dependent \emph{kinetic} coefficients fold $M^{-1}(x)$ into the real-space coefficient before the FFT on the same paths (GH \#427). The constant-coefficient per-mode paths keep the cheaper rfft basis --- a constant coefficient is diagonal in $k$, so no folding occurs. For Gaussian $c(x)$, the kernel $\hat{c}(q)$ decays exponentially $\to$ banded matrix.
 
 \subsubsection{Time Evolution Algorithms}
 \label{sec:modal-time-evolution}

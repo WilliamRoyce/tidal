@@ -389,35 +389,45 @@ control check: the conversion probability should recover $P = \sin^2(\kappa B_0 
 
 \textbf{Symptom:}
 \begin{lstlisting}[style=python]
-NotImplementedError: solve_modal cannot handle a position-dependent kinetic
-coefficient (field(s) ['a_1', 'a_2', 'a_3']). A position-dependent M(x) is a
-k-space convolution ...
+NotImplementedError: _build_evolution_matrices operates per k-mode and cannot
+represent a position-dependent kinetic coefficient (field(s) ...) ...
 \end{lstlisting}
-from \texttt{solve\_modal}, \texttt{solve\_modal\_pass1},
-\texttt{\_build\_evolution\_matrices}, or the conversion-stability probe.
+from \texttt{\_build\_evolution\_matrices} (reached directly by the
+conversion-stability probe or \texttt{modal\_jax}) or from
+\texttt{solve\_modal\_pass1} (the per-mode Duhamel correction path).
 
 \textbf{Root cause:} The equation's LHS carries a
 \texttt{kinetic\_coefficient\_symbolic} containing spatial coordinates
 (\texttt{x[]}, \texttt{y[]}, \dots), e.g.\ a localized background folded into the
-kinetic term.  In Fourier space a position-dependent mass matrix is a mode-coupling
-convolution $\hat{M}(k - k')$, which the modal solver does not implement (GH \#427
-tracks the feature; the guards are GH \#421).  Before the guards this failed as a
-grid-less \texttt{evaluate\_coefficient} \texttt{ValueError} on some paths and was
+kinetic term.  Since GH \#427, plain \texttt{solve\_modal} handles this: the
+routing predicate sends such specs to the convolution paths, which fold the
+per-grid-point $M^{-1}(x)$ into the real-space coefficients before the FFT
+(mathematically identical to the mass-side $\hat{M}^{-1}(k-k')$ convolution).
+Only the strictly per-mode engines still refuse, because a position-dependent
+$M$ couples Fourier modes and no per-mode mass matrix exists: the
+generalized-eigenvalue builder (probe/\texttt{modal\_jax} entry) and the Pass-1
+Duhamel path.  Before the GH \#421 guards this failed as a grid-less
+\texttt{evaluate\_coefficient} \texttt{ValueError} on some paths and was
 \emph{silently treated as $M = 1$} on the generalized-eigenvalue path --- including
 inside the inference stability probe.
 
 \textbf{Fix (one of):}
 \begin{itemize}
+  \item Use plain modal: auto-selection (or \texttt{--scheme modal}) runs the
+    spec on the convolution paths with full $M(x)$ support (GH \#427);
+    validated against CVODE to $<1\%$ RMS on the Euler--Heisenberg
+    dual-Gaussian spec.
   \item Use a time-domain solver: \texttt{--scheme cvode} or \texttt{--scheme ida}.
     Both evaluate position-dependent kinetics per grid point (GH \#382).
-    Auto-selection already routes such specs away from modal.
-  \item If the position-dependence is proportional to a small parameter, declare it
-    in \texttt{[perturbation].small\_parameters}: kinetic canonicalization
-    (GH \#380) moves it into $O(\varepsilon)$ RHS corrections and the base spec
-    stays constant-coefficient (this is the Euler--Heisenberg dual-Gaussian flow).
-  \item If the spec has a \texttt{[perturbation]} block but you passed
-    \texttt{--perturbative-order 0}, the full un-canonicalized spec is solved on
-    the plain modal path --- drop the override or switch scheme.
+  \item For perturbative flows, declare the small parameter in
+    \texttt{[perturbation].small\_parameters}: kinetic canonicalization
+    (GH \#380) moves the position dependence into $O(\varepsilon)$ RHS
+    corrections and the base spec stays constant-coefficient (this is the
+    Euler--Heisenberg dual-Gaussian flow).  Pass-1 correction kinetics that
+    remain position-dependent are refused (per-mode Duhamel).
+  \item A mode-coupling-aware stability gate for the inference probe is
+    tracked in GH \#441; until it lands, localized-background specs cannot be
+    stability-gated.
 \end{itemize}
 
 \textbf{Diagnostic:} \texttt{spec.has\_position\_dependent\_kinetic()} (or check
