@@ -1201,15 +1201,23 @@ class TestGH421BaseKineticGuard:
     failed deep inside the modal builders instead.
     """
 
-    def test_o_eps0_posdep_kinetic_refused_at_construction(self) -> None:
+    @pytest.mark.parametrize(
+        "kinetic",
+        [
+            # Power-form position dependence (mentions no small parameter,
+            # so it survives canonicalization into the base spec).
+            "1 + x[]^2",
+            # Call-form: pre-GH #428 this crashed lhs_collapses_to_zero
+            # with an AST-node KineticEvalError before the #421 guard
+            # could produce its actionable message; it must now reach the
+            # same refusal as the power form.
+            "1 + Sin[x[]]",
+        ],
+    )
+    def test_o_eps0_posdep_kinetic_refused_at_construction(self, kinetic: str) -> None:
         spec_data = copy.deepcopy(_KG_WITH_EPS)
-        # Power-form position dependence (mentions no small parameter, so
-        # it survives canonicalization into the base spec).  Call-form
-        # expressions like Sin[x[]] crash lhs_collapses_to_zero earlier
-        # with an unrelated KineticEvalError — a pre-existing gap tracked
-        # separately from #421.
         spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
-            "1 + x[]^2"
+            kinetic
         )
         spec = _make_spec(spec_data)
         with pytest.raises(NotImplementedError, match="kinetic"):
