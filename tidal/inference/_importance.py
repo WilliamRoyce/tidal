@@ -75,14 +75,19 @@ class ParameterImportanceResult:
     log_evidence_err : float
         Bootstrap uncertainty on log Z.
     consistency : dict[str, Any]
-        Self-check diagnostics for the marginal estimates (#420):
+        Self-check diagnostics for the marginal estimates (#420/#433):
         ``sum_marginals``, ``superadditivity_ok`` (for a product prior
         the chain rule gives ``D_KL(joint) >= sum of marginals`` exactly,
         so a violating sum means the estimator is broken),
         ``product_prior`` (whether the bound is exact for this run),
         ``saturated_params`` (marginals within 90% of the histogram
-        ceiling ``log(n_bins)`` — resolution-limited values), and
-        ``note``.  Empty dict when marginals could not be computed.
+        ceiling ``log(n_bins)`` — resolution-limited values), ``n_eff``
+        (Kish effective sample size of the posterior weights),
+        ``noise_floor`` (per-parameter estimator bias
+        ``(n_bins - 1)/(2 n_eff)`` — a marginal at or below its floor is
+        noise, not constraint), ``floor_dominated_params`` (the names
+        that fail that test), and ``note``.  Empty dict when marginals
+        could not be computed.
     """
 
     param_names: list[str]
@@ -480,6 +485,7 @@ def compute_parameter_importance(
 
     saturated: list[str] = []
     bias_numerator = 0.0  # accumulates (n_bins - 1) / 2 per finite marginal
+    bins_by_param: dict[str, int] = {}  # bins used per finite marginal (#433)
     for i, name in enumerate(result.param_names):
         try:
             col = np.asarray(ns.iloc[:, i])
@@ -526,6 +532,7 @@ def compute_parameter_importance(
             marginal_d_kl[name] = kl
             if np.isfinite(kl):
                 bias_numerator += (bins_used - 1) / 2.0
+                bins_by_param[name] = bins_used
                 if kl > 0.9 * float(np.log(bins_used)):
                     saturated.append(name)
         except (ValueError, ZeroDivisionError, AttributeError, IndexError) as exc:
@@ -557,6 +564,19 @@ def compute_parameter_importance(
     bias_allowance = 2.0 * bias_numerator / n_eff
     tolerance = 3.0 * d_kl_err + bias_allowance + 0.05
     superadditivity_ok = sum_marginals <= d_kl + tolerance
+    # Per-parameter noise floor (#433): the histogram marginal is biased up
+    # by ~(n_bins - 1)/(2 n_eff), so a marginal at or below its floor is
+    # estimator noise, not evidence the parameter is constrained.  This is
+    # how the floor-contaminated rescue chains (n_eff as low as 21)
+    # masqueraded as ranked per-coupling signal.
+    noise_floor = {
+        name: (bins - 1) / (2.0 * n_eff) for name, bins in bins_by_param.items()
+    }
+    floor_dominated = [
+        name
+        for name, kl in marginal_d_kl.items()
+        if name in noise_floor and np.isfinite(kl) and kl <= noise_floor[name]
+    ]
     consistency: dict[str, Any] = {
         "sum_marginals": sum_marginals,
         "joint_d_kl": d_kl,
@@ -569,11 +589,14 @@ def compute_parameter_importance(
         # marginal read as spuriously informative.  Recorded so readers
         # can judge whether small marginals are signal or floor.
         "n_eff": n_eff,
+        "noise_floor": noise_floor,
+        "floor_dominated_params": floor_dominated,
         "note": (
             "sum(marginals) <= joint D_KL is exact for product priors; "
             "approximate when a radial_angular joint prior is present. "
             "Saturated marginals are within 90% of the histogram ceiling "
-            "log(n_bins) and are resolution-limited."
+            "log(n_bins) and are resolution-limited. Marginals at or below "
+            "their noise_floor entry are estimator noise, not constraint."
         ),
     }
     if not superadditivity_ok:
@@ -592,6 +615,14 @@ def compute_parameter_importance(
             "marginal D_KL consistency: %s within 90%% of the estimator "
             "ceiling log(n_bins) — resolution-limited, treat as lower bounds",
             ", ".join(saturated),
+        )
+    if floor_dominated:
+        logger.warning(
+            "marginal D_KL consistency: %s at or below the noise floor "
+            "(n_bins-1)/(2*n_eff) with n_eff = %.0f — estimator noise, not "
+            "constraint; do not rank these parameters (see #433)",
+            ", ".join(floor_dominated),
+            n_eff,
         )
 
     return ParameterImportanceResult(
@@ -697,11 +728,17 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
     """Format parameter importance as a human-readable table.
 
     Parameters are ranked by marginal D_KL (most constrained first).
+    Rows whose marginal sits at or below the per-parameter noise floor
+    ``(n_bins - 1)/(2 n_eff)`` are annotated ``(<= floor)`` — such values
+    are estimator noise, not evidence of constraint (#433).
     """
     import math
 
     lines: list[str] = []
     lines.extend(("", "--- Parameter Importance (KL Divergence) ---", ""))
+
+    consistency = result.consistency or {}
+    noise_floor: dict[str, float] = consistency.get("noise_floor") or {}
 
     # Rank by marginal D_KL (descending)
     ranked = sorted(
@@ -726,6 +763,9 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
             importance = "moderate"
         else:
             importance = "weak"
+        floor = noise_floor.get(name)
+        if floor is not None and math.isfinite(dkl) and dkl <= floor:
+            importance = f"{importance} (<= floor)"
         lines.append(f"  {name:<20} {dkl:>12.4f}  {importance:>12}")
 
     lines.extend(
@@ -738,9 +778,8 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
         ),
     )
 
-    # Consistency self-checks (#420): make a broken estimator visible in the
-    # table itself, not just in the log.
-    consistency = result.consistency or {}
+    # Consistency self-checks (#420/#433): make a broken or under-sampled
+    # estimator visible in the table itself, not just in the log.
     if consistency and not consistency.get("superadditivity_ok", True):
         lines.extend(
             (
@@ -757,6 +796,17 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
             (
                 f"  WARNING: {', '.join(saturated)} at the histogram "
                 "resolution ceiling — treat as lower bounds",
+                "",
+            ),
+        )
+    floor_dominated = consistency.get("floor_dominated_params") or []
+    if floor_dominated:
+        n_eff = consistency.get("n_eff", float("nan"))
+        lines.extend(
+            (
+                f"  WARNING: {', '.join(floor_dominated)} at or below the "
+                f"noise floor (n_eff = {n_eff:.0f}) — estimator noise, not "
+                "constraint; do not rank (see #433)",
                 "",
             ),
         )

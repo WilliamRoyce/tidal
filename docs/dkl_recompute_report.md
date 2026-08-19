@@ -646,6 +646,14 @@ Ranking (most→least constrained): old `rho > sigma` → new `sigma > rho` — 
   couplings on regeneration.
 - The wider `hpc_results/` set (115 runs with affected prior kinds) keeps its
   pre-fix `importance.json`; recompute on demand when any of them is quoted.
+  **Staleness tell**: a pre-v0.48.8 `importance.json` has no `consistency`
+  block — if that key is absent, the marginals were computed with the broken
+  estimator and must not be quoted. (`tidal analyze <dir> --inference
+  --importance` recomputes live with the fixed estimator; the joint D_KL,
+  log Z and d_G in the same file were always correct.) Audited consumers:
+  the corner-plot headline quotes only the joint `d_kl` (safe), the
+  `plot_importance` bar chart always receives a freshly-computed result
+  (safe), and `tidal/inference/_atlas.py` does not read marginals at all.
 
 ## Caveats
 

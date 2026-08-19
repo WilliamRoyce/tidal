@@ -111,6 +111,25 @@ class TestPrior:
         assert p.transform(0.0) < -10
         assert p.transform(1.0) > 10
 
+    def test_arctan_uniform_warns_bounds_ignored(self) -> None:
+        """GH #425: arctan_uniform ignores low/high — construction must say
+        so instead of letting the bounds masquerade as the support.
+        """
+        import math as _math
+
+        from tidal.inference._prior import _ARCTAN_EPS, Prior
+
+        with pytest.warns(UserWarning, match="ignores its bounds"):
+            Prior("x", "arctan_uniform", -89.0, 89.0)
+        # Bounds matching the implied support do not warn.
+        support = _math.tan(_math.pi / 2 - _ARCTAN_EPS)
+        import warnings as _warnings
+
+        with _warnings.catch_warnings():
+            _warnings.simplefilter("error")
+            Prior("x", "arctan_uniform", -support, support)
+            Prior("x", "uniform", -89.0, 89.0)  # other kinds never warn
+
     def test_invalid_distribution(self) -> None:
         from tidal.inference._prior import Prior
 
@@ -1471,6 +1490,94 @@ class TestMarginalDKLPriorTransforms:
             },
         )
         assert "WARNING" not in format_importance_table(healthy)
+
+    # -- noise-floor awareness (#433) ----------------------------------
+
+    def test_low_n_eff_marks_floor_dominated(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A chain whose weights concentrate on ~20 samples has a
+        per-parameter noise floor of ~(40-1)/(2*20) ≈ 1 nat — every
+        floor-level marginal must be flagged, not ranked (the T9 rescue
+        chain failure mode).
+        """
+        pytest.importorskip("anesthetic")
+        import logging
+
+        from tidal.inference._importance import compute_parameter_importance
+        from tidal.inference._prior import Prior
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(5)
+        n, nlive = 2000, 100
+        prior = Prior(name="x", distribution="uniform", low=-1.0, high=1.0)
+        x = prior.sample(rng, n)
+        # Steep logL ramp → nested weights concentrate on the top handful
+        # of samples → tiny Kish n_eff, mimicking a floor-contaminated
+        # rescue chain.
+        log_l = 50.0 * np.linspace(0.0, 1.0, n) ** 8
+        result = InferenceResult(
+            samples=x[:, None],
+            log_likelihood=log_l,
+            log_prior=np.zeros(n),
+            param_names=["x"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={"sampler": "test", "nlive": nlive, "priors": [prior]},
+        )
+        with caplog.at_level(logging.WARNING, logger="tidal.inference"):
+            imp = compute_parameter_importance(result, n_bootstrap=10)
+
+        cons = imp.consistency
+        assert cons["n_eff"] < 200, "fixture failed to concentrate weights"
+        assert "noise_floor" in cons
+        assert cons["noise_floor"]["x"] == pytest.approx(
+            39.0 / (2 * cons["n_eff"]), rel=1e-9
+        )
+        # The uniform-prior marginal of a prior-distributed column is pure
+        # estimator bias here, so it must be flagged floor-dominated.
+        assert cons["floor_dominated_params"] == ["x"]
+        assert "noise floor" in caplog.text
+
+        from tidal.inference._importance import format_importance_table
+
+        table = format_importance_table(imp)
+        assert "(<= floor)" in table
+        assert "do not rank" in table
+
+    def test_healthy_n_eff_no_floor_warning(self) -> None:
+        """Equal-weight, large-N chains must not trip the floor flag."""
+        pytest.importorskip("anesthetic")
+        from tidal.inference._importance import (
+            compute_parameter_importance,
+            format_importance_table,
+        )
+        from tidal.inference._prior import Prior
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(6)
+        n, nlive = 6000, 1000
+        prior = Prior(name="x", distribution="uniform", low=-1.0, high=1.0)
+        # Genuinely constrained posterior (narrow normal inside the prior)
+        # with flat-ish logL ordering so weights stay broad.
+        x = np.clip(rng.normal(0.0, 0.05, n), -0.999, 0.999)
+        log_l = -0.5 * (x / 0.05) ** 2
+        result = InferenceResult(
+            samples=x[:, None],
+            log_likelihood=log_l,
+            log_prior=np.zeros(n),
+            param_names=["x"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={"sampler": "test", "nlive": nlive, "priors": [prior]},
+        )
+        imp = compute_parameter_importance(result, n_bootstrap=10)
+        assert imp.consistency["floor_dominated_params"] == []
+        assert "(<= floor)" not in format_importance_table(imp)
 
 
 # ===================================================================
