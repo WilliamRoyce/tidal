@@ -1,5 +1,12 @@
 # Phase D — Manuscript implications of the v3 architecture
 
+> **Correction (2026-08-19, additive — the tables below are preserved as written):**
+> the `arctan_uniform` prior columns describe the range as degrees mapped through
+> `tan`, giving ±57.3. The sampler never did that: `low`/`high` are ignored
+> entirely and the support is fixed at ±tan(π/2 − 0.05) ≈ **±19.98** (GH #425).
+> Read every ±57.3 in this file as ±19.98. Marginal D_KL values quoted here also
+> pre-date the GH #420 estimator fix — see `docs/RESULTS_AMENDMENTS.md`.
+
 **Created:** 2026-05-11
 **Status:** PENDING — gated on Phase B convergence
 **Companion to:** [V3_ARCHITECTURE.md](V3_ARCHITECTURE.md), [V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md)

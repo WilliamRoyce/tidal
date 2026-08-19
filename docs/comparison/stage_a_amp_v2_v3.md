@@ -1,5 +1,12 @@
 # stage_a_amp — v2 vs v3 comparison
 
+> **Correction (2026-08-19, additive — the tables below are preserved as written):**
+> the `arctan_uniform` prior columns describe the range as degrees mapped through
+> `tan`, giving ±57.3. The sampler never did that: `low`/`high` are ignored
+> entirely and the support is fixed at ±tan(π/2 − 0.05) ≈ **±19.98** (GH #425).
+> Read every ±57.3 in this file as ±19.98. Marginal D_KL values quoted here also
+> pre-date the GH #420 estimator fix — see `docs/RESULTS_AMENDMENTS.md`.
+
 - **v2 reference**: `hpc_results/28474676/`
 - **v3 chain**: `hpc_results/29189966/`
 
