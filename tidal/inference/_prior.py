@@ -37,6 +37,56 @@ _ARCTAN_EPS = 0.05
 VALID_DISTRIBUTIONS = frozenset({"uniform", "log_uniform", "normal", "arctan_uniform"})
 
 
+def effective_support(
+    distribution: str, low: float, high: float
+) -> tuple[float, float]:
+    """The range a prior actually samples from — not the range that was typed.
+
+    The single source of truth for "what range was sampled", so no
+    consumer has to re-derive it from the recorded ``low``/``high``.
+    Every place that did so independently got it wrong at least once:
+    the marginal D_KL estimator histogrammed a +-20 posterior over
+    ``(-89, 89)`` (GH #420) and the ``--full-prior-bounds`` corner plot
+    drew ``arctan_uniform`` panels over ``tan(radians(+-89))`` = +-57.3
+    (GH #451), because both read bounds that ``arctan_uniform`` ignores
+    (GH #425).
+
+    Exposed as a free function as well as :attr:`Prior.effective_support`
+    so consumers reading archived prior *records* can ask without
+    constructing a :class:`Prior` (which would re-emit the GH #425
+    bounds-ignored warning on every replot of an archived chain).
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(low, high)`` for ``uniform``/``log_uniform`` (the recorded
+        bounds ARE the support); ``(-S, +S)`` with
+        ``S = tan(pi/2 - _ARCTAN_EPS) ~= 19.98`` for ``arctan_uniform``,
+        independent of the recorded bounds; ``(-inf, +inf)`` for
+        ``normal``, whose support is genuinely unbounded — callers
+        needing a finite plotting range must derive one from the mean
+        and std themselves rather than be handed a silently truncated
+        interval.
+
+    Raises
+    ------
+    ValueError
+        If ``distribution`` is not in :data:`VALID_DISTRIBUTIONS`.
+    """
+    if distribution not in VALID_DISTRIBUTIONS:
+        msg = (
+            f"Unknown distribution '{distribution}'. Must be one of "
+            f"{sorted(VALID_DISTRIBUTIONS)}."
+        )
+        raise ValueError(msg)
+    if distribution == "arctan_uniform":
+        support = math.tan(math.pi / 2 - _ARCTAN_EPS)
+        return (-support, support)
+    if distribution == "normal":
+        return (-math.inf, math.inf)
+    return (float(low), float(high))
+
+
 @dataclass(frozen=True)
 class Prior:
     """A 1-D marginal prior distribution.
@@ -120,6 +170,19 @@ class Prior:
                     UserWarning,
                     stacklevel=3,
                 )
+
+    # ------------------------------------------------------------------
+    # Support
+    # ------------------------------------------------------------------
+
+    @property
+    def effective_support(self) -> tuple[float, float]:
+        """The range :meth:`sample` actually draws from — not what was typed.
+
+        Thin accessor for :func:`effective_support`; see it for the
+        per-distribution contract and the defects that motivated it.
+        """
+        return effective_support(self.distribution, self.low, self.high)
 
     # ------------------------------------------------------------------
     # Sampling (Monte Carlo)
@@ -436,6 +499,48 @@ def parse_joint_prior(spec: str) -> RadialAngularPrior:
 def total_prior_ndim(priors: list[Prior | RadialAngularPrior]) -> int:
     """Total cube dimension covered by a (possibly mixed) prior list."""
     return sum(p.n_dims if isinstance(p, RadialAngularPrior) else 1 for p in priors)
+
+
+def to_record(prior: Prior | RadialAngularPrior) -> dict[str, object]:
+    """Serialize a prior to its on-disk record (``inference.json`` ``priors``).
+
+    One definition of the record shape, shared by the writer in
+    :mod:`tidal.cli._sample` and by :meth:`InferenceResult.save`, so a
+    result whose ``metadata["priors"]`` holds live prior objects — which
+    the importance estimator accepts — reaches disk in the same form as
+    one built by the CLI, instead of raising "not JSON serializable"
+    there.  Every recorded chain having a faithful priors block is what
+    GH #434 was about.
+
+    Scalar records carry ``effective_low``/``effective_high`` alongside
+    the requested ``low``/``high`` so post-hoc consumers read what was
+    sampled rather than re-deriving it (GH #425/#451).  The keys are
+    OMITTED for an unbounded support, since ``Infinity`` is not valid
+    strict JSON.
+    """
+    if isinstance(prior, RadialAngularPrior):
+        return {
+            "kind": "radial_angular",
+            "names": list(prior.names),
+            "r_lo": prior.r_lo,
+            "r_hi": prior.r_hi,
+            "face_idx": prior.face_idx,
+            "sub_tile": list(prior.sub_tile),
+            "M": prior.M,
+            "Q": np.asarray(prior.Q).tolist(),
+        }
+    record: dict[str, object] = {
+        "kind": "scalar",
+        "name": prior.name,
+        "distribution": prior.distribution,
+        "low": prior.low,
+        "high": prior.high,
+    }
+    eff_lo, eff_hi = prior.effective_support
+    if math.isfinite(eff_lo) and math.isfinite(eff_hi):
+        record["effective_low"] = eff_lo
+        record["effective_high"] = eff_hi
+    return record
 
 
 def prior_param_names(priors: list[Prior | RadialAngularPrior]) -> list[str]:

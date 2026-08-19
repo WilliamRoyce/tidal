@@ -683,29 +683,25 @@ def _set_full_prior_axis_limits(
     Counter-part to :func:`_set_derived_axis_limits` which uses the
     posterior-weighted 5%-95% interval.  This mode is invoked by
     ``tidal plot --type corner --full-prior-bounds`` to make the
-    compactified-prior coverage visually honest: arctan_uniform:-89:89
-    panels show their full ±tan(89°) ≈ ±57.3 range so the user can
-    confirm the posterior is genuinely concentrated rather than
-    artificially auto-scaled to a sub-region.
+    compactified-prior coverage visually honest: each panel shows the
+    full range that was sampled, so the user can confirm the posterior is
+    genuinely concentrated rather than artificially auto-scaled to a
+    sub-region.
 
-    For ``arctan_uniform`` priors the bounds are degrees of the angle
-    variable and the physical sample range is ``tan(deg · π/180)``.
-    For ``log_uniform`` and ``uniform`` priors the ``[low, high]``
-    bounds map directly to the sample axis.
+    ``priors`` already carries the **effective support** per parameter
+    (:func:`_extract_prior_map`), so this function does no bounds
+    interpretation of its own.  It used to: it read ``arctan_uniform``
+    bounds as degrees and drew ±tan(89°) ≈ ±57.3 panels for a prior whose
+    support is ±19.98, over-stating the range ~2.9× and making every
+    posterior look correspondingly more concentrated (GH #451).  That was
+    the v3 design intent (``docs/V3_ARCHITECTURE.md``) which the sampler
+    never implemented (GH #425); the sampler produced the chains, so the
+    sampler is authoritative.
     """
-    import math
-
-    def _physical_bounds(dist: str, lo: float, hi: float) -> tuple[float, float]:
-        if dist == "arctan_uniform":
-            # Map angle-degrees bounds → physical sample bounds via tan.
-            return math.tan(math.radians(lo)), math.tan(math.radians(hi))
-        return lo, hi
-
     for col_idx, col_name in enumerate(plot_params):
         if col_name not in priors:
             continue
-        dist, lo, hi = priors[col_name]
-        x_lo, x_hi = _physical_bounds(dist, lo, hi)
+        _dist, x_lo, x_hi = priors[col_name]
         if not (x_lo < x_hi):
             continue
 
@@ -1542,6 +1538,31 @@ def _overlay_priors(axes_df: object, result: InferenceResult) -> None:
                 alpha=0.8,
                 label="prior",
             )
+        elif dist == "arctan_uniform" and hi > lo:
+            # theta ~ U(-theta_max, theta_max), x = tan(theta), so
+            # p(x) = 1/(2*theta_max) * 1/(1+x^2) — a truncated Cauchy.
+            # Campaign chains are overwhelmingly arctan-prior, so without
+            # this curve the "posterior tracks the prior" null check
+            # (#309) was unavailable for exactly the parameters where the
+            # #420 marginal-D_KL inflation bit hardest.
+            from tidal.inference._prior import _ARCTAN_EPS
+
+            theta_max = math.pi / 2 - _ARCTAN_EPS
+            xs = np.linspace(lo, hi, 400)
+            density = 1.0 / (2.0 * theta_max * (1.0 + xs**2))
+            ax.plot(xs, density, color="red", lw=1.2, alpha=0.8, label="prior")
+        elif dist == "normal" and hi > 0:
+            # Prior's convention for normal: low = mean, high = std.
+            # (lo, hi) here are the effective support, which is infinite
+            # for normal and therefore never reaches this branch via
+            # _extract_prior_map; kept so a directly-injected prior map
+            # renders rather than silently drawing nothing.
+            mu, sigma = lo, hi
+            xs = np.linspace(mu - 4.0 * sigma, mu + 4.0 * sigma, 400)
+            density = np.exp(-0.5 * ((xs - mu) / sigma) ** 2) / (
+                sigma * math.sqrt(2.0 * math.pi)
+            )
+            ax.plot(xs, density, color="red", lw=1.2, alpha=0.8, label="prior")
 
         if xlim is not None:
             ax.set_xlim(xlim)
@@ -1558,16 +1579,35 @@ def _extract_prior_map(
     added ``result.metadata["priors"]``). When replotting old chains
     that pre-date that commit, use ``tidal plot --priors "..."`` to
     inject them via :func:`tidal.inference._prior.parse_prior`.
+
+    The returned bounds are the **effective support** — the range that
+    was actually sampled — taken from the record's
+    ``effective_low``/``effective_high`` when present and reconstructed
+    via :attr:`tidal.inference._prior.Prior.effective_support` otherwise.
+    Archived chains record only the bounds that were typed, which for
+    ``arctan_uniform`` describe nothing (GH #425); reconstructing on read
+    corrects their plots without touching their JSONs (GH #451).
+    Parameters whose support is unbounded (``normal``) are omitted, since
+    every consumer here needs a finite range.
     """
+    import math
+
+    from tidal.inference._prior import effective_support
+
     meta = getattr(result, "metadata", None) or {}
     entries = meta.get("priors") or []
     out: dict[str, tuple[str, float, float]] = {}
     for p in entries:
+        eff: tuple[float, float] | None = None
         if isinstance(p, dict):
             name = p.get("name")
             dist = p.get("distribution") or p.get("dist") or p.get("kind")
             low = p.get("low", p.get("lo"))
             high = p.get("high", p.get("hi"))
+            eff_lo = p.get("effective_low")
+            eff_hi = p.get("effective_high")
+            if eff_lo is not None and eff_hi is not None:
+                eff = (float(eff_lo), float(eff_hi))
         else:
             name = getattr(p, "name", None)
             dist = (
@@ -1577,8 +1617,21 @@ def _extract_prior_map(
             )
             low = getattr(p, "low", None) or getattr(p, "lo", None)
             high = getattr(p, "high", None) or getattr(p, "hi", None)
-        if name and dist and low is not None and high is not None:
-            out[str(name)] = (str(dist), float(low), float(high))
+        if not (name and dist and low is not None and high is not None):
+            continue
+        if eff is None:
+            # Archived record, or a Prior-like object: ask the prior
+            # module what that distribution samples rather than trusting
+            # the bounds.
+            try:
+                eff = effective_support(str(dist), float(low), float(high))
+            except ValueError:
+                # Unknown distribution (e.g. a joint-prior record that
+                # reached here) — no support to speak of; skip it.
+                continue
+        if not (math.isfinite(eff[0]) and math.isfinite(eff[1])):
+            continue
+        out[str(name)] = (str(dist), eff[0], eff[1])
     return out
 
 

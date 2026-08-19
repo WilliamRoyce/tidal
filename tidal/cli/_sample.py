@@ -354,34 +354,9 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         # marginal D_KL per parameter, #308) can transform each column
         # into the space where its prior is uniform.  Mixed priors are
         # serialized by type so the loader can reconstruct each component.
-        import numpy as np
+        from tidal.inference._prior import to_record
 
-        prior_records: list[dict[str, object]] = []
-        for p in priors:
-            if isinstance(p, RadialAngularPrior):
-                prior_records.append(
-                    {
-                        "kind": "radial_angular",
-                        "names": list(p.names),
-                        "r_lo": p.r_lo,
-                        "r_hi": p.r_hi,
-                        "face_idx": p.face_idx,
-                        "sub_tile": list(p.sub_tile),
-                        "M": p.M,
-                        "Q": np.asarray(p.Q).tolist(),
-                    }
-                )
-            else:
-                prior_records.append(
-                    {
-                        "kind": "scalar",
-                        "name": p.name,
-                        "distribution": p.distribution,
-                        "low": p.low,
-                        "high": p.high,
-                    }
-                )
-        result.metadata["priors"] = prior_records
+        result.metadata["priors"] = [to_record(p) for p in priors]
         # Persist likelihood mode so the corner-plot title can label the
         # extremal logL correctly: "max A" for maximize, "max suppression"
         # for minimize, etc.  Without this the same number means different
