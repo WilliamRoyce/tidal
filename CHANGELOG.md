@@ -28,6 +28,38 @@ retroactively covered; see `git log` for the full history.
   every ρ, the refusal message names the coupled sectors, and sub-tolerance
   discards are logged. Cross-block support is tracked in #439; the related
   corner-collapse of position-dependent source coefficients in #438.
+- **Convolution paths rebuilt in the full complex FFT basis (#445)**. The
+  probe-vector block construction over the rfft half-spectrum was only
+  R-linear-correct: the DC/Nyquist bins carry no imaginary degree of
+  freedom, so sin-phase content that a position-dependent coefficient's
+  harmonics fold onto them was misrepresented (7–25% per-mode action
+  errors; 1–6% on smooth fields — pre-existing since the convolution
+  machinery landed, affecting all localized-background modal runs). The
+  block is now the exact circulant `ĉ[(k−k′) mod N]/N_tot` from a single
+  FFT of the coefficient: machine-precision action on every mode and
+  phase, cheaper to build. Per-mode paths keep the rfft basis.
+  Impact-quantification against recorded campaigns is tracked in #438.
+- **No silent corner-collapse of position-dependent coefficients (#438)**.
+  `_resolve_constant_coeff` raises instead of evaluating an ndarray
+  coefficient at the first grid point. Previously the conversion-stability
+  guard judged localized backgrounds at the domain edge (B ≈ 0) on every
+  gated sweep point / likelihood evaluation, and Pass-1 source matrices
+  corner-collapsed O(ε) correction coefficients. Localized sweep/sampling
+  gating now refuses loudly pending the #441 gate design.
+
+### Added
+
+- **Position-dependent kinetic coefficients in modal (#427)**. The
+  convolution paths fold the per-grid-point `M⁻¹(x)`
+  (grid-aware `build_inverse_kinetic_diag`, #382) into each velocity-row
+  coefficient in real space before the FFT — mathematically identical to
+  the mass-side `M̂⁻¹(k−k′)` convolution. Routing is kinetics-aware,
+  `can_use_modal` requirement 6 is retired, and auto-selection accepts
+  such specs; the strictly per-mode engines (genEig/stability-probe/
+  modal-jax entry, Pass-1 Duhamel) keep an updated refusal. Validated:
+  stripped-EH modal-vs-CVODE RMS < 1%, spectral-rate convergence,
+  cross-path kinetic-contract pins on both convolution paths, and the
+  intact EH spec runs end-to-end via `--perturbative-order 0`.
 
 ## [v0.34.0 – v0.47.9] — not individually recorded
 

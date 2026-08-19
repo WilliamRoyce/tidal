@@ -618,6 +618,13 @@ class TestGH429EHDualGaussianRefusal:
     physical, so the refusal must not depend on the overall source
     scale. Pre-#429 the absolute floor made the verdict a function of
     rho (refusing only for rho ≳ 1e-9 at this geometry).
+
+    Refusal layering (post-GH #438): the spec's O(ε) correction
+    coefficients carry the Gaussian profile, so `_build_source_matrix_k`
+    refuses them via the `_resolve_constant_coeff` hardening BEFORE the
+    Duhamel cross-block guard is reached — both refusals are honest and
+    rho-independent. The cross-block guard itself stays pinned by the
+    hand-crafted-matrix tests above, which bypass coefficient resolution.
     """
 
     EH_SPEC = "examples/data/euler_heisenberg_e_dual_gaussian.json"
@@ -670,7 +677,7 @@ class TestGH429EHDualGaussianRefusal:
                 return_eigendata=True,
             ),
         )
-        with pytest.raises(NotImplementedError, match="[Cc]ross-block") as excinfo:
+        with pytest.raises(NotImplementedError, match="first grid point") as excinfo:
             solve_modal_pass1(
                 pass0["eigendata"],
                 correction,
@@ -678,10 +685,11 @@ class TestGH429EHDualGaussianRefusal:
                 pass0["t"],
                 parameters=params,
             )
-        # The message names the coupled sectors.
+        # The message names the offending field and points at the
+        # working routes (GH #427 convolution modal, time-domain).
         msg = str(excinfo.value)
         assert "a_0" in msg
-        assert "a_3" in msg
+        assert "#427" in msg
 
 
 class TestPass1NearDegeneracy:

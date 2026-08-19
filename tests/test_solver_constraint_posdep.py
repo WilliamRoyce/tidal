@@ -36,7 +36,7 @@ from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.grid import GridInfo
 from tidal.solver.modal import (
     _build_convolution_matrix_with_constraints,
-    _build_k_axes,
+    _build_k_axes_full,
     _build_k_grid,
 )
 from tidal.solver.state import StateLayout
@@ -269,9 +269,10 @@ def test_gh379_synthetic_recovery_matches_analytical() -> None:
     grid = GridInfo(bounds=((0.0, 2.0 * np.pi),), shape=(n,), periodic=(True,))
     layout = StateLayout.from_spec(spec, grid.num_points)
     ce = CoefficientEvaluator(spec, grid, {})
-    k_axes = _build_k_axes(grid)
+    # GH #445: the convolution builders operate in the FULL fftn basis.
+    k_axes = _build_k_axes_full(grid)
     k_grid = _build_k_grid(k_axes)
-    rfft_shape = (n // 2 + 1,)
+    full_shape = (n,)
 
     _A_red, recovery, c_names, orig_to_reduced = (
         _build_convolution_matrix_with_constraints(
@@ -280,12 +281,12 @@ def test_gh379_synthetic_recovery_matches_analytical() -> None:
             grid,
             ce,
             k_grid,
-            rfft_shape,
+            full_shape,
         )
     )
 
     assert c_names == ["chi"]
-    n_modes = int(np.prod(rfft_shape))
+    n_modes = int(np.prod(full_shape))
 
     # Build a known φ(x) = 1.0 (constant); set v_φ=0; apply recovery
     n_dyn_slots = len(orig_to_reduced)
@@ -293,10 +294,10 @@ def test_gh379_synthetic_recovery_matches_analytical() -> None:
     phi_slot = orig_to_reduced[layout.field_slot_map["phi"]]
     # φ(x) = 1 in real space → FFT is δ_{m,0} · N
     phi_real = np.ones(n)
-    y_d_hat[phi_slot] = np.fft.rfft(phi_real)
+    y_d_hat[phi_slot] = np.fft.fft(phi_real)
 
     c_hat = recovery @ y_d_hat.ravel()
-    c_real = np.fft.irfft(c_hat, n=n)
+    c_real = np.fft.ifft(c_hat).real
 
     # Expected: χ(x) = h(x) · 1.0 = 0.5·cos(x), evaluated at the same
     # cell-centered grid coords (x_i = (i+0.5)·dx) the modal solver uses
