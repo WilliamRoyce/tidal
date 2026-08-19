@@ -85,10 +85,28 @@ def _label(name: str) -> str:
 
 
 def _score_from_imp(imp: dict, name: str) -> float:
+    """Combined max(amp marginal, sup marginal, cross) for one parameter.
+
+    A marginal flagged floor-dominated contributes 0 (GH #433): at low
+    N_eff it is estimator bias, and ranking on it selects the figure's
+    parameters by noise.  Cross-KL is prior-free and always counts.
+    """
+    from tidal.inference._importance import floor_dominated_params
+
     amp = imp.get("amp", {}).get("marginal_d_kl", {}) or {}
     sup = imp.get("sup", {}).get("marginal_d_kl", {}) or {}
     cross = imp.get("cross_amp_sup_kl", {}) or {}
-    vals = [amp.get(name, 0.0), sup.get(name, 0.0), cross.get(name, 0.0)]
+    amp_val = (
+        0.0
+        if name in floor_dominated_params(imp.get("amp", {}))
+        else amp.get(name, 0.0)
+    )
+    sup_val = (
+        0.0
+        if name in floor_dominated_params(imp.get("sup", {}))
+        else sup.get(name, 0.0)
+    )
+    vals = [amp_val, sup_val, cross.get(name, 0.0)]
     vals = [v if v is not None and math.isfinite(v) else 0.0 for v in vals]
     return max(vals)
 

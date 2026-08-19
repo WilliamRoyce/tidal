@@ -16,6 +16,7 @@ Handley, W. et al. (2015) "PolyChord: next-generation nested sampling",
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -865,6 +866,31 @@ def compute_cross_kl(
             cross[name] = float("nan")
 
     return cross
+
+
+def floor_dominated_params(importance_block: Mapping[str, Any]) -> frozenset[str]:
+    """Names in a saved importance block whose marginal is estimator noise.
+
+    Reads ``consistency.floor_dominated_params`` from one direction's
+    block of a ``parameter_importance.json`` / ``importance.json`` (the
+    dict holding ``marginal_d_kl``).  Provided so every consumer that
+    RANKS marginals — tables, TeX emitters, figure-selection scripts —
+    asks the same question the same way instead of each deciding for
+    itself whether a 0.9-nat marginal from an N_eff = 21 chain is signal
+    (GH #433).
+
+    Returns an empty set for a pre-v0.48.8 block with no consistency
+    data: absence of the block means the floors were never computed, not
+    that nothing is floor-dominated, so callers that care about the
+    difference should check for the key themselves.
+    """
+    consistency = importance_block.get("consistency")
+    if not isinstance(consistency, Mapping):
+        return frozenset()
+    names = consistency.get("floor_dominated_params")
+    if not isinstance(names, (list, tuple, set, frozenset)):
+        return frozenset()
+    return frozenset(str(n) for n in names)
 
 
 def format_importance_table(result: ParameterImportanceResult) -> str:

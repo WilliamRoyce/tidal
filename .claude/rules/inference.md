@@ -16,6 +16,13 @@ paths:
 2. **arctan_uniform's recorded low/high are UNUSED** (#425): the support is fixed at
    ±tan(π/2 − `_ARCTAN_EPS`) ≈ ±19.98. Never derive a histogram range, support, or
    density from those recorded bounds. `0:0` is the sanctioned "unused" sentinel.
+   Ask `tidal.inference._prior.effective_support(dist, low, high)` — the ONE place
+   that answers "what range was sampled". Every module that answered it privately
+   was wrong: the #420 estimator read the bounds as a histogram range, and the
+   corner plot read them as degrees and drew ±57.3 panels (#451). New chains also
+   record `effective_low`/`effective_high` per scalar prior (omitted when
+   unbounded, since `Infinity` is not valid strict JSON); archived chains have
+   the support reconstructed on read, never by trusting `low`/`high`.
 3. **Never rank a marginal at or below its noise floor** `(n_bins − 1)/(2·n_eff)`
    (#433). Every consumer of `marginal_d_kl` (tables, plots, TeX emitters) must
    consult `consistency["floor_dominated_params"]` / `noise_floor` before ranking

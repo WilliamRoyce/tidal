@@ -414,7 +414,43 @@ class InferenceResult:
             summary["sampler"] = sampler
         priors = self.metadata.get("priors")
         if priors is not None:
-            summary["priors"] = priors
+            # Normalize live prior objects to records. compute_parameter_
+            # importance accepts either form, so a result assembled in
+            # memory can carry Prior instances; without this they reach
+            # json.dump and raise "not JSON serializable" at the very
+            # last step of a finished run.
+            from tidal.inference._prior import (
+                Prior,
+                RadialAngularPrior,
+                to_record,
+            )
+
+            if isinstance(priors, list):
+                summary["priors"] = [
+                    to_record(p) if isinstance(p, (Prior, RadialAngularPrior)) else p
+                    for p in priors
+                ]
+            else:
+                summary["priors"] = priors
+        elif self.method == "nested":
+            # GH #434: six pre-schema campaign chains saved without a
+            # priors block, and the post-hoc recompute had to FABRICATE
+            # an all-arctan prior set for them — which was wrong for the
+            # runs that used a log-uniform xi, giving a spurious dominant
+            # 1.66 nats. The omission was silent then; it must not be.
+            # Warn rather than raise: a result assembled programmatically
+            # (tests, ad-hoc analysis) is entitled to have no priors, it
+            # just cannot be scored against them later.
+            import logging
+
+            logging.getLogger("tidal.inference").warning(
+                "saving nested result to %s with no priors metadata — "
+                "per-parameter marginal D_KL cannot be computed from this "
+                "directory, and post-hoc analysis will have to reconstruct "
+                "the priors from run provenance (see GH #434). Set "
+                "result.metadata['priors'] before saving.",
+                output_dir,
+            )
         rejected_prior_path = self.metadata.get("rejected_prior_path")
         if rejected_prior_path is not None:
             summary["rejected_prior_path"] = str(rejected_prior_path)
