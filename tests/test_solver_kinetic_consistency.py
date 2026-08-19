@@ -217,6 +217,19 @@ def _make_kg_spec_with_kinetic_path(
                             path → :func:`_build_evolution_matrices`.
                             The constraint is independent of ``phi_0`` so
                             the physics on ``phi_0`` is unchanged.
+    * ``convolution_kinetic`` — appends ``+ 0*x[]`` to the KINETIC
+                            coefficient (GH #427: forces
+                            ``kinetic_position_dependent=True`` while the
+                            value stays analytically constant), routing
+                            through the kinetics-aware predicate to
+                            :func:`_build_convolution_matrix` with the
+                            real-space M⁻¹(x) fold.
+    * ``convolution_kinetic_schur`` — same pos-dep-in-form kinetic plus
+                            the decoupled ``aux_0`` constraint → the
+                            GH #379 constraints variant
+                            (:func:`_build_convolution_matrix_with_constraints`)
+                            with the M⁻¹(x) fold. Closes the path-4
+                            coverage gap noted pre-GH #427.
     """
     base_term: dict[str, Any] = {
         "coefficient": 1.0,
@@ -226,6 +239,10 @@ def _make_kg_spec_with_kinetic_path(
     if path == "convolution":
         base_term["coefficient_symbolic"] = "1 + 0*x[]"
 
+    lhs_kinetic = kinetic
+    if path in {"convolution_kinetic", "convolution_kinetic_schur"}:
+        lhs_kinetic = f"{kinetic} + 0*x[]"
+
     fields: list[dict[str, Any]] = [{"name": "phi_0", "index": 0}]
     equations: list[dict[str, Any]] = [
         {
@@ -233,13 +250,13 @@ def _make_kg_spec_with_kinetic_path(
             "lhs": {
                 "expression": "d2_t(phi_0)",
                 "order": {"time": 2},
-                "kinetic_coefficient_symbolic": kinetic,
+                "kinetic_coefficient_symbolic": lhs_kinetic,
             },
             "rhs": {"type": "linear_combination", "terms": [base_term]},
         },
     ]
 
-    if path == "evolution_matrices":
+    if path in {"evolution_matrices", "convolution_kinetic_schur"}:
         # Add a decoupled algebraic constraint: aux_0 = 0 (trivial Schur).
         fields.append({"name": "aux_0", "index": 1})
         equations.append(
@@ -320,7 +337,15 @@ class TestAllModalPathsRespectKinetic:
         )
         return np.asarray(result["y"][-1][: grid.num_points], dtype=np.float64)
 
-    @pytest.mark.parametrize("path", ["convolution", "evolution_matrices"])
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "convolution",
+            "evolution_matrices",
+            "convolution_kinetic",
+            "convolution_kinetic_schur",
+        ],
+    )
     def test_path_agrees_with_per_mode_reference(
         self,
         path: str,

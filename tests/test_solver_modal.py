@@ -23,6 +23,8 @@ from tidal.symbolic.json_loader import EquationSystem
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from numpy.typing import NDArray
+
 # ---------------------------------------------------------------------------
 # Inline specs for testing
 # ---------------------------------------------------------------------------
@@ -2016,9 +2018,12 @@ class TestGH421PositionDependentKinetic:
 
     # -- eligibility ----------------------------------------------------
 
-    def test_can_use_modal_rejects_posdep_kinetic(self) -> None:
+    def test_can_use_modal_accepts_posdep_kinetic(self) -> None:
+        # GH #427: position-dependent kinetics are modal-eligible — the
+        # kinetics-aware routing predicate sends them to the convolution
+        # builders, which fold M⁻¹(x) into the real-space coefficients.
         spec = self._load_eh(strip_perturbation=True)
-        assert can_use_modal(spec, self._grid(), None) is False
+        assert can_use_modal(spec, self._grid(), None) is True
 
     def test_can_use_modal_accepts_constant_symbolic_kinetic(self) -> None:
         spec_data = copy.deepcopy(_KG_1D_SPEC)
@@ -2042,21 +2047,26 @@ class TestGH421PositionDependentKinetic:
 
     # -- entry guards ---------------------------------------------------
 
-    def test_solve_modal_raises_actionable(self) -> None:
+    def test_solve_modal_runs_posdep_kinetic(self) -> None:
+        # GH #427: was a raises-actionable pin; solve_modal now completes
+        # on the stripped EH spec (convolution path 4 with M⁻¹(x) folded
+        # into the coefficients). Accuracy is pinned separately against
+        # CVODE in TestGH427PositionDependentKineticModal.
         spec = self._load_eh(strip_perturbation=True)
-        layout = StateLayout.from_spec(spec, self._grid().num_points)
-        y0 = np.zeros(layout.num_slots * self._grid().num_points)
-        with pytest.raises(NotImplementedError, match="kinetic") as exc_info:
-            solve_modal(
-                spec,
-                self._grid(),
-                y0,
-                (0.0, 1.0),
-                parameters=self.EH_PARAMS,
-            )
-        # The message must name a way out, not just the failure.
-        assert "--scheme cvode" in str(exc_info.value)
-        assert "small_parameters" in str(exc_info.value)
+        grid = self._grid()
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        rng = np.random.default_rng(0)
+        y0 = 1e-3 * rng.standard_normal(layout.num_slots * grid.num_points)
+        result = solve_modal(
+            spec,
+            grid,
+            y0,
+            (0.0, 0.1),
+            parameters=self.EH_PARAMS,
+            num_snapshots=3,
+        )
+        assert result["success"]
+        assert np.all(np.isfinite(result["y"]))
 
     def test_build_evolution_matrices_raises_not_silent_m1(self) -> None:
         """The genEig builder previously swallowed the evaluation failure
@@ -2139,19 +2149,21 @@ class TestGH421PositionDependentKinetic:
         spec = self._load_eh(strip_perturbation=False)
         assert _resolve_scheme("auto", spec, self._grid(), None) == "modal"
 
-    def test_resolve_scheme_stripped_eh_routes_to_time_domain(self) -> None:
+    def test_resolve_scheme_stripped_eh_routes_to_modal(self) -> None:
+        # GH #427: auto-selection now keeps the stripped EH spec on modal
+        # (was {"ida", "cvode"} while requirement 6 excluded pos-dep
+        # kinetics from eligibility).
         from tidal.cli._simulate import _resolve_scheme
 
         spec = self._load_eh(strip_perturbation=True)
-        scheme = _resolve_scheme("auto", spec, self._grid(), None)
-        assert scheme in {"ida", "cvode"}  # both consume kinetics via grid=
+        assert _resolve_scheme("auto", spec, self._grid(), None) == "modal"
 
-    def test_resolve_scheme_explicit_modal_rejected(self) -> None:
+    def test_resolve_scheme_explicit_modal_accepted(self) -> None:
+        # GH #427: was a RuntimeError pin (requirement 6 rejection).
         from tidal.cli._simulate import _resolve_scheme
 
         spec = self._load_eh(strip_perturbation=True)
-        with pytest.raises(RuntimeError, match="kinetic"):
-            _resolve_scheme("modal", spec, self._grid(), None)
+        assert _resolve_scheme("modal", spec, self._grid(), None) == "modal"
 
     # -- the documented alternative actually works ----------------------
 
@@ -2177,3 +2189,238 @@ class TestGH421PositionDependentKinetic:
         )
         assert result["success"]
         assert np.all(np.isfinite(result["y"]))
+
+
+class TestGH427PositionDependentKineticModal:
+    """GH #427 validation: modal handles position-dependent kinetics via
+    real-space M⁻¹(x) folded into the convolution-path coefficients.
+
+    Success criteria from the issue: modal-vs-CVODE RMS < 1% on the
+    stripped EH dual-Gaussian spec (the only shipped pos-dep-kinetic
+    spec), and spectral-rate convergence with grid resolution. Includes
+    the GH #438 hardening pins (no silent corner-collapse of
+    position-dependent coefficients in per-mode builders).
+    """
+
+    EH_SPEC = TestGH421PositionDependentKinetic.EH_SPEC
+    EH_PARAMS = TestGH421PositionDependentKinetic.EH_PARAMS
+
+    def _load_stripped_eh(self) -> EquationSystem:
+        loader = TestGH421PositionDependentKinetic()
+        return loader._load_eh(strip_perturbation=True)
+
+    def _grid(self, n: int = 32) -> GridInfo:
+        return GridInfo(shape=(n,), bounds=((-2.0, 2.0),), periodic=(True,))
+
+    # -- issue success criterion 1: agreement with the time-domain ref --
+
+    def test_stripped_eh_modal_matches_cvode_rms(self) -> None:
+        """Modal (convolution path 4 with M⁻¹(x)) vs CVODE (grid-evaluated
+        kinetics, GH #382) on identical smooth ICs: RMS relative
+        difference < 1% over the window. Do NOT loosen this tolerance —
+        a failure here means the physics differs between backends and
+        must be investigated (soundness over coverage).
+
+        Comparison design: CVODE runs with SPECTRAL spatial operators
+        (conftest resets the global afterwards) so both backends share
+        the exact spatial discretization, and the IC is band-limited
+        (low-k harmonics, seeded phases per field). A white-noise IC
+        would measure high-k discretization differences between the
+        backends, not the GH #427 kinetic handling under test.
+        """
+        from tidal.solver.cvode import solve_cvode
+        from tidal.solver.operators import set_spectral
+
+        spec = self._load_stripped_eh()
+        grid = self._grid()
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = grid.axes_coords(0)
+        length = 4.0  # bounds (-2, 2)
+        rng = np.random.default_rng(0)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        for slot in layout.field_slot_map.values():
+            sl = layout.slot_slice(slot)
+            phases = rng.uniform(0.0, 2 * np.pi, size=3)
+            y0[sl] = 1e-3 * sum(
+                np.cos(2 * np.pi * (m + 1) * x / length + phases[m]) for m in range(3)
+            )
+        t_span = (0.0, 0.1)
+
+        modal = solve_modal(
+            spec, grid, y0, t_span, parameters=self.EH_PARAMS, num_snapshots=5
+        )
+        set_spectral(True)
+        cvode = solve_cvode(
+            spec,
+            grid,
+            y0,
+            t_span,
+            parameters=self.EH_PARAMS,
+            num_snapshots=5,
+            rtol=1e-10,
+            atol=1e-12,
+        )
+        assert modal["success"]
+        assert cvode["success"]
+
+        diff = np.asarray(modal["y"]) - np.asarray(cvode["y"])
+        rms_diff = float(np.sqrt(np.mean(diff**2)))
+        rms_ref = float(np.sqrt(np.mean(np.asarray(cvode["y"]) ** 2)))
+        assert rms_ref > 0.0
+        rel = rms_diff / rms_ref
+        assert rel < 1e-2, (
+            f"modal-vs-CVODE RMS relative difference {rel:.3e} exceeds 1% "
+            f"on the stripped EH spec (GH #427 success criterion)"
+        )
+
+    # -- issue success criterion 2: spectral convergence ----------------
+
+    def test_posdep_kinetic_spectral_convergence(self) -> None:
+        """A smooth periodic M(x) = 1 + 0.25·sin(x) KG problem must
+        converge to the fine-grid modal reference at spectral (faster
+        than algebraic) rate: the N=32 error must beat the N=16 error by
+        far more than the 4x of a 2nd-order scheme.
+
+        Comparison design: TIDAL grids are CELL-CENTERED
+        (grid.axes_coords), so centers never coincide across resolutions
+        — comparing raw grid values would inject an O(dx) alignment
+        artifact and mask the spectral rate. Instead the IC is the same
+        physical function evaluated at each grid's own centers, and
+        errors are measured on normalized DFT coefficients over shared
+        low-|k| bins (basis-independent).
+        """
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "1 + 0.25*Sin[x[]]"
+        )
+        spec = _make_spec(spec_data)
+        length = 2 * np.pi
+        t_span = (0.0, 0.5)
+        params = {"m2": 1.0}
+        k_keep = 5  # compare DFT bins |k| ≤ 5, well inside N=16's band
+
+        def _solve_spectrum(n: int) -> NDArray[np.complex128]:
+            grid = GridInfo(shape=(n,), bounds=((0.0, length),), periodic=(True,))
+            layout = StateLayout.from_spec(spec, grid.num_points)
+            x = grid.axes_coords(0)
+            y0 = np.zeros(layout.num_slots * n)
+            y0[:n] = np.sin(x)  # same physical IC at every resolution
+            result = solve_modal(
+                spec, grid, y0, t_span, parameters=params, num_snapshots=3
+            )
+            assert result["success"]
+            field = np.asarray(result["y"])[-1, :n]
+            spectrum = np.fft.fft(field) / n
+            # Phase-align bins to the physical origin: samples sit at
+            # cell centers x_j = (j+1/2)·dx, so bin k carries an extra
+            # factor exp(+i·κ·dx/2) relative to the x=0-referenced
+            # Fourier coefficient — divide it out.
+            k_bins = np.fft.fftfreq(n, d=1.0 / n)  # integer wavenumbers
+            dx = length / n
+            aligned = spectrum * np.exp(-1j * k_bins * (2 * np.pi / length) * dx / 2)
+            return np.concatenate([aligned[: k_keep + 1], aligned[-k_keep:]])
+
+        ref = _solve_spectrum(128)
+        errors: dict[int, float] = {}
+        for n in (16, 32):
+            errors[n] = float(np.max(np.abs(_solve_spectrum(n) - ref)))
+
+        # 2nd-order FD would give errors[16]/errors[32] ≈ 4; spectral
+        # accuracy on a smooth periodic problem should exceed that by
+        # orders of magnitude (both grids resolve M's single harmonic).
+        assert errors[32] < errors[16] / 20.0, (
+            f"convergence not spectral: err(16)={errors[16]:.3e}, "
+            f"err(32)={errors[32]:.3e} (ratio "
+            f"{errors[16] / max(errors[32], 1e-300):.1f}x, need > 20x)"
+        )
+
+    def test_varying_kinetic_path3_matches_cvode(self) -> None:
+        """Genuinely varying M(x) = 1 + 0.25·sin(x) on the constraint-free
+        convolution path (path 3) agrees with spectral CVODE to < 1% RMS.
+        Complements the EH test above, which exercises path 4.
+        """
+        from tidal.solver.cvode import solve_cvode
+        from tidal.solver.operators import set_spectral
+
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "1 + 0.25*Sin[x[]]"
+        )
+        spec = _make_spec(spec_data)
+        n = 32
+        grid = GridInfo(shape=(n,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = grid.axes_coords(0)
+        y0 = np.zeros(layout.num_slots * n)
+        y0[:n] = np.sin(x) + 0.3 * np.cos(2 * x + 0.4)
+        params = {"m2": 1.0}
+        t_span = (0.0, 0.5)
+
+        modal = solve_modal(spec, grid, y0, t_span, parameters=params, num_snapshots=5)
+        set_spectral(True)
+        cvode = solve_cvode(
+            spec,
+            grid,
+            y0,
+            t_span,
+            parameters=params,
+            num_snapshots=5,
+            rtol=1e-10,
+            atol=1e-12,
+        )
+        assert modal["success"]
+        assert cvode["success"]
+        diff = np.asarray(modal["y"]) - np.asarray(cvode["y"])
+        rel = float(
+            np.sqrt(np.mean(diff**2)) / np.sqrt(np.mean(np.asarray(cvode["y"]) ** 2))
+        )
+        assert rel < 1e-2, f"path-3 modal-vs-CVODE RMS {rel:.3e} exceeds 1%"
+
+    # -- GH #438 hardening: no silent corner-collapse -------------------
+
+    def test_resolve_constant_coeff_raises_on_posdep(self) -> None:
+        """_resolve_constant_coeff must refuse an ndarray (position-
+        dependent) coefficient instead of silently evaluating it at the
+        first grid point (GH #438).
+        """
+        from tidal.solver.coefficients import CoefficientEvaluator
+        from tidal.solver.modal import _resolve_constant_coeff
+
+        spec = self._load_stripped_eh()
+        grid = self._grid()
+        ce = CoefficientEvaluator(spec, grid, self.EH_PARAMS)
+        # Find a position-dependent term to resolve.
+        eq_idx, term_idx, posdep_term = next(
+            (ei, ti, term)
+            for ei, eq in enumerate(spec.equations)
+            for ti, term in enumerate(eq.rhs_terms)
+            if term.position_dependent
+        )
+        with pytest.raises(NotImplementedError, match="first grid point"):
+            _resolve_constant_coeff(posdep_term, ce, eq_idx=eq_idx, term_idx=term_idx)
+
+    def test_stability_probe_refuses_posdep_rhs_background(self) -> None:
+        """The stability probe on a localized (position-dependent RHS)
+        spec previously evaluated the background at the domain edge
+        (B ≈ 0) and judged the near-vacuum theory. Post-GH #438 the
+        refusal propagates — NotImplementedError deliberately does not
+        match the probe's (LinAlgError, ValueError) handler, so it must
+        NOT be converted into a fabricated verdict.
+        """
+        from tidal.measurement._stability import check_conversion_stability
+
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        terms = spec_data["equations"][0]["rhs"]["terms"]  # type: ignore[index]
+        terms.append(
+            {
+                "coefficient": 1.0,
+                "operator": "identity",
+                "field": "phi_0",
+                "coefficient_symbolic": "0.5*Sin[x[]]",
+                "coordinate_dependent": ["x"],
+            }
+        )
+        spec = _make_spec(spec_data)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        with pytest.raises(NotImplementedError, match="first grid point"):
+            check_conversion_stability(spec, grid, {"m2": 1.0}, source="phi_0")
