@@ -324,7 +324,7 @@ class TestPath4ECalAdjudication:
     Constraint rows h_0/h_1/h_2 (no mishandled terms): close at 1e-12–1e-15
     → recovery/Schur is machine-exact on the handled subspace.
 
-    Full-closure xfails below carry the measured defect numbers:
+    Full-closure xfail marks below carry the measured defect numbers:
 
     * constraint rows WITH dropped inter-constraint derivative terms:
       h_3 = 0.374, h_4 = 0.980, h_7 = 0.980, h_9 = 0.877 — the dropped
