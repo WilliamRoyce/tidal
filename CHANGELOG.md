@@ -104,6 +104,31 @@ retroactively covered; see `git log` for the full history.
   FFT of the coefficient: machine-precision action on every mode and
   phase, cheaper to build. Per-mode paths keep the rfft basis.
   Impact-quantification against recorded campaigns is tracked in #438.
+- **Deferred constraint-velocity substitutions now carry the velocity-row
+  M⁻¹ (#444)**. In the pos-dep + constraints builder (path 4), dynamical-RHS
+  terms referencing a constraint field's velocity or acceleration were
+  deferred until the recovery matrix existed — and the deferral dropped the
+  emitting row's `velocity_row_scale`, so those contributions were emitted
+  without the 1/M factor. Not a corner case: all 8 dual-Gaussian roster
+  specs carry 6–944 such terms on rows with non-unit kinetics (`-kappa^(-2)`
+  graviton rows, `-xi`, multi-parameter χ sums), including the E.cal
+  calibration spec whose recorded Boccaletti agreement predates this fix.
+  The scale is now recorded at deferral time and applied at substitution
+  (scalar and position-dependent M(x) alike, via the GH #427 fold). Pinned
+  by a composed-DAE-residual oracle (`χ = h(x)·φ` ⇒ the velocity-row action
+  must equal `(1/M)·[∂²ₓφ + c_v·h·v_φ]` pointwise — machine-precision for
+  positive, NEGATIVE, and position-dependent M; fails pre-fix by the missing
+  factor), IDA agreement on the synthetic, and new contract pins for the
+  Pass-1 source builder and the energy path on position-dependent kinetics.
+  **Applying the correct scale exposed #455**: the ungauged-gravity spec
+  class (E.cal and the torsion roster) becomes near-singular in the
+  velocity-coupling resolution (operator abscissa 0.51 → 1594,
+  α-independent) — every recorded result on that class ran on the
+  accidentally-regularized wrong operator, and the builder also silently
+  drops constraint-side `first_derivative_t` partner terms (7 on the
+  nonminimal spec). The GH #379 expectation tests and the E.cal smoke are
+  skipped pinned to #455 until its truncation-vs-degeneracy question is
+  adjudicated by the localized-path audit oracles.
 - **No silent corner-collapse of position-dependent coefficients (#438)**.
   `_resolve_constant_coeff` raises instead of evaluating an ndarray
   coefficient at the first grid point. Previously the conversion-stability
