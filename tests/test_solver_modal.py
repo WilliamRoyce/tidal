@@ -2515,3 +2515,73 @@ class TestGH427PositionDependentKineticModal:
         grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
         with pytest.raises(NotImplementedError, match="first grid point"):
             check_conversion_stability(spec, grid, {"m2": 1.0}, source="phi_0")
+
+
+class TestGH427EnergyOnPositionDependentKinetics:
+    """WS1 rider: the energy machinery on the one shipped pos-dep-kinetic
+    spec, which only became runnable (and hence measurable) with GH #427.
+
+    `_energy.py` resolves position-dependent Hamiltonian coefficients on
+    the grid (`_build_coord_arrays` / `evaluate_coefficient` with
+    coord_arrays); the stripped EH spec carries 21 such terms. This pins
+    that the path (a) evaluates without raising, (b) returns finite
+    values, and (c) conserves total energy over a short window — the
+    background is time-independent, so H is conserved; a corner-collapse
+    or basis error in the energy coefficients would break conservation at
+    the percent level immediately.
+    """
+
+    def test_stripped_eh_energy_finite_and_conserved(self) -> None:
+        from tidal.measurement._energy import compute_energy_timeseries
+        from tidal.measurement._io import SimulationData
+
+        loader = TestGH421PositionDependentKinetic()
+        spec = loader._load_eh(strip_perturbation=True)
+        grid = GridInfo(shape=(32,), bounds=((-2.0, 2.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = grid.axes_coords(0)
+        length = 4.0
+        rng = np.random.default_rng(0)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        for slot in layout.field_slot_map.values():
+            sl = layout.slot_slice(slot)
+            phases = rng.uniform(0.0, 2 * np.pi, size=3)
+            y0[sl] = 1e-3 * sum(
+                np.cos(2 * np.pi * (m + 1) * x / length + phases[m]) for m in range(3)
+            )
+        params = TestGH421PositionDependentKinetic.EH_PARAMS
+
+        result = solve_modal(
+            spec, grid, y0, (0.0, 0.1), parameters=params, num_snapshots=5
+        )
+        assert result["success"]
+
+        n_pts = grid.num_points
+        snaps = np.asarray(result["y"])
+        fields = {
+            name: snaps[:, slot * n_pts : (slot + 1) * n_pts]
+            for name, slot in layout.field_slot_map.items()
+        }
+        velocities = {
+            name: snaps[:, slot * n_pts : (slot + 1) * n_pts]
+            for name, slot in layout.velocity_slot_map.items()
+        }
+        data = SimulationData(
+            times=np.asarray(result["t"]),
+            fields=fields,
+            velocities=velocities,
+            grid_spacing=grid.dx,
+            grid_bounds=grid.bounds,
+            periodic=grid.periodic,
+            spec=spec,
+            parameters=dict(params),
+        )
+        _times, _per_field, _interaction, total = compute_energy_timeseries(data)
+        assert np.all(np.isfinite(total)), "energy produced non-finite values"
+        assert abs(total[0]) > 0.0, "energy is identically zero — nothing measured"
+        drift = float(np.max(np.abs(total - total[0])) / abs(total[0]))
+        assert drift < 1e-2, (
+            f"total energy drifts {drift:.3e} over t=0.1 on a time-independent "
+            f"background — the pos-dep Hamiltonian coefficients are being "
+            f"mis-evaluated"
+        )
