@@ -497,23 +497,23 @@ class TestGH444DeferredVelocityRowScale:
         phi_hat = np.where(
             keep, rng.standard_normal(n) + 1j * rng.standard_normal(n), 0
         )
-        vphi_hat = np.where(
+        vel_phi_hat = np.where(
             keep, rng.standard_normal(n) + 1j * rng.standard_normal(n), 0
         )
         # Hermitian-symmetrize so the states are real fields.
         phi = np.fft.ifft(phi_hat).real
-        vel_phi = np.fft.ifft(vphi_hat).real
+        vel_phi = np.fft.ifft(vel_phi_hat).real
         phi_hat = np.fft.fft(phi)
-        vphi_hat = np.fft.fft(vel_phi)
+        vel_phi_hat = np.fft.fft(vel_phi)
 
         phi_red = orig_to_reduced[layout.field_slot_map["phi"]]
-        vphi_red = orig_to_reduced[layout.velocity_slot_map["phi"]]
+        vel_phi_red = orig_to_reduced[layout.velocity_slot_map["phi"]]
         n_dyn = len(orig_to_reduced)
         y_hat = np.zeros(n_dyn * n, dtype=np.complex128)
         y_hat[phi_red * n : (phi_red + 1) * n] = phi_hat
-        y_hat[vphi_red * n : (vphi_red + 1) * n] = vphi_hat
+        y_hat[vel_phi_red * n : (vel_phi_red + 1) * n] = vel_phi_hat
 
-        action = (A_red @ y_hat)[vphi_red * n : (vphi_red + 1) * n]
+        action = (A_red @ y_hat)[vel_phi_red * n : (vel_phi_red + 1) * n]
         action_real = np.fft.ifft(action).real
 
         k_phys = 2.0 * np.pi * np.fft.fftfreq(n, d=length / n)
