@@ -135,7 +135,7 @@ def _run_minimal_repro(
 
 
 @pytest.mark.skip(
-    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than xfailed. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
+    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than marked xfail. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
 )
 def test_gh379_minimal_repro_does_not_diverge() -> None:
     """At α=δ=0.001 the broken theory must produce smooth perturbative dynamics.
@@ -163,7 +163,7 @@ def test_gh379_minimal_repro_does_not_diverge() -> None:
 
 
 @pytest.mark.skip(
-    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than xfailed. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
+    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than marked xfail. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
 )
 def test_gh379_alpha_zero_baseline() -> None:
     """At α=0 the torsion sector decouples; output must match Gertsenshtein."""
@@ -175,7 +175,7 @@ def test_gh379_alpha_zero_baseline() -> None:
 
 
 @pytest.mark.skip(
-    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than xfailed. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
+    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than marked xfail. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
 )
 def test_gh379_torsion_scales_linearly_with_alpha() -> None:
     """Torsion-field peak scales linearly with α (perturbative regime).
@@ -502,9 +502,9 @@ class TestGH444DeferredVelocityRowScale:
         )
         # Hermitian-symmetrize so the states are real fields.
         phi = np.fft.ifft(phi_hat).real
-        vphi = np.fft.ifft(vphi_hat).real
+        vel_phi = np.fft.ifft(vphi_hat).real
         phi_hat = np.fft.fft(phi)
-        vphi_hat = np.fft.fft(vphi)
+        vphi_hat = np.fft.fft(vel_phi)
 
         phi_red = orig_to_reduced[layout.field_slot_map["phi"]]
         vphi_red = orig_to_reduced[layout.velocity_slot_map["phi"]]
@@ -518,7 +518,7 @@ class TestGH444DeferredVelocityRowScale:
 
         k_phys = 2.0 * np.pi * np.fft.fftfreq(n, d=length / n)
         lap_phi = np.fft.ifft(-(k_phys**2) * phi_hat).real
-        expected = (lap_phi + self.C_V * h_of_x * vphi) / m_of_x
+        expected = (lap_phi + self.C_V * h_of_x * vel_phi) / m_of_x
 
         err = np.max(np.abs(action_real - expected)) / max(
             np.max(np.abs(expected)), 1e-300
