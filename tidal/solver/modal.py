@@ -2420,13 +2420,35 @@ def _build_convolution_matrix_with_constraints(
     ] = []
     # deferred_terms_dyn_velc: dyn RHS references v_constraint with t_order=0 OR
     # first_derivative_t(constraint) — both require v_c substitution after recovery.
-    # entries: (vel_red, eq_idx, term_idx, term, mult, cj_constraint_idx)
+    # entries: (vel_red, eq_idx, term_idx, term, mult, cj_constraint_idx, scale)
+    # GH #444: `scale` is the emitting equation's velocity-row M⁻¹
+    # (velocity_row_scale). The deferral previously dropped it and the
+    # application sites used scale=1.0, so every deferred contribution on a
+    # row with a non-unit kinetic (−κ⁻², −ξ, …: all 8 dual-Gaussian roster
+    # specs) was off by a factor of M — a kinetic-contract violation
+    # (module docstring; TestAllModalPathsRespectKinetic).
     deferred_terms_dyn_velc: list[
-        tuple[int, int, int, OperatorTerm, NDArray[np.complex128], int]
+        tuple[
+            int,
+            int,
+            int,
+            OperatorTerm,
+            NDArray[np.complex128],
+            int,
+            complex | NDArray[np.float64],
+        ]
     ] = []
     # deferred_terms_dyn_ddc: dyn RHS references d2_t(constraint) — requires ẍ_c
     deferred_terms_dyn_ddc: list[
-        tuple[int, int, int, OperatorTerm, NDArray[np.complex128], int]
+        tuple[
+            int,
+            int,
+            int,
+            OperatorTerm,
+            NDArray[np.complex128],
+            int,
+            complex | NDArray[np.float64],
+        ]
     ] = []
 
     # ---- A_dd kinematic rows: dq/dt = v ---------------------------------
@@ -2460,7 +2482,7 @@ def _build_convolution_matrix_with_constraints(
                             # coeff · op · v_c — needs v_c = d/dt(recovery·y_d).
                             # Defer until recovery is built.
                             deferred_terms_dyn_velc.append(
-                                (vel_red, eq_idx, term_idx, term, mult, cj),
+                                (vel_red, eq_idx, term_idx, term, mult, cj, scale),
                             )
                         else:
                             warned_unhandled.add(
@@ -2481,12 +2503,12 @@ def _build_convolution_matrix_with_constraints(
                     elif t_order == 1:
                         # coeff · first_dt(q_c) = coeff · v_c → defer
                         deferred_terms_dyn_velc.append(
-                            (vel_red, eq_idx, term_idx, term, mult, cj),
+                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
                         )
                     elif t_order == 2:
                         # coeff · d2_t(q_c) = coeff · ẍ_c → defer
                         deferred_terms_dyn_ddc.append(
-                            (vel_red, eq_idx, term_idx, term, mult, cj),
+                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
                         )
                     else:
                         warned_unhandled.add(
@@ -2685,6 +2707,11 @@ def _build_convolution_matrix_with_constraints(
     # which equals A_dd[vel_slot(fj), field_slot(k)] for K and
     #              A_dd[vel_slot(fj), vel_slot(k)] for D, already M⁻¹-scaled.
     # The deferred-term contribution: K_cd[ci_block, :] += conv(term) @ A_dd[vel_slot(fj)_block, :]
+    # GH #444 note: unlike the dyn-row velc/ddc lists below, this list
+    # correctly uses scale=1.0 — the M⁻¹ it needs is the DYNAMICAL row's,
+    # and it arrives through the composed A_dd factor (whose velocity rows
+    # were emitted with velocity_row_scale). Constraint rows themselves
+    # carry no kinetic coefficient (time_order == 0).
     for ci, eq_idx, term_idx, term, mult, fj in deferred_terms_constraint:
         fj_vel_red = orig_to_reduced[layout.velocity_slot_map[dyn_field_names[fj]]]
         temp = _term_conv_block(term, mult, scale=1.0, eq_idx=eq_idx, term_idx=term_idx)
@@ -2720,8 +2747,14 @@ def _build_convolution_matrix_with_constraints(
     vel_coupling_mat = np.zeros_like(
         A_reduced
     )  # term × recovery, will be composed with A_reduced
-    for vel_red, eq_idx, term_idx, term, mult, cj in deferred_terms_dyn_velc:
-        temp = _term_conv_block(term, mult, scale=1.0, eq_idx=eq_idx, term_idx=term_idx)
+    for vel_red, eq_idx, term_idx, term, mult, cj, row_scale in deferred_terms_dyn_velc:
+        # GH #444: apply the emitting row's M⁻¹ (recorded at deferral time).
+        # _term_conv_block handles both scalar and position-dependent
+        # (ndarray) scales — the latter folds M⁻¹(x) into the coefficient
+        # before the FFT (GH #427), so arbitrary kinetics are covered.
+        temp = _term_conv_block(
+            term, mult, scale=row_scale, eq_idx=eq_idx, term_idx=term_idx
+        )
         # vel_c block in recovery = recovery[cj_block, :]
         recovery_block = recovery[cj * n_modes : (cj + 1) * n_modes, :]
         # Contribution: (vel_red row block) += temp @ recovery_block @ A_reduced
@@ -2738,8 +2771,11 @@ def _build_convolution_matrix_with_constraints(
     # Combine with vel_coupling: this contributes a A_reduced² term, distinct from vel's A_reduced.
     has_ddc_coupling = False
     ddc_coupling_mat = np.zeros_like(A_reduced)
-    for vel_red, eq_idx, term_idx, term, mult, cj in deferred_terms_dyn_ddc:
-        temp = _term_conv_block(term, mult, scale=1.0, eq_idx=eq_idx, term_idx=term_idx)
+    for vel_red, eq_idx, term_idx, term, mult, cj, row_scale in deferred_terms_dyn_ddc:
+        # GH #444: same M⁻¹ application as the velc list above.
+        temp = _term_conv_block(
+            term, mult, scale=row_scale, eq_idx=eq_idx, term_idx=term_idx
+        )
         recovery_block = recovery[cj * n_modes : (cj + 1) * n_modes, :]
         ddc_coupling_mat[
             vel_red * n_modes : (vel_red + 1) * n_modes,
