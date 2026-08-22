@@ -453,3 +453,100 @@ class TestGH382PositionDependentKinetic:
         spec = _make_kg_spec_with_kinetic("1 + 0.1*x[]**2")
         with pytest.raises((ValueError, NameError)):
             build_inverse_kinetic_diag(spec, {})
+
+
+class TestPass1SourceBuilderRespectsKinetic:
+    """GH #444 rider: the Pass-1 source builder is bound to the
+    ``velocity_row_scale`` contract by modal.py's module docstring but was
+    not covered by the cross-path parametrization above (it is not a
+    ``solve_modal`` dispatch target). Direct pin: every source entry for a
+    2nd-order correction row must scale by 1/M relative to the M = 1 build.
+    """
+
+    def test_source_matrix_scales_by_inverse_kinetic(self) -> None:
+        import copy
+
+        from tidal.solver.coefficients import CoefficientEvaluator
+        from tidal.solver.modal import (
+            _build_k_axes,
+            _build_k_grid,
+            _build_source_matrix_k,
+        )
+        from tidal.solver.state import StateLayout
+
+        base: dict = {
+            "metadata": {
+                "parameters": {"m2": 1.0, "eps": 0.05, "alpha": 0.5},
+                "perturbation": {"small_parameters": ["eps"], "order": 1},
+            },
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-eps",
+                                "order_in_eps": 1,
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        params = {"m2": 1.0, "eps": 0.05, "alpha": 0.5}
+        grid = GridInfo(shape=(16,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        k_grid = _build_k_grid(_build_k_axes(grid))
+        rfft_shape = (16 // 2 + 1,)
+
+        def _sources(kinetic: str | None) -> dict[int, np.ndarray]:
+            data = copy.deepcopy(base)
+            if kinetic is not None:
+                data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = kinetic
+            spec = EquationSystem.from_dict(data)
+            correction = spec.filter_by_order(1)
+            layout = StateLayout.from_spec(spec, grid.num_points)
+            ce = CoefficientEvaluator(correction, grid, params)
+            m_src, drops = _build_source_matrix_k(
+                correction, layout, grid, ce, k_grid, rfft_shape
+            )
+            assert not drops
+            return m_src
+
+        unit = _sources(None)
+        scaled = _sources("1 + alpha")  # M = 1.5
+        assert unit.keys() == scaled.keys()
+        for order, m_unit in unit.items():
+            np.testing.assert_allclose(
+                scaled[order],
+                m_unit / 1.5,
+                rtol=1e-13,
+                err_msg=(
+                    "Pass-1 source builder violates the velocity_row_scale "
+                    f"contract at operator time-order {order}"
+                ),
+            )
