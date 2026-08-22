@@ -2191,6 +2191,97 @@ class TestGH421PositionDependentKinetic:
         assert np.all(np.isfinite(result["y"]))
 
 
+class TestGH447KineticEvaluationSwallow:
+    """GH #447(a): `_build_evolution_matrices` no longer swallows kinetic
+    evaluation failures into a silent ``M = 1``.
+
+    The builder caught every exception and continued with M = 1, so a
+    kinetic referencing a parameter absent from ``--param`` produced wrong
+    amplitudes with exit code 0 — including inside the conversion-stability
+    probe, which calls this builder on every gated sweep point and
+    likelihood evaluation. There is no correct fallback: M = 1 is a
+    different theory.
+    """
+
+    def _spec_with_kinetic(self, kinetic: str) -> EquationSystem:
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = kinetic  # type: ignore[index]
+        # Force the genEig/Schur path: a decoupled algebraic constraint.
+        spec_data["fields"].append({"name": "aux_0", "index": 1})  # type: ignore[union-attr]
+        spec_data["equations"].append(  # type: ignore[union-attr]
+            {
+                "field": "aux_0",
+                "lhs": {"expression": "aux_0", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 0.0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            },
+        )
+        return _make_spec(spec_data)
+
+    def _build(self, spec: EquationSystem, params: dict[str, float]) -> None:
+        from tidal.solver.coefficients import CoefficientEvaluator
+        from tidal.solver.modal import (
+            _build_evolution_matrices,
+            _build_k_axes,
+            _build_k_grid,
+        )
+
+        grid = GridInfo(shape=(16,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        ce = CoefficientEvaluator(spec, grid, params)
+        k_grid = _build_k_grid(_build_k_axes(grid))
+        rfft_shape = (grid.shape[0] // 2 + 1,)
+        _build_evolution_matrices(spec, layout, grid, ce, k_grid, rfft_shape)
+
+    def test_missing_parameter_raises_actionable(self) -> None:
+        from tidal.solver._exceptions import KineticEvaluationError
+
+        spec = self._spec_with_kinetic("-xi")
+        with pytest.raises(KineticEvaluationError) as exc_info:
+            self._build(spec, {"m2": 1.0})  # xi deliberately absent
+        msg = str(exc_info.value)
+        assert "phi_0" in msg  # names the field
+        assert "-xi" in msg  # names the expression
+        assert "xi" in msg
+        assert "--param" in msg
+        assert "m2" in msg  # lists what WAS supplied
+
+    def test_not_swallowed_by_stability_probe(self) -> None:
+        """KineticEvaluationError is a RuntimeError precisely so the probe's
+        ``(LinAlgError, ValueError)`` handler cannot relabel a configuration
+        error as a "tachyonic" physics verdict.
+        """
+        from tidal.measurement._stability import check_conversion_stability
+        from tidal.solver._exceptions import KineticEvaluationError
+
+        spec = self._spec_with_kinetic("-xi")
+        grid = GridInfo(shape=(16,), bounds=((0.0, 10.0),), periodic=(True,))
+        with pytest.raises(KineticEvaluationError):
+            check_conversion_stability(spec, grid, {"m2": 1.0}, source="phi_0")
+
+    def test_resolvable_kinetic_still_builds(self) -> None:
+        """The happy path is unchanged: a kinetic whose symbols are all
+        supplied resolves and populates the mass matrix.
+        """
+        spec = self._spec_with_kinetic("-xi")
+        self._build(spec, {"m2": 1.0, "xi": -2.0})  # no raise
+
+    def test_absent_kinetic_still_defaults_to_one(self) -> None:
+        """``kinetic_coefficient_symbolic: null`` means M = 1 by JSON
+        convention — that is a declared value, not a swallowed failure, and
+        must keep working.
+        """
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"].pop(  # type: ignore[index]
+            "kinetic_coefficient_symbolic", None
+        )
+        self._build(_make_spec(spec_data), {"m2": 1.0})  # no raise
+
+
 class TestGH427PositionDependentKineticModal:
     """GH #427 validation: modal handles position-dependent kinetics via
     real-space M⁻¹(x) folded into the convolution-path coefficients.

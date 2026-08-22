@@ -136,6 +136,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+from tidal.solver._exceptions import KineticEvaluationError
 from tidal.solver._setup import warn_frozen_constraints
 from tidal.solver.operators import get_wavenumbers, is_periodic_bc
 from tidal.solver.state import StateLayout
@@ -417,6 +418,42 @@ def can_use_modal(
     # builders, which fold M⁻¹(x) into the real-space coefficients. The
     # former requirement 6 (GH #421 refusal) is retired.
     return True
+
+
+def _kinetic_eval_error(
+    field_name: str,
+    kin_sym: str,
+    coeff_eval: object,
+    exc: Exception,
+) -> KineticEvaluationError:
+    """Build the GH #447 refusal for an unresolvable kinetic coefficient.
+
+    Names the field and the expression, and — for the common case of an
+    unbound symbol — the missing name and the parameters that WERE
+    supplied, since "forgot a ``--param``" is the failure this most often
+    represents. ``evaluate_coefficient`` wraps the original exception, so
+    the unbound-name case is recovered from the ``__cause__`` chain.
+    """
+    cause: BaseException | None = exc
+    while cause is not None and not isinstance(cause, NameError):
+        cause = cause.__cause__
+    hint = ""
+    if isinstance(cause, NameError):
+        params = getattr(coeff_eval, "_parameters", {}) or {}
+        supplied = ", ".join(sorted(params)) or "(none)"
+        hint = (
+            f" The expression references a symbol that has no value: "
+            f"{cause}. Parameters supplied: {supplied}. Pass the missing "
+            f"one with --param NAME=VALUE (or add it to the theory's "
+            f"[parameters] section)."
+        )
+    msg = (
+        f"Cannot evaluate the kinetic coefficient for field {field_name!r} "
+        f"(expression: {kin_sym!r}): {exc}.{hint} The modal mass matrix "
+        f"needs a concrete M; continuing with M = 1 would silently solve a "
+        f"different theory, so this is refused (GH #447)."
+    )
+    return KineticEvaluationError(msg)
 
 
 def _raise_position_dependent_kinetic(spec: EquationSystem, where: str) -> None:
@@ -902,26 +939,45 @@ def _build_evolution_matrices(
         eq_f = eq_for_field[fname]
         kin_sym = getattr(eq_f, "kinetic_coefficient_symbolic", None)
         if kin_sym is None:
+            # No kinetic declared — M = 1 by JSON convention (not a fallback).
             M_mat[:, fi, fi] = 1.0
         else:
+            # GH #447: no silent fallback. This builder previously caught
+            # every exception and proceeded with M = 1, so a kinetic
+            # referencing a parameter absent from `--param` produced wrong
+            # amplitudes with exit code 0 — and did so inside the stability
+            # probe that gates every sweep point / likelihood evaluation.
+            # There is no correct fallback value: M = 1 is a different
+            # theory. Raise KineticEvaluationError (a RuntimeError, so the
+            # probe's (LinAlgError, ValueError) handler cannot relabel it
+            # "tachyonic") with the field, the expression and the cause.
             try:
                 kin_val = evaluate_coefficient(
                     kin_sym,
                     coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
                     spec.effective_coordinates,
                 )
-            except Exception:  # noqa: BLE001
-                # Fall back to the old hardcoded value if resolution fails.
-                # Matches the behavior of normalize_kinetic_coefficients
-                # which skips normalization in this case.
-                M_mat[:, fi, fi] = 1.0
-                continue
+            except (ValueError, TypeError, ArithmeticError) as exc:
+                raise _kinetic_eval_error(fname, kin_sym, coeff_eval, exc) from exc
             if isinstance(kin_val, np.ndarray):
-                # Position-dependent kinetic — broadcast to per-mode shape.
-                # (Rare; most theories have constant kin coefficients.)
-                M_mat[:, fi, fi] = complex(kin_val.ravel()[0])
-            else:
-                M_mat[:, fi, fi] = complex(float(kin_val))
+                # Position-dependent kinetics are refused by the guard at
+                # the top of this function, so an array here means the
+                # coefficient varies over some other axis (e.g. time) that
+                # the per-mode mass matrix cannot represent either.
+                # Collapsing to element 0 would silently pick one point
+                # (the GH #438 defect class).
+                msg = (
+                    f"Kinetic coefficient for field {fname!r} evaluated to an "
+                    f"array rather than a scalar (expression: {kin_sym!r}). "
+                    f"The generalized-eigenvalue builder writes M onto a "
+                    f"per-mode mass matrix and has no representation for a "
+                    f"varying M. Use plain solve_modal / auto-selection "
+                    f"(position-dependent kinetics run on the convolution "
+                    f"paths, GH #427) or a time-domain scheme "
+                    f"(--scheme cvode / --scheme ida)."
+                )
+                raise KineticEvaluationError(msg)
+            M_mat[:, fi, fi] = complex(float(kin_val))
 
     # Constraint matrices — built in two phases:
     #   Phase 1: collect terms from constraint equations
