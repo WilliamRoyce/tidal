@@ -757,9 +757,16 @@ class ComponentEquation:
         ``kinetic_coefficient_symbolic`` contains a spatial coordinate call
         such as ``x[]`` or ``y[]``; time-only dependence (``t[]``) returns
         ``False``.  Solvers that evaluate the kinetic coefficient without a
-        grid (the modal builders — see GH #421) must refuse such equations
-        rather than evaluate at a single point or silently fall back to
-        M = 1.
+        grid (the per-mode modal builders — see GH #421) must refuse such
+        equations rather than evaluate at a single point or silently fall
+        back to M = 1.
+
+        GH #447(e): detection is REGEX-ONLY (``_COORD_CALL_RE`` over the
+        expression string). Unlike ``OperatorTerm.position_dependent``,
+        which prefers explicit ``coordinate_dependent`` metadata, the LHS
+        schema carries no coordinate metadata for kinetics — nothing is
+        ignored today, but if the schema ever grows an explicit declaration
+        for the kinetic coefficient, this property must learn to read it.
         """
         if self.kinetic_coefficient_symbolic is None:
             return False
