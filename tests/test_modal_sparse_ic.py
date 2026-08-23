@@ -249,6 +249,8 @@ def test_eigenvalue_pre_check_catches_noise_amplified_divergence() -> None:
     this is the load-bearing safety property the new pre-check
     inherits from the all-modes expm pre-check.
     """
+    from tidal.solver.modal import SingularPencilError
+
     fixed = (
         "kappa=1.0",
         "B0=0.01",
@@ -257,7 +259,13 @@ def test_eigenvalue_pre_check_catches_noise_amplified_divergence() -> None:
         "alpha3=0.0794345149654468",
     )
     overrides = {"delta1": 0.077796221228164}
-    with pytest.raises(SimulationDivergedError):
+    # GH #457/#467 (2026-08-25): the corrected pencil engine refuses this
+    # sample point even EARLIER than the eigenvalue pre-check — the
+    # deflation contract detects near constraint-index breakdown at
+    # build time (this sample's γ_v1 = 17.11 growth was itself computed
+    # on the pre-#457 oracle-refuted operator). Either refusal upholds
+    # the load-bearing safety property: no garbage run starts.
+    with pytest.raises((SimulationDivergedError, SingularPencilError)):
         _run_sim_snapshots(
             sparse_ic=True,
             overrides=overrides,

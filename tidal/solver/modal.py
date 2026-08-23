@@ -1965,10 +1965,17 @@ def _build_convolution_matrix_with_constraints(
 ) -> tuple[
     NDArray[np.complex128],  # A_reduced (n_dyn_tot x n_dyn_tot)
     NDArray[np.complex128],  # recovery (n_c_tot x n_dyn_tot)
-    list[str],  # constraint field names
+    list[str],  # RESIDUAL constraint field names
     dict[int, int],  # orig_to_reduced slot mapping
+    NDArray[np.complex128] | None,  # manifold projector (n_dyn_tot²) or None
 ]:
     """Build reduced evolution matrix for pos-dep theories with constraints.
+
+    GH #457: promoted order-0 rows (``spec.second_order_sector``) join
+    the dynamical sector as pencil rows with mass content on the B side;
+    the composition runs the deflating-subspace engine when B is
+    singular, returning the manifold projector for on-manifold ICs.
+    Only RESIDUAL rows are Schur-eliminated.
 
     This is the position-dependent analog of :func:`_build_evolution_matrices`
     (the constant-coefficient generalized-eigenvalue path). It builds
@@ -2029,12 +2036,19 @@ def _build_convolution_matrix_with_constraints(
     n_modes = int(np.prod(rfft_shape))
 
     # ---- Classify equations ----
+    # GH #457: promoted order-0 rows (second_order_sector) join the
+    # dynamical sector; only RESIDUAL rows are Schur-eliminated.
+    promoted_fields = spec.second_order_sector.promoted
     dyn_field_names: list[str] = [
-        eq.field_name for eq in spec.equations if eq.time_derivative_order >= 2
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order >= 2 or eq.field_name in promoted_fields
     ]
     dyn_field_idx: dict[str, int] = {n: i for i, n in enumerate(dyn_field_names)}
     constraint_field_names: list[str] = [
-        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order == 0 and eq.field_name not in promoted_fields
     ]
     c_idx_map: dict[str, int] = {n: i for i, n in enumerate(constraint_field_names)}
     n_c = len(constraint_field_names)
@@ -2169,6 +2183,13 @@ def _build_convolution_matrix_with_constraints(
     n_dyn_tot = n_dyn_slots * n_modes
     n_c_tot = n_c * n_modes
     A_dd = np.zeros((n_dyn_tot, n_dyn_tot), dtype=np.complex128)
+    # GH #457: B-side mass content of the pencil B·ẏ = A·y. Collected as
+    # POSITIVE contributions of RHS q̈-target terms (and promoted-row
+    # mass); composed below as B = I_adj − B_mass − vel_coupling, where
+    # I_adj has 0 on promoted velocity-row diagonals (their LHS is
+    # algebraic — no v̇_self term).
+    B_mass = np.zeros((n_dyn_tot, n_dyn_tot), dtype=np.complex128)
+    has_b_mass = bool(promoted_fields)
     A_dc_field = np.zeros((n_dyn_tot, n_c_tot), dtype=np.complex128)
     A_dc_vel = np.zeros((n_dyn_tot, n_c_tot), dtype=np.complex128)
     K_cd = np.zeros((n_c_tot, n_dyn_tot), dtype=np.complex128)
@@ -2199,18 +2220,6 @@ def _build_convolution_matrix_with_constraints(
             complex | NDArray[np.float64],
         ]
     ] = []
-    # deferred_terms_dyn_ddc: dyn RHS references d2_t(constraint) — requires ẍ_c
-    deferred_terms_dyn_ddc: list[
-        tuple[
-            int,
-            int,
-            int,
-            OperatorTerm,
-            NDArray[np.complex128],
-            int,
-            complex | NDArray[np.float64],
-        ]
-    ] = []
 
     # ---- A_dd kinematic rows: dq/dt = v ---------------------------------
     for fname in dyn_field_names:
@@ -2223,9 +2232,14 @@ def _build_convolution_matrix_with_constraints(
     warned_unhandled: set[tuple[str, str, str]] = set()
 
     for eq_idx, eq in enumerate(spec.equations):
-        if eq.time_derivative_order >= 2:
-            # ---------------- Dynamical equation ----------------
-            scale = velocity_row_scale(eq.field_name, m_inv)
+        is_promoted_row = eq.field_name in promoted_fields
+        if eq.time_derivative_order >= 2 or is_promoted_row:
+            # ---------------- Dynamical-sector equation ----------------
+            # Promoted rows (GH #457) have an algebraic LHS: no kinetic
+            # to divide by (scale = 1) and no v̇_self — their mass
+            # content is the off-diagonal q̈ cross terms collected into
+            # B_mass below.
+            scale = 1.0 if is_promoted_row else velocity_row_scale(eq.field_name, m_inv)
             vel_red = orig_to_reduced[layout.velocity_slot_map[eq.field_name]]
             for term_idx, term in enumerate(eq.rhs_terms):
                 target_field = term.field
@@ -2236,20 +2250,27 @@ def _build_convolution_matrix_with_constraints(
                 t_order = decomp.time_order
 
                 if base_field in c_idx_map:
-                    # ----- target is a CONSTRAINT field -----
+                    # ----- target is a RESIDUAL algebraic field -----
                     cj = c_idx_map[base_field]
-                    if is_vel_ref:
-                        if t_order == 0:
-                            # coeff · op · v_c — needs v_c = d/dt(recovery·y_d).
-                            # Defer until recovery is built.
-                            deferred_terms_dyn_velc.append(
-                                (vel_red, eq_idx, term_idx, term, mult, cj, scale),
-                            )
-                        else:
-                            warned_unhandled.add(
-                                (eq.field_name, term.operator, target_field),
-                            )
-                    elif t_order == 0:
+                    total_t = t_order + (1 if is_vel_ref else 0)
+                    if total_t >= 2:
+                        # Classification invariant (GH #457): an order-0
+                        # field whose acceleration any row references is
+                        # PROMOTED — it cannot be residual here.
+                        msg = (
+                            f"classification invariant violated: row "
+                            f"{eq.field_name!r} carries {term.operator}"
+                            f"({term.field}) of residual field "
+                            f"{base_field!r} (GH #457)"
+                        )
+                        raise AssertionError(msg)
+                    if total_t == 1:
+                        # coeff · v_c (or first_dt(q_c)) — needs
+                        # v_c = d/dt(recovery·y_d); defer until recovery.
+                        deferred_terms_dyn_velc.append(
+                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
+                        )
+                    else:
                         # coeff · op · q_c → A_dc_field
                         _emit_term(
                             A_dc_field,
@@ -2260,20 +2281,6 @@ def _build_convolution_matrix_with_constraints(
                             scale=scale,
                             eq_idx=eq_idx,
                             term_idx=term_idx,
-                        )
-                    elif t_order == 1:
-                        # coeff · first_dt(q_c) = coeff · v_c → defer
-                        deferred_terms_dyn_velc.append(
-                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
-                        )
-                    elif t_order == 2:
-                        # coeff · d2_t(q_c) = coeff · ẍ_c → defer
-                        deferred_terms_dyn_ddc.append(
-                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
-                        )
-                    else:
-                        warned_unhandled.add(
-                            (eq.field_name, term.operator, target_field),
                         )
                 elif base_field in dyn_field_idx:
                     # ----- target is a DYNAMICAL field -----
@@ -2293,10 +2300,22 @@ def _build_convolution_matrix_with_constraints(
                                 term_idx=term_idx,
                             )
                         else:
-                            # first_dt(v_X) = ẍ_X = M-cross coupling (rare; not handled)
-                            warned_unhandled.add(
-                                (eq.field_name, term.operator, target_field),
+                            # first_dt(v_X) = ẍ_X: mass-side content of
+                            # the pencil (GH #457) — collect into B_mass.
+                            target_red = orig_to_reduced[
+                                layout.velocity_slot_map[base_field]
+                            ]
+                            _emit_term(
+                                B_mass,
+                                vel_red,
+                                target_red,
+                                term,
+                                mult,
+                                scale=scale,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
                             )
+                            has_b_mass = True
                     elif t_order == 0:
                         target_red = orig_to_reduced[layout.field_slot_map[base_field]]
                         _emit_term(
@@ -2325,11 +2344,23 @@ def _build_convolution_matrix_with_constraints(
                             term_idx=term_idx,
                         )
                     else:
-                        # d2_t(dyn_field) in dyn RHS = M-cross coupling
-                        # genEig handles this; convolution analog is non-trivial
-                        warned_unhandled.add(
-                            (eq.field_name, term.operator, target_field),
+                        # d2_t(dyn_field): q̈ cross coupling = mass-side
+                        # content of the pencil B·ẏ = A·y (GH #457) —
+                        # this includes the promoted rows' M_cc terms.
+                        target_red = orig_to_reduced[
+                            layout.velocity_slot_map[base_field]
+                        ]
+                        _emit_term(
+                            B_mass,
+                            vel_red,
+                            target_red,
+                            term,
+                            mult,
+                            scale=scale,
+                            eq_idx=eq_idx,
+                            term_idx=term_idx,
                         )
+                        has_b_mass = True
             continue
 
         if eq.time_derivative_order == 0:
@@ -2344,13 +2375,19 @@ def _build_convolution_matrix_with_constraints(
                 t_order = decomp.time_order
 
                 if base_field in c_idx_map:
-                    # constraint → constraint (K_cc); only t_order=0 supported
+                    # residual → residual (K_cc). Time content here is
+                    # impossible: any inter-constraint time reference
+                    # promotes BOTH endpoints (GH #457) — the old code
+                    # silently dropped these (the h_3-class defect).
                     cj = c_idx_map[base_field]
                     if is_vel_ref or t_order > 0:
-                        warned_unhandled.add(
-                            (eq.field_name, term.operator, target_field),
+                        msg = (
+                            f"classification invariant violated: residual "
+                            f"row {eq.field_name!r} carries "
+                            f"{term.operator}({term.field}) of residual "
+                            f"field {base_field!r} (GH #457)"
                         )
-                        continue
+                        raise AssertionError(msg)
                     _emit_term(
                         K_cc,
                         ci,
@@ -2486,15 +2523,16 @@ def _build_convolution_matrix_with_constraints(
     if n_c_tot == 0:
         recovery = np.zeros((0, n_dyn_tot), dtype=np.complex128)
     else:
-        # Solve K_cc · q_c + K_cd · q_d = 0  →  q_c = -K_cc⁻¹ · K_cd · q_d
-        try:
-            recovery = -np.linalg.solve(K_cc, K_cd)
-        except np.linalg.LinAlgError:
-            logger.warning(
-                "K_cc singular in pos-dep Schur elimination; falling back to lstsq",
-            )
-            lstsq_result, *_ = np.linalg.lstsq(K_cc, K_cd, rcond=1e-12)
-            recovery = -lstsq_result
+        # Solve K_cc · q_c + K_cd · q_d = 0  →  q_c = -K_cc⁻¹ · K_cd · q_d.
+        # GH #459 (mirrored from the path-2 S_cc fix): rank-revealing
+        # pseudoinverse — a near-singular localized K_cc under plain
+        # solve/lstsq produced ~1e12-scale recovery that poisoned the
+        # pencil downstream; pinv solves consistent (possibly redundant)
+        # systems exactly with the documented min-norm convention.
+        recovery = -(
+            np.asarray(np.linalg.pinv(K_cc, rcond=1e-10), dtype=np.complex128)
+            @ K_cd
+        )
 
     # ---- Compose A_reduced from dynamical block + constraint substitution ----
     A_reduced = A_dd + A_dc_field @ recovery
@@ -2526,24 +2564,6 @@ def _build_convolution_matrix_with_constraints(
         ] += temp @ recovery_block
         has_vel_coupling = True
 
-    # Handle deferred dyn-RHS terms referencing ẍ_c (d2_t(constraint))
-    # ẍ_c = d²/dt²(recovery · y_d) = recovery · d²y_d/dt² = recovery · A_reduced² · y_d
-    # Contribution: (vel_red row block) += temp @ recovery_block @ A_reduced²
-    # Combine with vel_coupling: this contributes a A_reduced² term, distinct from vel's A_reduced.
-    has_ddc_coupling = False
-    ddc_coupling_mat = np.zeros_like(A_reduced)
-    for vel_red, eq_idx, term_idx, term, mult, cj, row_scale in deferred_terms_dyn_ddc:
-        # GH #444: same M⁻¹ application as the velc list above.
-        temp = _term_conv_block(
-            term, mult, scale=row_scale, eq_idx=eq_idx, term_idx=term_idx
-        )
-        recovery_block = recovery[cj * n_modes : (cj + 1) * n_modes, :]
-        ddc_coupling_mat[
-            vel_red * n_modes : (vel_red + 1) * n_modes,
-            :,
-        ] += temp @ recovery_block
-        has_ddc_coupling = True
-
     # If A_dc_vel is non-trivial (first-order eq RHS → v_c), its contribution is
     # A_dc_vel @ v_c = A_dc_vel @ recovery · A_reduced → folded into vel_coupling.
     # A_dc_vel is zero-size when the spec has no constraint fields (n_c == 0,
@@ -2554,14 +2574,28 @@ def _build_convolution_matrix_with_constraints(
         vel_coupling_mat += A_dc_vel @ recovery
         has_vel_coupling = True
 
-    # Resolve A_reduced including the v_c and ẍ_c contributions.
-    # A_reduced satisfies:
-    #   A_reduced = (A_dd + A_dc_field·recovery) + vel_coupling_mat · A_reduced + ddc_coupling_mat · A_reduced²
-    # The ddc (A²) term gives a quadratic equation in A_reduced, not generally solvable in closed form.
-    # Heuristic for the present scope: drop the ddc term if its operator norm is small relative to A_reduced;
-    # otherwise log a warning. The deferred-velc piece IS handled via B_lhs pre-solve:
-    #   (I - vel_coupling_mat) · A_reduced = A_dd + A_dc_field·recovery
-    if has_vel_coupling:
+    # ---- Final composition of the pencil B·ẏ = A·y ----------------------
+    #   A = A_dd + A_dc_field·recovery   (accumulated above)
+    #   B = I_adj − B_mass − vel_coupling_mat
+    # where I_adj zeroes the promoted velocity-row diagonals (their LHS is
+    # algebraic — no v̇_self, GH #457). When B has mass content the pencil
+    # is composed by the deflating-subspace engine (singular B: the
+    # promoted sector's constraint chains are deflated exactly, with the
+    # manifold projector returned for on-manifold ICs); when only velocity
+    # coupling is present, B = I − vc is the classic invertible pre-solve.
+    manifold_proj_out: NDArray[np.complex128] | None = None
+    if has_b_mass:
+        eye_adj = np.eye(n_dyn_tot, dtype=np.complex128)
+        for fname in promoted_fields:
+            vel_red_p = orig_to_reduced[layout.velocity_slot_map[fname]]
+            for m in range(n_modes):
+                idx = vel_red_p * n_modes + m
+                eye_adj[idx, idx] = 0.0
+        b_total = eye_adj - B_mass - vel_coupling_mat
+        A_reduced, manifold_proj_out = _pencil_deflate(
+            A_reduced, b_total, context="pos-dep evolution pencil"
+        )
+    elif has_vel_coupling:
         B_lhs = np.eye(A_reduced.shape[0], dtype=np.complex128) - vel_coupling_mat
         try:
             A_reduced = np.linalg.solve(B_lhs, A_reduced)
@@ -2570,22 +2604,6 @@ def _build_convolution_matrix_with_constraints(
                 "B_lhs singular in pos-dep velocity-coupling solve; falling back to lstsq",
             )
             A_reduced = np.linalg.lstsq(B_lhs, A_reduced, rcond=1e-12)[0]
-
-    if has_ddc_coupling:
-        # First-order Newton iteration: A_reduced ← A_reduced + ddc_coupling_mat · A_reduced²
-        # Adds one correction order. For δ₁ ~ 0.001 the contribution is O(δ₁²) ~ 10⁻⁶, negligible
-        # vs. the dominant ~10⁻⁴ a_1 signal. Apply once; iterate only if needed.
-        correction = ddc_coupling_mat @ (A_reduced @ A_reduced)
-        corr_norm = float(np.max(np.abs(correction)))
-        a_norm = float(np.max(np.abs(A_reduced)))
-        if corr_norm > 0.1 * a_norm and a_norm > 0:
-            logger.warning(
-                "d2_t(constraint) in dyn RHS contributes %.2e (cf %.2e in A_reduced); "
-                "single-iteration Newton may be insufficient",
-                corr_norm,
-                a_norm,
-            )
-        A_reduced += correction
 
     if warned_unhandled:
         warnings.warn(
@@ -2606,6 +2624,7 @@ def _build_convolution_matrix_with_constraints(
         recovery.astype(np.complex128, copy=False),
         constraint_field_names,
         orig_to_reduced,
+        manifold_proj_out,
     )
 
 
@@ -3975,6 +3994,7 @@ def solve_modal(
             recovery_2d,
             c_names_list,
             orig_to_reduced_map,
+            conv_manifold_proj,
         ) = _build_convolution_matrix_with_constraints(
             spec,
             layout,
@@ -4015,6 +4035,15 @@ def solve_modal(
         y0_hat_dyn = np.zeros((n_dyn_slots, n_modes), dtype=np.complex128)
         for orig_si, red_pos in orig_to_reduced.items():
             y0_hat_dyn[red_pos] = y0_hat_full[orig_si]
+
+        # GH #457: promoted second-order sector — project the IC onto
+        # the constraint manifold (off-manifold directions are frozen by
+        # the deflated generator; a component left off the manifold
+        # would persist as a constant constraint violation).
+        if conv_manifold_proj is not None:
+            y0_hat_dyn = (conv_manifold_proj @ y0_hat_dyn.ravel()).reshape(
+                y0_hat_dyn.shape
+            )
 
         # Evolve the reduced matrix via Krylov expm_multiply
         times, dyn_snapshots = _evolve_full_matrix(

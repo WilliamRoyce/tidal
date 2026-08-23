@@ -229,7 +229,7 @@ def _path4_state(
     layout = StateLayout.from_spec(spec, n)
     ce = CoefficientEvaluator(spec, grid, params)
     k_grid = _build_k_grid(_build_k_axes_full(grid))
-    A, recovery, c_names, o2r = _build_convolution_matrix_with_constraints(
+    A, recovery, c_names, o2r, conv_proj = _build_convolution_matrix_with_constraints(
         spec, layout, grid, ce, k_grid, tuple(grid.shape)
     )
     n_dyn = len(o2r)
@@ -249,6 +249,12 @@ def _path4_state(
         spec_c = np.where(keep, rng.standard_normal(n) + 1j * rng.standard_normal(n), 0)
         real = np.fft.ifft(spec_c).real
         y_hat[red * n : (red + 1) * n] = np.fft.fft(real)
+
+    if conv_proj is not None:
+        # Post-#457 the promoted sector is deflated; the operator's
+        # contract holds on the constraint manifold (membership itself
+        # verified by the constraint rows closing).
+        y_hat = conv_proj @ y_hat
 
     Ay = A @ y_hat
     AAy = A @ Ay
@@ -346,30 +352,33 @@ class TestPath4ECalAdjudication:
         st = _path4_state(spec, grid, PHASE_E_PARAMS)
         return spec, st, ResidualOracle(spec, grid, PHASE_E_PARAMS)
 
-    def test_handled_subspace_certified(self) -> None:
-        """Rows without mishandled terms MUST close — this is the strict,
-        passing certification of the recovery/Schur chain for everything
-        the builder claims to handle.
+    def test_promoted_localized_build_refuses_honestly(self) -> None:
+        """GH #468: the corrected path-4 assembly for promoted localized
+        specs REFUSES rather than silently evolving a wrong operator.
+
+        History of this test: it originally certified the healthy
+        subspace of the pre-#457 TRUNCATED operator (the one whose #455
+        abscissa grew with resolution). That operator no longer exists —
+        the promoted sector now assembles as a 528-dim coupled pencil
+        whose float64 deflation is not yet robust (tolerance compounding;
+        ‖A‖ ≈ 5.4e6 physical stiffness after the #459-mirrored pinv
+        recovery). Until #468 lands the robust deflation, the honest
+        behavior is a loud SingularPencilError with the breakdown
+        diagnosis.
         """
-        _spec, st, oracle = self._state()
-        res, _gaps = oracle.residuals(
-            st["fields"], st["vels"], st["accels"], st["dv_dt"]
-        )
-        dropped_rows = {"h_3", "h_4", "h_7", "h_9"}
-        vc_polluted = {"h_6", "h_8"}
-        # a_2 sits at ~7e-9: conditioning residue of the near-singular
-        # composition (cond ~1e13 loses ~13 digits); tolerance reflects
-        # that measured floor, not a loosened contract.
-        clean = {k: v for k, v in res.items() if k not in dropped_rows | vc_polluted}
-        bad = {k: v for k, v in clean.items() if v > 1e-8}
-        assert not bad, f"handled-subspace rows fail to close: {bad}"
+        from tidal.solver.modal import SingularPencilError
+
+        spec = _load("gertsenshtein_ungauged_e_dual_gaussian")
+        grid = GridInfo(bounds=((0.0, 100.0),), shape=(24,), periodic=(True,))
+        with pytest.raises(SingularPencilError):
+            _path4_state(spec, grid, PHASE_E_PARAMS)
 
     @pytest.mark.xfail(
         strict=True,
-        reason="GH #457 CONFIRMED (measured 2026-08-25): dropped "
-        "inter-constraint derivative terms leave O(1) residuals "
-        "(h_3 0.374, h_4 0.980, h_7 0.980, h_9 0.877). Flips when the "
-        "constraint sector's D_cc/M_cc structure is handled.",
+        reason="GH #468: the promoted localized pencil's float64 "
+        "deflation is not yet robust — the build refuses honestly "
+        "(pre-#457 measured defect numbers: h_3 0.374, h_4 0.980, "
+        "h_7 0.980, h_9 0.877). Flips when #468 lands.",
     )
     def test_constraint_rows_full_closure(self) -> None:
         spec, st, oracle = self._state()
@@ -386,11 +395,11 @@ class TestPath4ECalAdjudication:
 
     @pytest.mark.xfail(
         strict=True,
-        reason="GH #455 (measured 2026-08-25): near-singular "
-        "velocity-coupling solve (cond(B_lhs) ≈ 9.7e12, driven by the "
-        "#457-truncated K_cc's ‖recovery‖ ≈ 1.2e6) corrupts the "
-        "VC-coupled velocity rows (h_6 0.278, h_8 0.124). Flips with the "
-        "#457 fix.",
+        reason="GH #468: the promoted localized pencil's float64 "
+        "deflation is not yet robust — the build refuses honestly "
+        "(pre-#457 measured defect numbers: h_6 0.278, h_8 0.124 from "
+        "the near-singular truncated composition). Flips when #468 "
+        "lands.",
     )
     def test_dynamical_rows_full_closure(self) -> None:
         spec, st, oracle = self._state()

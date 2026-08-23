@@ -284,7 +284,7 @@ def test_gh379_synthetic_recovery_matches_analytical() -> None:
     k_grid = _build_k_grid(k_axes)
     full_shape = (n,)
 
-    _A_red, recovery, c_names, orig_to_reduced = (
+    _A_red, recovery, c_names, orig_to_reduced, _proj = (
         _build_convolution_matrix_with_constraints(
             spec,
             layout,
@@ -472,7 +472,7 @@ class TestGH444DeferredVelocityRowScale:
         ce = CoefficientEvaluator(spec, grid, self.PARAMS)
         k_grid = _build_k_grid(_build_k_axes_full(grid))
 
-        A_red, _recovery, c_names, orig_to_reduced = (
+        A_red, _recovery, c_names, orig_to_reduced, _proj = (
             _build_convolution_matrix_with_constraints(
                 spec, layout, grid, ce, k_grid, (n,)
             )
