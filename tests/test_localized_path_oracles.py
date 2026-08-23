@@ -538,6 +538,7 @@ class PerModeOracle:
             self.o2r,
             _scc_inv,
             _sing_mask,
+            self.manifold_proj,
         ) = _build_evolution_matrices(spec, self.layout, grid, ce, k_grid, rfft_shape)
         self.k_flat = np.asarray(k_grid[0]).reshape(-1)
         self.n_dyn = self.A_rhs.shape[1]
@@ -685,6 +686,11 @@ class PerModeOracle:
                 diag["excluded_modes"] += 1
                 continue
             y = rng.standard_normal(self.n_dyn) + 1j * rng.standard_normal(self.n_dyn)
+            if self.manifold_proj is not None:
+                # Post-#457 builders reduce to the constraint manifold;
+                # the operator's contract holds ON it. Manifold membership
+                # is itself verified by the constraint rows closing.
+                y = self.manifold_proj[m] @ y
             state = self._mode_state(m, y, G)
             for eq in self.spec.equations:
                 r_norm = self._row_residual(eq, k, state, gaps)
@@ -712,18 +718,15 @@ class TestPath2PerModeOracle:
         bad = {name: v for name, v in rows.items() if v > 1e-11}
         assert not bad, f"path-2 positive control fails to close: {bad}"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Path-2 A_dc dispatch CONFIRMED defective (measured "
-        "2026-08-25): A_dc_field/A_dc_vel are emitted with raw coeff·mult "
-        "and never M⁻¹-scaled (modal.py:1063-1070, cf. m_inv applied to "
-        "A_dd only at :1416-1438). With M = 1.5 the residual is exactly "
-        "(M−1)/M = 1/3 at the k=0 mode; the identical spec with M = 1 "
-        "closes at machine precision (the positive control). Path-2 "
-        "analog of GH #444. Flips when the A_dc emission carries the "
-        "velocity-row scale.",
-    )
     def test_constraint_coupling_carries_row_mass_scale(self) -> None:
+        """GH #458 mechanism 1 — FIXED by the pencil composition (2026-08-25).
+
+        Pre-fix this was a strict xfail carrying the measured defect:
+        A_dc emitted raw with no M⁻¹ gave residual exactly (M−1)/M = 1/3
+        at M = 1.5. The pencil carries the row mass on the B side, so the
+        fold-in is scale-correct by construction; this row now closes at
+        machine precision and the test guards the fix permanently.
+        """
         spec = _uniform_velc_spec("1 + alpha")  # M = 1.5, everything else equal
         grid = GridInfo(bounds=((0.0, 2 * np.pi),), shape=(24,), periodic=(True,))
         oracle = PerModeOracle(spec, grid, {"alpha": 0.5})
@@ -809,65 +812,74 @@ class TestPath2UniformProductionAdjudication:
         bad = {k: v for k, v in rows.items() if k in healthy and v > 1e-8}
         assert not bad, f"handled rows fail to close: {bad}"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="GH #457 on path 2 (measured 2026-08-25): constraint rows "
-        "h_3 1.290 / h_4 2.027 / h_7 2.027 / h_9 2.326 — d2_t(C) folded "
-        "into S_cc as identity, gradient_x(v_C) silently dropped. Flips "
-        "with the #457 reclassification.",
-    )
     def test_ungauged_constraint_rows_full_closure(self) -> None:
+        """GH #457 on path 2 — FIXED by promotion + the pencil engine.
+
+        Pre-fix (strict xfail, measured 2026-08-25): h_3 1.290 / h_4 2.027
+        / h_7 2.027 / h_9 2.326 — d2_t(C) folded into S_cc as identity,
+        gradient_x(v_C) silently dropped. The promoted rows now live in
+        the dynamical sector's pencil and close at machine precision.
+        """
         rows, _diag = self._run("gertsenshtein_ungauged", self.UNGAUGED_PARAMS)
         con = {k: v for k, v in rows.items() if k in {"h_3", "h_4", "h_7", "h_9"}}
         bad = {k: v for k, v in con.items() if v > 1e-8}
         assert not bad, f"constraint rows fail full closure: {bad}"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Path-2 A_dc dispatch defects (measured 2026-08-25): "
-        "h_6 1.006 / h_8 2.000 (A_dc_vel missing M⁻¹ = −κ², a sign flip) "
-        "and a_2 1.077 / a_3 0.982 (t_order-blind fold of "
-        "first_derivative_t(C) into A_dc_field; a_3 has M = 1, isolating "
-        "this mechanism). Flips with the t_order-aware, M⁻¹-scaled A_dc "
-        "dispatch fix.",
-    )
     def test_ungauged_dynamical_rows_full_closure(self) -> None:
+        """GH #458 both mechanisms — FIXED (t_order-aware A_dc + pencil).
+
+        Pre-fix (strict xfail, measured 2026-08-25): h_6 1.006 / h_8 2.000
+        (A_dc_vel missing M⁻¹ = −κ², a sign flip) and a_2 1.077 / a_3
+        0.982 (t_order-blind fold of first_derivative_t(C) into
+        A_dc_field). All four rows now close at machine precision.
+        """
         rows, _diag = self._run("gertsenshtein_ungauged", self.UNGAUGED_PARAMS)
         dyn = {k: v for k, v in rows.items() if k in {"h_6", "h_8", "a_2", "a_3"}}
         bad = {k: v for k, v in dyn.items() if v > 1e-8}
         assert not bad, f"dynamical rows fail full closure: {bad}"
 
     def test_dark_photon_handled_rows_certified(self) -> None:
-        rows, diag = self._run("dark_photon_plasma", self.DPP_PARAMS)
+        """All DYNAMICAL rows now close at machine precision (2026-08-25).
+
+        Pre-fix: t_2/t_10/t_17 at 1.35 (missing M⁻¹ on the −ξ rows) and
+        a_3 at 0.195. The spec's byte-identical equation triplets
+        (GH #465) make the pencil structurally singular at every mode;
+        the engine's gauge completion drops the redundant combinations
+        with a warning and the physical (sum) sector evolves exactly.
+        """
+        with pytest.warns(UserWarning, match="quotiented out"):
+            rows, diag = self._run("dark_photon_plasma", self.DPP_PARAMS)
         assert diag["excluded_modes"] == 0
         healthy = {
             "a_0",
             "a_1",
             "a_2",
+            "a_3",
             "h_5",
             "h_7",
             "t_0",
             "t_1",
+            "t_2",
+            "t_9",
+            "t_10",
             "t_15",
+            "t_17",
             "t_22",
             "t_23",
-            "t_9",
         }
         bad = {k: v for k, v in rows.items() if k in healthy and v > 1e-8}
         assert not bad, f"handled rows fail to close: {bad}"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Rank-deficient S_cc + det-gated Tikhonov (measured "
-        "2026-08-25): dark_photon_plasma's t_6/t_13/t_20 are identical "
-        "rows (S_cc rank-1, singular at EVERY mode); the 1e-14 shift's "
-        "ill-conditioned inverse leaves ~1e-2 noise on rows that must "
-        "close by construction, and t_2/t_10/t_17 1.35 / a_3 0.195 on "
-        "the coupled dynamical rows (entangled with the missing-M⁻¹ "
-        "A_dc defect on the −ξ-kinetic rows). Flips with rank-revealing "
-        "constraint elimination (SVD, null frozen) + the A_dc fix.",
-    )
     def test_dark_photon_full_closure(self) -> None:
-        rows, _diag = self._run("dark_photon_plasma", self.DPP_PARAMS)
+        """GH #459 — FIXED (rank-revealing pinv residual elimination).
+
+        Pre-fix (strict xfail): the rank-1 S_cc triplet t_6/t_13/t_20
+        carried det-gated Tikhonov recovery noise (1.17e-2 at test
+        params). With the pseudoinverse (min-norm on the consistent
+        redundant system) EVERY row of the spec closes at machine
+        precision.
+        """
+        with pytest.warns(UserWarning, match="quotiented out"):
+            rows, _diag = self._run("dark_photon_plasma", self.DPP_PARAMS)
         bad = {k: v for k, v in rows.items() if v > 1e-8}
         assert not bad, f"rows fail full closure: {bad}"

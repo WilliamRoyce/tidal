@@ -178,14 +178,33 @@ class TestRankDeficientMass:
             np.testing.assert_allclose(dy[3], -c * omega2 * q1, atol=1e-10)
 
 
-class TestSingularPencilRefusal:
-    def test_gauge_direction_refuses(self) -> None:
-        # Column 2 (and 3) appear in neither A nor B: undetermined.
+class TestSingularPencilGaugeCompletion:
+    """Singular pencils get an EXPLICIT, warned gauge completion.
+
+    Dependent equations are dropped and the least-constrained state
+    combinations frozen at IC — the loud form of the min-norm/frozen
+    convention the pre-#457 machinery applied silently (needed because
+    sweeps legitimately cross #260-class critical points, and GH #465
+    specs ship redundant equation copies). SingularPencilError is
+    reserved for pencils the completion cannot regularize.
+    """
+
+    def test_disconnected_pair_frozen_with_warning(self) -> None:
+        # Slots (qφ, vφ, qc, vc): a clean oscillator plus a (qc, vc)
+        # pair whose equation row is missing entirely — vc undetermined.
         A = np.zeros((4, 4), dtype=np.complex128)
         B = np.zeros((4, 4), dtype=np.complex128)
         B[0, 0] = 1.0
         A[0, 1] = 1.0
         B[1, 1] = 1.0
         A[1, 0] = -1.0
-        with pytest.raises(SingularPencilError, match="gauge"):
-            _pencil_deflate(A, B, context="unit test")
+        B[2, 2] = 1.0
+        A[2, 3] = 1.0  # kinematic row of the orphan pair
+        with pytest.warns(UserWarning, match="quotiented out"):
+            A_eff, _proj = _pencil_deflate(A, B, context="unit test")
+        # The oscillator dynamics are untouched by the completion.
+        y = np.array([0.7, -0.2, 0.0, 0.0], dtype=np.complex128)
+        dy = A_eff @ y
+        np.testing.assert_allclose(dy[0], -0.2, atol=1e-10)
+        np.testing.assert_allclose(dy[1], -0.7, atol=1e-10)
+        assert SingularPencilError is not None  # class stays exported

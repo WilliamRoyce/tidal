@@ -443,6 +443,40 @@ class PerturbativeSolver:
         # explicit eigendecomposition (modal.py raises NotImplementedError).
         # Detecting at construction time gives the user a meaningful error
         # before they wait for a derive + simulate to reach the deep raise.
+        # GH #464 fence (user decision 2026-08-25, cites #321): a field
+        # that is both ε-DEMOTED (order collapsed to 0 at ε=0) and
+        # PROMOTED (its demoted row carries inter-constraint time
+        # derivatives, GH #457) has state slots in the corrected base
+        # operator, but its O(ε¹) corrections were built for the
+        # S_cc-based augmented recovery (#290) which no longer covers it.
+        # This only occurs in the deferred R̃² theory class (#321 — R²
+        # perturbation promotes new degrees of freedom); rather than
+        # design new Pass-1 routing for a deferred class, refuse with the
+        # provenance. The ε⁰ (plain modal) path for these specs is fully
+        # supported.
+        demoted_fields = {
+            eq.field_name
+            for full_eq, eq in zip(
+                self.full_spec.equations, self.base_spec.equations, strict=True
+            )
+            if full_eq.time_derivative_order > 0 and eq.time_derivative_order == 0
+        }
+        promoted_overlap = sorted(
+            demoted_fields & self.base_spec.second_order_sector.promoted
+        )
+        if promoted_overlap:
+            msg = (
+                f"Perturbative flow fenced (GH #464): fields "
+                f"{promoted_overlap} are both ε-demoted and promoted to "
+                f"the second-order sector (GH #457) — their O(ε¹) "
+                f"corrections would need Pass-1 routing through the "
+                f"promoted state slots, which belongs to the deferred "
+                f"R̃²/constraint-promotion program (GH #321). Run the ε⁰ "
+                f"base theory with plain modal (no [perturbation] "
+                f"section), or see #464 for status."
+            )
+            raise NotImplementedError(msg)
+
         if self._base_has_position_dependence():
             msg = (
                 "PerturbativeSolver requires a constant-coefficient base "

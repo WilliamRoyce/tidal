@@ -303,7 +303,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     # tachyonic with infinite excess.
     ce = CoefficientEvaluator(spec, grid, parameters)
     try:
-        A_test, B_test, _, _, _, mapping, _, _ = _build_evolution_matrices(
+        A_test, B_test, _, _, _, mapping, _, _, _ = _build_evolution_matrices(
             spec,
             layout,
             grid,
@@ -562,7 +562,7 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
 
     # Build systems
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, _, _, _, _, mapping, _, _ = _build_evolution_matrices(
+    A_test, _, _, _, _, mapping, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
@@ -573,7 +573,7 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
 
     baseline_params = {**parameters, **baseline_overrides}
     ce_bl = CoefficientEvaluator(spec, grid, baseline_params)
-    A_bl, _, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_bl, _, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,

@@ -40,6 +40,7 @@ References
 
 from __future__ import annotations
 
+import logging
 import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -54,6 +55,8 @@ from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 # Numerical tolerance thresholds
 _SINGULAR_TOL = 1e-14  # Below this, a Fourier multiplier is treated as singular
 _COMPAT_TOL = 1e-10  # Source projection tolerance for compatibility check
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -997,9 +1000,25 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
     from tidal.solver.fields import FieldSet  # noqa: PLC0415
     from tidal.solver.state import StateLayout  # noqa: PLC0415
 
-    # Collect ALL constraint equations
+    # Collect the RESIDUAL constraint equations. Promoted order-0 rows
+    # (GH #457, spec.second_order_sector) are second-order-sector members
+    # whose consistency the modal builder enforces exactly via the
+    # constraint-manifold projection of the IC — solving their TRUNCATED
+    # form here (this solver drops acceleration operators,
+    # _ACCEL_AND_HIGHER_OPS) would enforce a different equation and fight
+    # that projection.
+    promoted = spec.second_order_sector.promoted
+    if promoted:
+        logger.info(
+            "Constraint IC: fields %s are promoted to the second-order "
+            "sector (GH #457); their consistency is enforced by the modal "
+            "manifold projection, not the algebraic IC solve.",
+            sorted(promoted),
+        )
     constraint_eqs = [
-        (i, eq) for i, eq in enumerate(spec.equations) if eq.time_derivative_order == 0
+        (i, eq)
+        for i, eq in enumerate(spec.equations)
+        if eq.time_derivative_order == 0 and eq.field_name not in promoted
     ]
 
     if not constraint_eqs:

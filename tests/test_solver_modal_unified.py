@@ -156,7 +156,7 @@ def test_unified_builder_handles_rank_deficient_mass() -> None:
     spec = _make_rank_deficient_spec()
     layout, grid, coeff_eval, k_grid, rfft_shape = _build_eval_context(spec)
 
-    A_rhs, B_lhs, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_rhs, B_lhs, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
@@ -213,7 +213,7 @@ def test_unified_builder_generalized_eig_tachyon_free() -> None:
     spec = _make_rank_deficient_spec()
     layout, grid, coeff_eval, k_grid, rfft_shape = _build_eval_context(spec)
 
-    A_rhs, B_lhs, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_rhs, B_lhs, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
@@ -357,7 +357,7 @@ def test_svd_schur_continuity_through_critical_point() -> None:
     layout_n, grid_n, ce_n, kg_n, rs_n = _build_eval_context(spec_near)
     layout_c, grid_c, ce_c, kg_c, rs_c = _build_eval_context(spec_crit)
 
-    A_near, _, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_near, _, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec_near,
         layout_n,
         grid_n,
@@ -365,7 +365,7 @@ def test_svd_schur_continuity_through_critical_point() -> None:
         kg_n,
         rs_n,
     )
-    A_crit, _, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_crit, _, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec_crit,
         layout_c,
         grid_c,
@@ -559,7 +559,7 @@ def test_kcc_rank_deficient_pinv_continuity() -> None:
     layout_n, grid_n, ce_n, kg_n, rs_n = _build_eval_context(spec_near)
     layout_c, grid_c, ce_c, kg_c, rs_c = _build_eval_context(spec_crit)
 
-    A_near, _, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_near, _, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec_near,
         layout_n,
         grid_n,
@@ -567,7 +567,7 @@ def test_kcc_rank_deficient_pinv_continuity() -> None:
         kg_n,
         rs_n,
     )
-    A_crit, _, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_crit, _, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec_crit,
         layout_c,
         grid_c,
