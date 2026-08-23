@@ -44,6 +44,8 @@ from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.grid import GridInfo
 from tidal.solver.modal import (
     _build_convolution_matrix_with_constraints,
+    _build_evolution_matrices,
+    _build_k_axes,
     _build_k_axes_full,
     _build_k_grid,
 )
@@ -402,3 +404,470 @@ class TestPath4ECalAdjudication:
         }
         bad = {k: v for k, v in dyn.items() if v > 1e-8}
         assert not bad, f"dynamical rows fail full closure: {bad}"
+
+
+# ---------------------------------------------------------------------------
+# Per-mode PATH-2 oracle (uniform specs → _build_evolution_matrices).
+#
+# Stage-0 instrument of the hardened WS2/#457 plan: the constant-coefficient
+# genEig path ran the UNIFORM thesis campaigns, so its constraint-row
+# handling must be adjudicated with the same rigor as path 4's — but with an
+# instrument whose own positive control passes first (the first scratch
+# harness double-counted the mass matrix on dynamical rows and its numbers
+# were discarded; that failure mode is pinned in PerModeOracle's docstring).
+# ---------------------------------------------------------------------------
+
+
+def _spatial_mult(op: str, k: float) -> complex:
+    """Scalar spatial multiplier of ``op`` at wavenumber ``k`` (1-D)."""
+    return complex(
+        _spatial_apply(op, np.ones(1, dtype=np.complex128), np.array([k]))[0]
+    )
+
+
+def _uniform_velc_spec(kinetic: str | None, c_v: float = 0.4) -> EquationSystem:
+    """Constant-coefficient variant of the GH #444 synthetic for path 2.
+
+    φ with ``M·d2_t(φ) = ∂²ₓφ + c_v·v_χ`` and constraint ``χ = h·φ`` with
+    CONSTANT ``h`` (path 2 is the constant-coefficient engine — the
+    ``Cos[x[]]`` coupling of the path-4 control is out of its contract).
+    Analytically ``v_χ = h·v_φ``, so the composed generator must satisfy
+    ``dv_φ/dt = (1/M)·(−k²·φ + c_v·h·v_φ)`` per mode.
+    """
+    h_amp = 0.5
+    spec_data: dict[str, Any] = {
+        "metadata": {"name": "gh457_p2_synthetic", "parameters": {"alpha": 0.5}},
+        "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+        "fields": [{"name": "phi", "index": 0}, {"name": "chi", "index": 1}],
+        "equations": [
+            {
+                "field": "phi",
+                "lhs": {
+                    "expression": "d2_t(phi)",
+                    "order": {"time": 2, "space": 0},
+                    **(
+                        {"kinetic_coefficient_symbolic": kinetic}
+                        if kinetic is not None
+                        else {}
+                    ),
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi",
+                        },
+                        {
+                            "coefficient": c_v,
+                            "operator": "identity",
+                            "field": "v_chi",
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "chi",
+                "lhs": {"expression": "chi", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -1.0, "operator": "identity", "field": "chi"},
+                        {"coefficient": h_amp, "operator": "identity", "field": "phi"},
+                    ],
+                },
+            },
+        ],
+    }
+    return EquationSystem.from_dict(spec_data)
+
+
+class PerModeOracle:
+    """Independent per-mode residual evaluation for UNIFORM specs (path 2).
+
+    Verified path-2 semantics (GH #457 investigation, 2026-08-25):
+    ``_build_evolution_matrices`` returns ``A_rhs`` whose velocity rows are
+    ALREADY M⁻¹-scaled (batched ``m_inv @ K/D``), and ``B_lhs =
+    I − A_dc_vel·recovery`` or ``None``; the per-mode evolution generator
+    is ``G = B⁻¹·A`` (QZ generalized eig in production). The oracle must
+    therefore NOT multiply the generator's velocity-row output by the mass
+    matrix when forming q̈ — doing so double-counts M (the bug that
+    invalidated the first scratch harness; its numbers were discarded).
+    Row check is identical to :class:`ResidualOracle`:
+    ``kinetic_i·q̈_i − Σ(independently evaluated terms) = 0`` for
+    dynamical rows, ``Σ terms = 0`` for constraint rows.
+
+    Modes whose ``cond(B)`` exceeds 1e10 are excluded from residual claims
+    and counted in the diagnostics (a near-singular velocity-coupling
+    solve is a separate finding — the #455 signature — not a residual
+    measurement).
+
+    Constraint rows with NO time-derivative reference to another
+    constraint field close BY CONSTRUCTION (the recovery is defined by
+    solving exactly those rows in S_cc/S_cd form) — they are listed in
+    the diagnostics as ``by_construction`` so tautological closures are
+    never quoted as evidence of health.
+    """
+
+    def __init__(
+        self,
+        spec: EquationSystem,
+        grid: GridInfo,
+        params: dict[str, float],
+    ) -> None:
+        if len(grid.shape) != 1:
+            msg = "PerModeOracle currently supports 1-D grids only"
+            raise NotImplementedError(msg)
+        self.spec = spec
+        self.grid = grid
+        self.params = params
+        self.layout = StateLayout.from_spec(spec, grid.num_points)
+        ce = CoefficientEvaluator(spec, grid, params)
+        k_axes = _build_k_axes(grid)
+        k_grid = _build_k_grid(k_axes)
+        rfft_shape_list = list(grid.shape)
+        rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
+        rfft_shape = tuple(rfft_shape_list)
+        (
+            self.A_rhs,
+            self.B_lhs,
+            self.recovery,
+            _v_rec,
+            self.c_names,
+            self.o2r,
+            _scc_inv,
+            _sing_mask,
+        ) = _build_evolution_matrices(spec, self.layout, grid, ce, k_grid, rfft_shape)
+        self.k_flat = np.asarray(k_grid[0]).reshape(-1)
+        self.n_dyn = self.A_rhs.shape[1]
+        self.constraint_set = {
+            eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+        }
+
+    # -- constant coefficient evaluation (independent path) ---------------
+    def _const_scalar(self, sym: str | None, fallback: float) -> complex:
+        from tidal.symbolic._eval_utils import evaluate_coefficient
+
+        if sym is None:
+            return complex(fallback)
+        val = evaluate_coefficient(
+            sym, self.params, self.spec.effective_coordinates, {}, 0.0
+        )
+        arr = np.asarray(val)
+        if arr.ndim != 0:
+            msg = f"coefficient {sym!r} is not constant — wrong oracle for this spec"
+            raise ValueError(msg)
+        return complex(arr)
+
+    def _generator(self, m: int) -> tuple[np.ndarray, float]:
+        A_m = self.A_rhs[m]
+        if self.B_lhs is None:
+            return A_m, 1.0
+        B_m = self.B_lhs[m]
+        cond = float(np.linalg.cond(B_m))
+        if cond <= 1e10:
+            return np.linalg.solve(B_m, A_m), cond
+        return A_m, cond  # excluded by the caller; value unused
+
+    def _row_is_by_construction(self, eq: ComponentEquation) -> bool:
+        if eq.time_derivative_order != 0:
+            return False
+        for term in eq.rhs_terms:
+            tf = term.field
+            is_vel = tf.startswith("v_")
+            base = tf[2:] if is_vel else tf
+            if base in self.constraint_set and (
+                is_vel or _time_order(term.operator) >= 1
+            ):
+                return False
+        return True
+
+    def _mode_state(
+        self, m: int, y: np.ndarray, G: np.ndarray
+    ) -> tuple[
+        dict[str, complex], dict[str, complex], dict[str, complex], dict[str, complex]
+    ]:
+        """Per-mode scalar state dicts (fields, vels, accels, dv_dt)."""
+        dy = G @ y
+        d2y = G @ dy
+        fields: dict[str, complex] = {}
+        vels: dict[str, complex] = {}
+        accels: dict[str, complex] = {}
+        dv_dt: dict[str, complex] = {}
+        for name, slot in self.layout.field_slot_map.items():
+            if slot in self.o2r:
+                fields[name] = complex(y[self.o2r[slot]])
+        for name, slot in self.layout.velocity_slot_map.items():
+            if slot in self.o2r:
+                red = self.o2r[slot]
+                vels[name] = complex(y[red])
+                dv_dt[name] = complex(dy[red])
+                accels[name] = complex(dy[red])
+        qc = self.recovery[m] @ y
+        vc = self.recovery[m] @ dy
+        ac = self.recovery[m] @ d2y
+        for ci, cname in enumerate(self.c_names):
+            fields[cname] = complex(qc[ci])
+            vels[cname] = complex(vc[ci])
+            accels[cname] = complex(ac[ci])
+        return fields, vels, accels, dv_dt
+
+    def _row_residual(
+        self,
+        eq: ComponentEquation,
+        k: float,
+        state: tuple[
+            dict[str, complex],
+            dict[str, complex],
+            dict[str, complex],
+            dict[str, complex],
+        ],
+        gaps: dict[str, list[tuple[str, str]]],
+    ) -> float:
+        fields, vels, accels, dv_dt = state
+        rhs = 0.0 + 0.0j
+        scale = 0.0
+        for term in eq.rhs_terms:
+            tf = term.field
+            is_vel = tf.startswith("v_")
+            base = tf[2:] if is_vel else tf
+            t_ord = _time_order(term.operator) + (1 if is_vel else 0)
+            source = {0: fields, 1: vels, 2: accels}.get(t_ord)
+            if source is None or base not in source:
+                entry = (term.operator, term.field)
+                if entry not in gaps.setdefault(eq.field_name, []):
+                    gaps[eq.field_name].append(entry)
+                continue
+            c = self._const_scalar(term.coefficient_symbolic, float(term.coefficient))
+            contrib = c * _spatial_mult(term.operator, k) * source[base]
+            rhs += contrib
+            scale = max(scale, abs(contrib))
+        if eq.time_derivative_order >= 2:
+            kin = self._const_scalar(
+                getattr(eq, "kinetic_coefficient_symbolic", None), 1.0
+            )
+            lhs = kin * dv_dt[eq.field_name]
+            res = lhs - rhs
+            scale = max(scale, abs(lhs))
+        else:
+            res = rhs
+        return abs(res) / max(scale, 1e-300)
+
+    # -- the oracle -------------------------------------------------------
+    def residuals(
+        self, seed: int = 4577
+    ) -> tuple[dict[str, float], dict[str, list[tuple[str, str]]], dict[str, Any]]:
+        """Per-row max normalized residual over all well-posed modes.
+
+        Returns ``(rows, gaps, diag)``: residuals keyed by equation,
+        coverage gaps (term targets the oracle could not resolve — never
+        silently skipped), and diagnostics (excluded ill-conditioned
+        modes, max cond(B), by-construction row list).
+        """
+        rng = np.random.default_rng(seed)
+        rows: dict[str, float] = {}
+        gaps: dict[str, list[tuple[str, str]]] = {}
+        diag: dict[str, Any] = {
+            "excluded_modes": 0,
+            "max_cond_B": 1.0,
+            "by_construction": sorted(
+                eq.field_name
+                for eq in self.spec.equations
+                if self._row_is_by_construction(eq)
+            ),
+        }
+        for m in range(self.k_flat.size):
+            k = float(self.k_flat[m])
+            G, cond = self._generator(m)
+            diag["max_cond_B"] = max(diag["max_cond_B"], cond)
+            if cond > 1e10:
+                diag["excluded_modes"] += 1
+                continue
+            y = rng.standard_normal(self.n_dyn) + 1j * rng.standard_normal(self.n_dyn)
+            state = self._mode_state(m, y, G)
+            for eq in self.spec.equations:
+                r_norm = self._row_residual(eq, k, state, gaps)
+                rows[eq.field_name] = max(rows.get(eq.field_name, 0.0), r_norm)
+        return rows, gaps, diag
+
+
+class TestPath2PerModeOracle:
+    """Positive control for the Stage-0 path-2 instrument.
+
+    The oracle itself must be proven before any of its numbers count as
+    evidence (WS2 lessons register: the first scratch harness failed its
+    would-be control by double-counting M). With unit mass the composed
+    generator has no M⁻¹ ambiguity anywhere, and every row must close at
+    machine precision.
+    """
+
+    def test_positive_control_unit_mass(self) -> None:
+        spec = _uniform_velc_spec(None)
+        grid = GridInfo(bounds=((0.0, 2 * np.pi),), shape=(24,), periodic=(True,))
+        oracle = PerModeOracle(spec, grid, {"alpha": 0.5})
+        rows, gaps, diag = oracle.residuals()
+        assert not gaps, f"oracle coverage gaps on the control spec: {gaps}"
+        assert diag["excluded_modes"] == 0
+        bad = {name: v for name, v in rows.items() if v > 1e-11}
+        assert not bad, f"path-2 positive control fails to close: {bad}"
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Path-2 A_dc dispatch CONFIRMED defective (measured "
+        "2026-08-25): A_dc_field/A_dc_vel are emitted with raw coeff·mult "
+        "and never M⁻¹-scaled (modal.py:1063-1070, cf. m_inv applied to "
+        "A_dd only at :1416-1438). With M = 1.5 the residual is exactly "
+        "(M−1)/M = 1/3 at the k=0 mode; the identical spec with M = 1 "
+        "closes at machine precision (the positive control). Path-2 "
+        "analog of GH #444. Flips when the A_dc emission carries the "
+        "velocity-row scale.",
+    )
+    def test_constraint_coupling_carries_row_mass_scale(self) -> None:
+        spec = _uniform_velc_spec("1 + alpha")  # M = 1.5, everything else equal
+        grid = GridInfo(bounds=((0.0, 2 * np.pi),), shape=(24,), periodic=(True,))
+        oracle = PerModeOracle(spec, grid, {"alpha": 0.5})
+        rows, gaps, _diag = oracle.residuals()
+        assert not gaps
+        bad = {name: v for name, v in rows.items() if v > 1e-11}
+        assert not bad, f"A_dc coupling misses the row mass scale: {bad}"
+
+
+class TestPath2UniformProductionAdjudication:
+    """Path-2 residuals on UNIFORM production specs (measured 2026-08-25).
+
+    The constant-coefficient genEig path ran the uniform campaigns, so
+    these are thesis-relevant numbers. All measured with the hardened
+    per-mode oracle AFTER its positive control passed; cond(B) ≤ 4 on
+    every mode of both specs, so none of this is conditioning garbage —
+    every failure is structural. Mechanism attribution (verified against
+    modal.py source, 2026-08-25):
+
+    ``gertsenshtein_ungauged`` (κ=1, B0=0.01 — E.cal's uniform parent):
+
+    * clean at ≤1e-8: a_0, a_1, h_5 (dynamical), h_0/h_1/h_2
+      (recovery-defining, close by construction);
+    * constraint rows h_4 2.027 / h_7 2.027 / h_9 2.326 — d2_t(C) folded
+      into S_cc with spatial mult ≡ 1 (ḧᶜ treated as hᶜ, :1015-1017), and
+      h_3 1.290 — gradient_x(v_C) silently falls through every branch of
+      the constraint-row dispatch (:1018-1038). GH #457 on path 2.
+    * dynamical rows h_6 1.006 / h_8 2.000 — A_dc_vel missing the row's
+      M⁻¹ = −κ² (kinetic −κ⁻²: the missing factor is a SIGN FLIP);
+      a_2 1.077 / a_3 0.982 — first_derivative_t(C) on a dynamical row
+      matches ``target_field in c_idx_map`` FIRST (:1063-1066), so ḣᶜ is
+      folded into A_dc_field as hᶜ — the t_order-blind dynamical-row
+      analog of #457. a_3 has M = 1 and no other coupling: it isolates
+      the t_order-blindness from the missing-M⁻¹ defect. NOTE: h_2 is
+      NOT in the #457 promoted closure, so the reclassification alone
+      does not fix a_3 — the A_dc dispatch itself needs t_order
+      awareness.
+
+    ``torsion_gertsenshtein`` base spec (b5-demoted) fails identically on
+    the shared h/a sector (same eight rows, same numbers) — its ε⁰
+    content coincides with the ungauged spec, cross-checking both runs.
+
+    ``dark_photon_plasma`` (headline thesis theory; TEST params
+    B0=0.01, alpha3=0.01, deltam=0.05, kappa=1, mA2=0.02, xi=1 — row
+    structure is parameter-independent, magnitudes are not):
+
+    * t_6/t_13/t_20 are BYTE-IDENTICAL constraint rows → S_cc is rank-1
+      (exactly singular) at EVERY mode → the det-gated 1e-14 Tikhonov
+      shift (:1476-1484) fires everywhere and its ill-conditioned inverse
+      leaves 1e-4..1e-2 noise on rows that should close by construction;
+    * dynamical rows t_2/t_10/t_17 1.35 (kinetic −ξ: A_dc_vel missing
+      M⁻¹) and a_3 0.195 (M = 1; degenerate-recovery noise through its
+      2·deltam·v_C couplings).
+    """
+
+    N = 24
+
+    def _run(
+        self, name: str, params: dict[str, float]
+    ) -> tuple[dict[str, float], dict[str, Any]]:
+        spec = _load(name)
+        grid = GridInfo(bounds=((0.0, 100.0),), shape=(self.N,), periodic=(True,))
+        oracle = PerModeOracle(spec, grid, params)
+        rows, gaps, diag = oracle.residuals()
+        assert not gaps, f"oracle coverage gaps on {name}: {gaps}"
+        return rows, diag
+
+    UNGAUGED_PARAMS = {"kappa": 1.0, "B0": 0.01}
+    DPP_PARAMS = {
+        "kappa": 1.0,
+        "B0": 0.01,
+        "alpha3": 0.01,
+        "deltam": 0.05,
+        "mA2": 0.02,
+        "xi": 1.0,
+    }
+
+    def test_ungauged_handled_rows_certified(self) -> None:
+        rows, diag = self._run("gertsenshtein_ungauged", self.UNGAUGED_PARAMS)
+        assert diag["excluded_modes"] == 0
+        assert diag["by_construction"] == ["h_0", "h_1", "h_2"]
+        healthy = {"a_0", "a_1", "h_5", "h_0", "h_1", "h_2"}
+        bad = {k: v for k, v in rows.items() if k in healthy and v > 1e-8}
+        assert not bad, f"handled rows fail to close: {bad}"
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="GH #457 on path 2 (measured 2026-08-25): constraint rows "
+        "h_3 1.290 / h_4 2.027 / h_7 2.027 / h_9 2.326 — d2_t(C) folded "
+        "into S_cc as identity, gradient_x(v_C) silently dropped. Flips "
+        "with the #457 reclassification.",
+    )
+    def test_ungauged_constraint_rows_full_closure(self) -> None:
+        rows, _diag = self._run("gertsenshtein_ungauged", self.UNGAUGED_PARAMS)
+        con = {k: v for k, v in rows.items() if k in {"h_3", "h_4", "h_7", "h_9"}}
+        bad = {k: v for k, v in con.items() if v > 1e-8}
+        assert not bad, f"constraint rows fail full closure: {bad}"
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Path-2 A_dc dispatch defects (measured 2026-08-25): "
+        "h_6 1.006 / h_8 2.000 (A_dc_vel missing M⁻¹ = −κ², a sign flip) "
+        "and a_2 1.077 / a_3 0.982 (t_order-blind fold of "
+        "first_derivative_t(C) into A_dc_field; a_3 has M = 1, isolating "
+        "this mechanism). Flips with the t_order-aware, M⁻¹-scaled A_dc "
+        "dispatch fix.",
+    )
+    def test_ungauged_dynamical_rows_full_closure(self) -> None:
+        rows, _diag = self._run("gertsenshtein_ungauged", self.UNGAUGED_PARAMS)
+        dyn = {k: v for k, v in rows.items() if k in {"h_6", "h_8", "a_2", "a_3"}}
+        bad = {k: v for k, v in dyn.items() if v > 1e-8}
+        assert not bad, f"dynamical rows fail full closure: {bad}"
+
+    def test_dark_photon_handled_rows_certified(self) -> None:
+        rows, diag = self._run("dark_photon_plasma", self.DPP_PARAMS)
+        assert diag["excluded_modes"] == 0
+        healthy = {
+            "a_0",
+            "a_1",
+            "a_2",
+            "h_5",
+            "h_7",
+            "t_0",
+            "t_1",
+            "t_15",
+            "t_22",
+            "t_23",
+            "t_9",
+        }
+        bad = {k: v for k, v in rows.items() if k in healthy and v > 1e-8}
+        assert not bad, f"handled rows fail to close: {bad}"
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="Rank-deficient S_cc + det-gated Tikhonov (measured "
+        "2026-08-25): dark_photon_plasma's t_6/t_13/t_20 are identical "
+        "rows (S_cc rank-1, singular at EVERY mode); the 1e-14 shift's "
+        "ill-conditioned inverse leaves ~1e-2 noise on rows that must "
+        "close by construction, and t_2/t_10/t_17 1.35 / a_3 0.195 on "
+        "the coupled dynamical rows (entangled with the missing-M⁻¹ "
+        "A_dc defect on the −ξ-kinetic rows). Flips with rank-revealing "
+        "constraint elimination (SVD, null frozen) + the A_dc fix.",
+    )
+    def test_dark_photon_full_closure(self) -> None:
+        rows, _diag = self._run("dark_photon_plasma", self.DPP_PARAMS)
+        bad = {k: v for k, v in rows.items() if v > 1e-8}
+        assert not bad, f"rows fail full closure: {bad}"
