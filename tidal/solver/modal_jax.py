@@ -227,6 +227,19 @@ def _solve_modal_jax_constrained(  # noqa: PLR0917
         _build_evolution_matrices,  # pyright: ignore[reportPrivateUsage]
     )
 
+    # GH #457: this path folds B via a plain batched solve with no null
+    # projection, so a promoted second-order sector would silently produce
+    # wrong operators (the numpy path uses QZ / null-frozen semantics).
+    # Refuse until the pencil machinery is ported (GH #463 tracks parity).
+    promoted = spec.second_order_sector.promoted
+    if promoted:
+        msg = (
+            f"modal-jax cannot evolve specs with a promoted second-order "
+            f"sector (fields: {sorted(promoted)}); the numpy modal solver "
+            f"handles them. See GH #457."
+        )
+        raise NotImplementedError(msg)
+
     n_slots = layout.num_slots
     n_pts = layout.num_points
     n_modes = y0_hat.shape[1]

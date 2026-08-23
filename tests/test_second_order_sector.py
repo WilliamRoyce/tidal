@@ -440,3 +440,94 @@ class TestIndexTwoPreScan:
             if self._risky(spec):
                 risky_specs += 1
         assert risky_specs > 0
+
+
+# ---------------------------------------------------------------------------
+# Stage 2a: refusal consistency + display (accessor-only, no layout change)
+# ---------------------------------------------------------------------------
+
+
+class TestStage2Refusals:
+    """Promoted specs must be refused EARLY and actionably by backends that
+    cannot represent the second-order sector, instead of failing late
+    (missing-v_-slot KeyError) or silently building wrong operators.
+
+    The state-layout flip and the modal builders' promotion land together
+    in the Stage-3/4 commit — until then the modal paths keep their
+    measured (defective) behavior, pinned by the oracle xfail marks.
+    """
+
+    def test_rhs_evaluator_refuses_promoted_spec(self) -> None:
+        import numpy as np
+
+        from tidal.solver.coefficients import CoefficientEvaluator
+        from tidal.solver.grid import GridInfo
+        from tidal.solver.rhs import RHSEvaluator
+
+        spec = _load_spec("gertsenshtein_ungauged")
+        grid = GridInfo(bounds=((0.0, 100.0),), shape=(16,), periodic=(True,))
+        ce = CoefficientEvaluator(spec, grid, {"kappa": 1.0, "B0": 0.01})
+        with pytest.raises(NotImplementedError, match=r"h_3.*#457") as exc:
+            RHSEvaluator(spec, grid, ce)
+        assert "modal" in str(exc.value)
+        del np
+
+    def test_rhs_evaluator_accepts_ordinary_constraint_spec(self) -> None:
+        from tidal.solver.coefficients import CoefficientEvaluator
+        from tidal.solver.grid import GridInfo
+        from tidal.solver.rhs import RHSEvaluator
+
+        spec = _mini_spec(
+            {
+                "c_a": (0, [("laplacian_x", "phi")]),
+                "phi": (2, [("laplacian_x", "phi")]),
+            }
+        )
+        grid = GridInfo(bounds=((0.0, 6.0),), shape=(16,), periodic=(True,))
+        ce = CoefficientEvaluator(spec, grid, {})
+        RHSEvaluator(spec, grid, ce)  # must not raise
+
+    def test_modal_jax_refuses_promoted_spec(self) -> None:
+        import numpy as np
+
+        from tidal.solver.coefficients import CoefficientEvaluator
+        from tidal.solver.grid import GridInfo
+        from tidal.solver.modal_jax import (
+            _solve_modal_jax_constrained,  # pyright: ignore[reportPrivateUsage]
+        )
+        from tidal.solver.state import StateLayout
+
+        spec = _load_spec("gertsenshtein_ungauged")
+        grid = GridInfo(bounds=((0.0, 100.0),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        ce = CoefficientEvaluator(spec, grid, {"kappa": 1.0, "B0": 0.01})
+        # The refusal fires before any matrix work or JAX use, so dummy
+        # evolution arguments are never touched.
+        with pytest.raises(NotImplementedError, match=r"h_3.*#457"):
+            _solve_modal_jax_constrained(
+                spec,
+                layout,
+                grid,
+                ce,
+                [np.zeros(9)],
+                (9,),
+                np.zeros((layout.num_slots, 9), dtype=np.complex128),
+                np.linspace(0.0, 1.0, 2),
+                None,
+                2,
+                None,
+                None,
+            )
+
+    def test_inspect_annotates_promoted_rows(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from tidal.cli import main
+
+        path = REPO_ROOT / "examples/data/gertsenshtein_ungauged.json"
+        if not path.exists():
+            pytest.skip("spec not present")
+        assert main(["inspect", str(path), "--equation", "h_3"]) == 0
+        out = capsys.readouterr().out
+        assert "promoted to second-order sector" in out
+        assert "GH #457" in out

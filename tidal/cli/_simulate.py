@@ -2295,11 +2295,13 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     # nested-sampling likelihood path — skip it when we're in-memory
     # mode (see #269, #291).
     if in_memory_out is None:
-        with contextlib.suppress(ValueError):
+        with contextlib.suppress(ValueError, NotImplementedError):
             # May raise ValueError for systems with time-derivative operators
             # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
-            # cannot handle. These are simulated by the modal solver's
-            # generalized mass-matrix path which works directly in Fourier space.
+            # cannot handle, or NotImplementedError for promoted second-order
+            # sectors (GH #457). These are simulated by the modal solver's
+            # generalized mass-matrix path which works directly in Fourier
+            # space — the diagnostic is optional there.
             _warn_zero_evolution(spec, grid_info, y0, params, bc)
     # Note: mass stability pre-check removed — the modal solver's eigenvalue
     # pre-check (in _evolve_per_mode) provides more accurate instability

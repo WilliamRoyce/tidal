@@ -59,6 +59,24 @@ class RHSEvaluator:
         coeff_eval: CoefficientEvaluator,
         bc: BCSpec | None = None,
     ) -> None:
+        # GH #457: order-0 rows that reference time derivatives of other
+        # order-0 fields form a coupled second-order subsystem that the
+        # time-domain state layout (q, v for order>0 fields only) cannot
+        # represent. Refuse HERE — the shared entry of IDA/CVODE/leapfrog/
+        # scipy — instead of failing later with a missing-v_-slot KeyError
+        # or silently evaluating a truncated equation.
+        promoted = spec.second_order_sector.promoted
+        if promoted:
+            msg = (
+                f"This spec's constraint closure couples second-order "
+                f"structure among its order-0 rows (promoted fields: "
+                f"{sorted(promoted)}). Time-domain backends cannot represent "
+                f"inter-constraint time-derivative terms; use the modal "
+                f"solver (auto-selected for flat-metric periodic specs). "
+                f"See GH #457."
+            )
+            raise NotImplementedError(msg)
+
         self._spec = spec
         self._grid = grid
         self._coeff_eval = coeff_eval

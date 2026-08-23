@@ -256,6 +256,7 @@ def _render_equation(
     equation: ComponentEquation,
     *,
     summary: bool = False,
+    promoted: frozenset[str] = frozenset(),
 ) -> list[str]:
     """Render one equation as lines, kinetic coefficient on the left-hand side.
 
@@ -299,7 +300,15 @@ def _render_equation(
     order = equation.time_derivative_order
     name = equation.field_name
     kinetic = equation.kinetic_coefficient_symbolic
-    head = f"d{order}_t({name})" if order else f"{name} (constraint)"
+    if order:
+        head = f"d{order}_t({name})"
+    elif name in promoted:
+        # Algebraic LHS, but the row carries (or is targeted by) inter-
+        # constraint time derivatives: it belongs to the second-order
+        # sector and cannot be Schur-eliminated as algebraic (GH #457).
+        head = f"{name} (algebraic LHS — promoted to second-order sector, GH #457)"
+    else:
+        head = f"{name} (constraint)"
     kinetic_shown = _COORD_CALL.sub(r"\1", kinetic) if kinetic else None
     lhs = f"[{kinetic_shown}] {head}" if kinetic_shown else head
 
@@ -344,13 +353,19 @@ def _print_equations(spec: object, *, detail: str = "full") -> None:
     if not isinstance(spec, EquationSystem):
         return
 
+    promoted = spec.second_order_sector.promoted
     if detail != "summary":
         print(
             f"Fields ({spec.n_components} "
             f"component{'s' if spec.n_components != 1 else ''}):",
         )
         for eq in spec.equations:
-            kind = "dynamical" if eq.time_derivative_order > 0 else "constraint"
+            if eq.time_derivative_order > 0:
+                kind = "dynamical"
+            elif eq.field_name in promoted:
+                kind = "promoted"  # second-order sector, GH #457
+            else:
+                kind = "constraint"
             print(
                 f"  {eq.field_name:<12s} {kind:<12s} time_order={eq.time_derivative_order}"
             )
@@ -360,7 +375,9 @@ def _print_equations(spec: object, *, detail: str = "full") -> None:
         "Equations:" if detail != "summary" else "Signs (proven only; ? = undecided):"
     )
     for eq in spec.equations:
-        for line in _render_equation(eq, summary=detail == "summary"):
+        for line in _render_equation(
+            eq, summary=detail == "summary", promoted=promoted
+        ):
             print(line)
     print()
 
