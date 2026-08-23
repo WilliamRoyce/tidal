@@ -883,3 +883,45 @@ class TestPath2UniformProductionAdjudication:
             rows, _diag = self._run("dark_photon_plasma", self.DPP_PARAMS)
         bad = {k: v for k, v in rows.items() if v > 1e-8}
         assert not bad, f"rows fail full closure: {bad}"
+
+
+class TestPath2NonminimalAdjudication:
+    """OPEN DEFECT (GH #467, measured 2026-08-25): the nonminimal-class
+    assembly is oracle-refuted.
+
+    torsion_gertsenshtein_nonminimal (17 promoted fields, D_cc-rich, 14
+    residual rows, plain operator vocabulary) builds an operator whose
+    per-mode oracle residuals are O(0.03-1.8) on 20 rows, and whose
+    pencil contains a GENUINE spurious eigenvalue Re(λ) ≈ 2.3e8
+    (homogeneous residual 6.5e-18 — it is in the assembled pencil, not a
+    QZ artifact; the oracle refutation shows the pencil itself differs
+    from the equations). Ruled out by measurement: deferred-substitution
+    approximation (zero such terms on this spec), rounded-infinite
+    eigenvalue misclassification (the gap classifier handles those),
+    recovery blowup (‖recovery‖ ≈ 5e4, bounded).
+    """
+
+    PARAMS = {
+        "kappa": 1.0,
+        "B0": 0.01,
+        "alpha1": 0.0,
+        "alpha2": -1.0,
+        "alpha3": 1.0,
+        "delta1": 1.0,
+    }
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="GH #467: nonminimal-class assembly defect — oracle "
+        "residuals O(0.03-1.8) on 20 rows and a spurious genuine "
+        "pencil eigenvalue Re(λ) ≈ 2.3e8 at the T4 point. Flips when "
+        "#467 is fixed.",
+    )
+    def test_nonminimal_full_closure(self) -> None:
+        spec = _load("torsion_gertsenshtein_nonminimal")
+        grid = GridInfo(bounds=((0.0, 50.0),), shape=(32,), periodic=(True,))
+        oracle = PerModeOracle(spec, grid, self.PARAMS)
+        rows, gaps, _diag = oracle.residuals()
+        assert not gaps
+        bad = {k: v for k, v in rows.items() if v > 1e-7}
+        assert not bad, f"rows fail closure: {bad}"

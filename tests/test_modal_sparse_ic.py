@@ -307,7 +307,15 @@ def test_inference_eval_perf() -> None:
             times.append((time.perf_counter() - t0) * 1000)
 
     median_ms = float(np.median(times))
-    assert median_ms <= 200.0, (
-        f"likelihood-eval median wall {median_ms:.2f} ms exceeds 200 ms budget; "
-        "investigate matrix-construction or coefficient-resolution paths"
+    # Budget re-derived 2026-08-25 (GH #457 pencil engine): this fixture
+    # (general_nonminimal) has a promoted second-order sector, so every
+    # eval runs the ordered-QZ deflation per mode (~117 ms/build measured;
+    # median 556 ms vs the old 75 ms — the old operator was WRONG on this
+    # spec class, so the old budget pinned the wrong computation). 900 ms
+    # keeps ~1.6× headroom for slow CI workers; GH #466 tracks bringing
+    # the engine cost back down (probe/QZ reuse across modes).
+    assert median_ms <= 900.0, (
+        f"likelihood-eval median wall {median_ms:.2f} ms exceeds the "
+        "900 ms budget (re-derived for the QZ pencil engine, GH #457); "
+        "see GH #466 before touching the budget again"
     )

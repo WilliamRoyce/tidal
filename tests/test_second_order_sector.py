@@ -183,9 +183,9 @@ class TestClassificationPredicate:
         )
         assert spec.second_order_sector.promoted == frozenset()
 
-    def test_dynamical_row_refs_never_seed(self) -> None:
-        # Dynamical-row references to constraints route through A_dc —
-        # their defects are GH #458, not classification.
+    def test_dynamical_row_velocity_refs_never_seed(self) -> None:
+        # First-order references from dynamical rows are exact through
+        # the B-side recovery fold (Ċ = recovery·ẏ) — no promotion.
         spec = _mini_spec(
             {
                 "c_a": (0, []),
@@ -193,6 +193,20 @@ class TestClassificationPredicate:
             }
         )
         assert spec.second_order_sector.promoted == frozenset()
+
+    def test_dynamical_row_acceleration_ref_promotes_target(self) -> None:
+        # q̈ of an eliminated field is jerk-level through a velocity-
+        # dependent recovery — the target must promote (T4 class,
+        # measured 2026-08-25 on torsion_gertsenshtein_nonminimal t_0).
+        spec = _mini_spec(
+            {
+                "c_a": (0, []),
+                "phi": (2, [("d2_t", "c_a")]),
+            }
+        )
+        s2 = spec.second_order_sector
+        assert s2.promoted == frozenset({"c_a"})
+        assert s2.reasons["c_a"] == "mass-targeted"
 
     def test_identity_self_term_creates_no_edge(self) -> None:
         # Every row of the factory carries identity(self) — including the
@@ -224,9 +238,12 @@ CORPUS_EXPECTED: dict[str, frozenset[str]] = {
     "gertsenshtein_ungauged_e_dual_gaussian": E_CLASS,
     "dark_photon_plasma_e_dual_gaussian": E_CLASS,
     "torsion_gertsenshtein_b5_zero": E_CLASS,
-    "torsion_gertsenshtein_complete_even": E_CLASS,
-    "torsion_gertsenshtein_complete_even_e_dual_gaussian": E_CLASS,
-    "torsion_gertsenshtein_complete_even_full_xi": E_CLASS,
+    # complete_even: h_1/h_2 are mass-targeted from DYNAMICAL rows —
+    # algebraic recovery cannot supply their q̈ (T4-class, 2026-08-25)
+    "torsion_gertsenshtein_complete_even": E_CLASS | frozenset({"h_1", "h_2"}),
+    "torsion_gertsenshtein_complete_even_e_dual_gaussian": E_CLASS
+    | frozenset({"h_1", "h_2"}),
+    "torsion_gertsenshtein_complete_even_full_xi": E_CLASS | frozenset({"h_1", "h_2"}),
     "torsion_gertsenshtein_einstein_cartan_e_dual_gaussian": E_CLASS,
     "torsion_gertsenshtein_minimal_propagating": E_CLASS,
     "torsion_gertsenshtein_minimal_propagating_e0_dual_gaussian": E_CLASS,
@@ -239,11 +256,39 @@ CORPUS_EXPECTED: dict[str, frozenset[str]] = {
     # larger closures
     "torsion_gertsenshtein_nonminimal": E_CLASS
     | frozenset(
-        {"h_2", "t_1", "t_2", "t_5", "t_9", "t_10", "t_14", "t_17", "t_19", "t_23"}
+        {
+            "h_2",
+            "t_0",
+            "t_1",
+            "t_2",
+            "t_5",
+            "t_9",
+            "t_10",
+            "t_14",
+            "t_15",
+            "t_17",
+            "t_19",
+            "t_22",
+            "t_23",
+        }
     ),
     "torsion_gertsenshtein_nonminimal_e_dual_gaussian": E_CLASS
     | frozenset(
-        {"h_2", "t_1", "t_2", "t_5", "t_9", "t_10", "t_14", "t_17", "t_19", "t_23"}
+        {
+            "h_2",
+            "t_0",
+            "t_1",
+            "t_2",
+            "t_5",
+            "t_9",
+            "t_10",
+            "t_14",
+            "t_15",
+            "t_17",
+            "t_19",
+            "t_22",
+            "t_23",
+        }
     ),
     "torsion_gertsenshtein_parity_odd": E_CLASS
     | frozenset(
@@ -251,7 +296,21 @@ CORPUS_EXPECTED: dict[str, frozenset[str]] = {
     ),
     "torsion_gertsenshtein_parity_odd_minimal": E_CLASS
     | frozenset(
-        {"h_2", "t_0", "t_3", "t_4", "t_7", "t_8", "t_12", "t_15", "t_18", "t_22"}
+        {
+            "h_2",
+            "t_0",
+            "t_3",
+            "t_4",
+            "t_5",
+            "t_7",
+            "t_8",
+            "t_12",
+            "t_14",
+            "t_15",
+            "t_18",
+            "t_19",
+            "t_22",
+        }
     ),
     "torsion_gertsenshtein_complete_odd": E_CLASS
     | frozenset(

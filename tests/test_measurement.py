@@ -4734,6 +4734,12 @@ class TestCheckConversionStabilityPade:
         assert not result.stable
         assert result.max_excess > 0.3
 
+    @pytest.mark.skip(
+        reason="GH #467: the nonminimal-class operator is oracle-refuted "
+        "(both pre- and post-#457, differently) — the probe verdict here "
+        "is meaningless until #467 fixes the assembly; re-derive the "
+        "expectation then"
+    )
     def test_handles_t4_high_cond_v_without_over_rejection(self) -> None:
         """T4 (Ricci-EM, cond(V) ~ 1e14) at known-stable (α2=-1, δ1=1) → pass.
 

@@ -929,26 +929,39 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
 def _inter_constraint_time_edges(
     equations: Sequence[ComponentEquation],
     c_fields: set[str],
-) -> list[tuple[str, str, int]]:
-    """Edges over order-0 rows: (row_field, target_field, total_t_order).
+) -> tuple[list[tuple[str, str, int]], set[str]]:
+    """Time-reference structure that promotes order-0 rows (GH #457).
 
-    An edge exists where an order-0 row's term references another order-0
-    field with total time order ≥ 1 (operator time order plus one for a
-    ``v_``-prefixed target).
+    Returns ``(edges, mass_targeted_from_dynamical)``:
+
+    * ``edges``: (row_field, target_field, total_t_order) for order-0
+      rows referencing another order-0 field with total time order ≥ 1
+      (operator time order plus one for a ``v_``-prefixed target).
+    * ``mass_targeted_from_dynamical``: order-0 fields whose
+      ACCELERATION (total time order ≥ 2) is referenced from a
+      DYNAMICAL row. Algebraic elimination cannot represent q̈ of an
+      eliminated field when its recovery is velocity-dependent (the
+      twice-differentiated recovery is jerk-level); promoting the field
+      turns the term into an ordinary B-side mass coupling. Velocity
+      references (total order 1) from dynamical rows do NOT promote —
+      ``Ċ = recovery·ẏ`` is exact as a B-side fold.
     """
     edges: list[tuple[str, str, int]] = []
+    dyn_mass_targets: set[str] = set()
+    second_order = 2
     for eq in equations:
-        if eq.time_derivative_order != 0:
-            continue
         for term in eq.rhs_terms:
             is_vel = term.field.startswith("v_")
             base = term.field[2:] if is_vel else term.field
             if base not in c_fields:
                 continue
             t_total = operator_time_order(term.operator) + (1 if is_vel else 0)
-            if t_total >= 1:
-                edges.append((eq.field_name, base, t_total))
-    return edges
+            if eq.time_derivative_order == 0:
+                if t_total >= 1:
+                    edges.append((eq.field_name, base, t_total))
+            elif t_total >= second_order:
+                dyn_mass_targets.add(base)
+    return edges, dyn_mass_targets
 
 
 @dataclass(frozen=True)
@@ -1405,10 +1418,14 @@ class EquationSystem:
         c_fields = {
             eq.field_name for eq in self.equations if eq.time_derivative_order == 0
         }
-        edges = _inter_constraint_time_edges(self.equations, c_fields)
+        edges, dyn_mass_targets = _inter_constraint_time_edges(
+            self.equations, c_fields
+        )
 
         # Connected components over c_fields (union-find); promoted =
-        # union of components containing at least one edge.
+        # union of components containing at least one edge, plus the
+        # components of fields whose acceleration a DYNAMICAL row
+        # references (their algebraic recovery cannot supply q̈).
         parent: dict[str, str] = {f: f for f in c_fields}
 
         def _find(a: str) -> str:
@@ -1421,9 +1438,11 @@ class EquationSystem:
             ra, rb = _find(row), _find(tgt)
             if ra != rb:
                 parent[ra] = rb
-        edged_roots = {_find(row) for row, _tgt, _t in edges} | {
-            _find(tgt) for _row, tgt, _t in edges
-        }
+        edged_roots = (
+            {_find(row) for row, _tgt, _t in edges}
+            | {_find(tgt) for _row, tgt, _t in edges}
+            | {_find(f) for f in dyn_mass_targets}
+        )
         promoted = frozenset(f for f in c_fields if _find(f) in edged_roots)
 
         tag_sets: dict[str, set[str]] = {f: set() for f in promoted}
@@ -1435,6 +1454,8 @@ class EquationSystem:
             tag_sets[tgt].add(
                 "mass-targeted" if t_total >= second_order else "velocity-targeted"
             )
+        for f in dyn_mass_targets:
+            tag_sets[f].add("mass-targeted")
         reasons = {
             f: "+".join(sorted(tags)) if tags else "closure"
             for f, tags in tag_sets.items()

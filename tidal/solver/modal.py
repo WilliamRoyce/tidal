@@ -1008,13 +1008,6 @@ def _build_evolution_matrices(
         tuple[int, complex, NDArray[np.complex128], int, int]
     ] = []
 
-    # Dynamical-row d2_t(residual C) terms (GH #458): C̈ folds into the
-    # pencil's B side once the recovery exists.
-    # Each entry: (vel_slot_row, coeff, spatial_mult, cj)
-    deferred_dyn_ddc: list[
-        tuple[int, complex | NDArray[np.complex128], NDArray[np.complex128], int]
-    ] = []
-
     # ---- Populate matrices from equations ----
     for eq_idx, eq in enumerate(spec.equations):
         is_constraint = (
@@ -1114,23 +1107,22 @@ def _build_evolution_matrices(
                     A_dc_field[:, vel_slot, cj] += coeff * mult
                 elif total_t == 1:
                     A_dc_vel[:, vel_slot, cj] += coeff * mult
-                elif total_t == 2:
-                    # q̈ of a residual algebraic field: C̈ = recovery·ÿ.
-                    # The field-column part of the recovery gives q̈_j =
-                    # v̇_j (B-side content, folded after recovery exists);
-                    # a velocity-column part would need v⃛ (jerk level)
-                    # and is refused at the fold. The OLD dispatch folded
-                    # q̈_c as q_c here (t_order-blind — GH #458).
-                    deferred_dyn_ddc.append((vel_slot, coeff, mult, cj))
                 else:
+                    # Classification invariant (GH #457): an order-0
+                    # field whose acceleration any row references is
+                    # promoted by second_order_sector (algebraic recovery
+                    # cannot supply q̈), so it cannot be in c_idx_map
+                    # here. The OLD dispatch folded q̈_c as q_c
+                    # (t_order-blind — GH #458).
                     msg = (
-                        f"equation {eq.field_name!r}: term "
-                        f"{term.operator}({term.field}) carries time order "
-                        f"{total_t} of residual algebraic field "
-                        f"{base_field!r} — beyond second-derivative "
-                        f"recovery. GH #458."
+                        f"classification invariant violated: dynamical row "
+                        f"{eq.field_name!r} carries {term.operator}"
+                        f"({term.field}) (total time order {total_t}) of "
+                        f"residual field {base_field!r} — "
+                        f"second_order_sector should have promoted it "
+                        f"(GH #457)"
                     )
-                    raise NotImplementedError(msg)
+                    raise AssertionError(msg)
             elif base_field in dyn_field_idx:
                 fj = dyn_field_idx[base_field]
                 if t_order == 0:
@@ -1318,31 +1310,8 @@ def _build_evolution_matrices(
         # carries the row mass, no separate M⁻¹ scaling exists to forget.
         a_fold = A0 + A_dc_field @ recovery
         b_fold = B0 - A_dc_vel @ recovery
-
-        # Dynamical-row q̈_C terms (GH #458): C̈ = recovery·ÿ. The
-        # field-column part gives q̈_j = v̇_j → B-side entries on the
-        # velocity columns; a velocity-column part would be jerk-level
-        # (v⃛) and is refused rather than approximated.
-        for ddc_vel_row, ddc_coeff, ddc_mult, ddc_cj in deferred_dyn_ddc:
-            for fname_dd in dyn_field_names:
-                fq_dd = orig_to_reduced[layout.field_slot_map[fname_dd]]
-                fv_dd = orig_to_reduced[layout.velocity_slot_map[fname_dd]]
-                rec_vel_part = float(np.max(np.abs(recovery[:, ddc_cj, fv_dd])))
-                if rec_vel_part > 1e-14:
-                    msg = (
-                        f"d2_t of residual field "
-                        f"{constraint_field_names[ddc_cj]!r} requires the "
-                        f"twice-differentiated recovery through a velocity "
-                        f"column (jerk-level content) — not representable. "
-                        f"GH #458."
-                    )
-                    raise NotImplementedError(msg)
-                b_fold[:, ddc_vel_row, fv_dd] -= (
-                    ddc_coeff * ddc_mult * recovery[:, ddc_cj, fq_dd]
-                )
     else:
         recovery = np.zeros((n_modes, 0, n_dyn_slots), dtype=np.complex128)
-        assert not deferred_dyn_ddc  # targets require n_c > 0 by construction
         a_fold = A0
         b_fold = B0
         Scc_inv_out = None
@@ -2977,7 +2946,31 @@ def _pencil_deflate(
     def _is_finite_eig(
         alpha: NDArray[np.complex128], beta: NDArray[np.complex128]
     ) -> NDArray[np.bool_]:
-        return np.abs(beta) > tol * (np.abs(alpha) + np.abs(beta) + tol)
+        # Finite vs infinite by the ratio r = |β|/(|α|+|β|). QZ rounds
+        # TRUE infinite eigenvalues (singular B directions) to tiny but
+        # NONZERO β; with a fixed threshold they masquerade as huge
+        # finite modes (λ ~ 1/r) whose spurious positive real parts
+        # poison the exponential — measured λ ~ 1e8..1e14 with hres = 0
+        # on the T4 nonminimal pencil. The split is therefore
+        # DATA-DERIVED: pairs with r > 1e-2 are always finite; below
+        # that, the largest multiplicative gap (≥ 3 orders) in the
+        # sorted ratios separates genuine stiff modes from rounded
+        # infinite ones; with no clear gap the fixed tolerance applies.
+        r = np.abs(beta) / (np.abs(alpha) + np.abs(beta) + 1e-300)
+        clearly_finite = 1e-2
+        cut = tol
+        rs = np.sort(np.maximum(r, 1e-16))[::-1]
+        if rs.size >= 2:
+            gaps = rs[:-1] / rs[1:]
+            # Only cuts whose LOWER edge sits below the clearly-finite
+            # floor are admissible (never split inside the genuine
+            # finite cluster); take the largest such gap if decisive.
+            admissible = rs[1:] < clearly_finite
+            if np.any(admissible):
+                gi = int(np.argmax(np.where(admissible, gaps, 0.0)))
+                if gaps[gi] >= 1e3:
+                    cut = float(np.sqrt(rs[gi] * rs[gi + 1]))
+        return r > min(cut, clearly_finite)
 
     # Regularity probe: a pencil is singular iff det(λB − A) ≡ 0 in λ.
     # Probing the smallest singular value of (λ₀B − A) at fixed generic
