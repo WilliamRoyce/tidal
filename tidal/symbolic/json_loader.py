@@ -105,6 +105,39 @@ def is_known_operator(name: str) -> bool:
     return bool(re.match(r"^d\d+_t$", name))
 
 
+_PURE_TIME_OP_RE = re.compile(r"^d(\d+)_t$")
+_MIXED_T_OP_RE = re.compile(r"^mixed_T(\d*)")
+_MIXED_NUMERIC_OP_RE = re.compile(r"^mixed_(\d+)(?:_\d+)+$")
+
+
+def operator_time_order(name: str) -> int:
+    """Time-derivative order carried by an RHS operator name.
+
+    Complements :func:`is_known_operator`: static/spatial operators are
+    order 0, ``first_derivative_t`` is 1, ``d<N>_t`` is N, and mixed
+    time-space operators carry their T exponent (``mixed_T_S1x`` = 1,
+    ``mixed_T2_S1x`` = 2, numeric ``mixed_<t>_<s>...`` = t). The total
+    time order of a term is this value plus one when the term targets a
+    velocity slot (``v_``-prefixed field name).
+
+    This is the single symbolic-side source of truth used by
+    :attr:`EquationSystem.second_order_sector` (GH #457); solver-side
+    operator decompositions must agree with it.
+    """
+    if name == "first_derivative_t":
+        return 1
+    m = _PURE_TIME_OP_RE.match(name)
+    if m:
+        return int(m.group(1))
+    m = _MIXED_T_OP_RE.match(name)
+    if m:
+        return int(m.group(1)) if m.group(1) else 1
+    m = _MIXED_NUMERIC_OP_RE.match(name)
+    if m:
+        return int(m.group(1))
+    return 0
+
+
 # --- LHS structure ---
 
 
@@ -890,6 +923,77 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
     return value
 
 
+# --- Second-order sector classification (GH #457) ---
+
+
+def _inter_constraint_time_edges(
+    equations: Sequence[ComponentEquation],
+    c_fields: set[str],
+) -> list[tuple[str, str, int]]:
+    """Edges over order-0 rows: (row_field, target_field, total_t_order).
+
+    An edge exists where an order-0 row's term references another order-0
+    field with total time order ≥ 1 (operator time order plus one for a
+    ``v_``-prefixed target).
+    """
+    edges: list[tuple[str, str, int]] = []
+    for eq in equations:
+        if eq.time_derivative_order != 0:
+            continue
+        for term in eq.rhs_terms:
+            is_vel = term.field.startswith("v_")
+            base = term.field[2:] if is_vel else term.field
+            if base not in c_fields:
+                continue
+            t_total = operator_time_order(term.operator) + (1 if is_vel else 0)
+            if t_total >= 1:
+                edges.append((eq.field_name, base, t_total))
+    return edges
+
+
+@dataclass(frozen=True)
+class SecondOrderSector:
+    """Constraint-classified rows that carry second-order structure.
+
+    ``time_derivative_order == 0`` states the true LHS fact of a row; it
+    does NOT guarantee the row is algebraic. Rows whose RHS references
+    time derivatives of OTHER order-0 fields (``d2_t(C)`` → M_cc mass
+    coupling, ``first_derivative_t(C)`` / ``v_C`` → D_cc damping
+    coupling) form a coupled second-order subsystem that algebraic
+    (Schur) elimination cannot represent — folding them as algebraic is
+    the GH #457 defect, measured at O(1) residuals on 20 shipped specs.
+
+    ``promoted`` is the closure of that subsystem: the connected
+    components (over order-0 rows, with an edge for every inter-constraint
+    time reference) that contain at least one edge. Promoted rows must be
+    routed through the rank-deficient-mass machinery (state slots, mass
+    matrix row M[fi,fi] = 0, per-mode Schur), consistently across the
+    modal paths; everything else about ``time_derivative_order`` — LaTeX
+    display, demotion detection, schema validation — keeps reading the
+    stored LHS fact.
+
+    ONE-DEFINITION RULE: this accessor is the only source of the
+    promoted/residual split. Routing or layout code must consult it —
+    never test ``time_derivative_order == 0`` directly for a routing
+    decision, and never introduce a second classification path.
+
+    Attributes
+    ----------
+    promoted : frozenset[str]
+        Field names of the promoted order-0 rows.
+    reasons : Mapping[str, str]
+        Per promoted field, why it is in the sector: ``carries M_cc`` /
+        ``carries D_cc`` (the row references another constraint's
+        acceleration / velocity), ``mass-targeted`` / ``velocity-targeted``
+        (another constraint row references this field's acceleration /
+        velocity), or ``closure`` (joined only through connectivity).
+        Multiple tags are ``+``-joined in sorted order.
+    """
+
+    promoted: frozenset[str]
+    reasons: Mapping[str, str]
+
+
 # --- Equation system ---
 
 
@@ -1280,6 +1384,62 @@ class EquationSystem:
     def equation_map(self) -> dict[str, int]:
         """Map from field name to equation index. Cached on frozen dataclass."""
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
+
+    @cached_property
+    def second_order_sector(self) -> SecondOrderSector:
+        """Promoted order-0 rows carrying second-order structure (GH #457).
+
+        See :class:`SecondOrderSector` for semantics and the
+        one-definition rule. The classification is provenance-agnostic:
+        it reads whatever equations this system holds, so JSON-native
+        order-0 rows and ε-demoted base-spec rows are treated
+        identically (the demotion-injected identity self-term has time
+        order 0 and never creates an edge).
+
+        Deliberately NOT edges (measured-healthy machinery, WS2 oracle):
+        constraint-row time references of DYNAMICAL fields (S_cd velocity
+        slots / deferred acceleration substitution) and dynamical-row
+        references of any kind (those route through A_dc/M/D/K — their
+        defects are GH #458, not classification).
+        """
+        c_fields = {
+            eq.field_name for eq in self.equations if eq.time_derivative_order == 0
+        }
+        edges = _inter_constraint_time_edges(self.equations, c_fields)
+
+        # Connected components over c_fields (union-find); promoted =
+        # union of components containing at least one edge.
+        parent: dict[str, str] = {f: f for f in c_fields}
+
+        def _find(a: str) -> str:
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+
+        for row, tgt, _t in edges:
+            ra, rb = _find(row), _find(tgt)
+            if ra != rb:
+                parent[ra] = rb
+        edged_roots = {_find(row) for row, _tgt, _t in edges} | {
+            _find(tgt) for _row, tgt, _t in edges
+        }
+        promoted = frozenset(f for f in c_fields if _find(f) in edged_roots)
+
+        tag_sets: dict[str, set[str]] = {f: set() for f in promoted}
+        second_order = 2
+        for row, tgt, t_total in edges:
+            tag_sets[row].add(
+                "carries M_cc" if t_total >= second_order else "carries D_cc"
+            )
+            tag_sets[tgt].add(
+                "mass-targeted" if t_total >= second_order else "velocity-targeted"
+            )
+        reasons = {
+            f: "+".join(sorted(tags)) if tags else "closure"
+            for f, tags in tag_sets.items()
+        }
+        return SecondOrderSector(promoted=promoted, reasons=reasons)
 
     # ------------------------------------------------------------------ #
     # Perturbative-order filtering (v6 plan, Stage 2)                    #
