@@ -3026,6 +3026,116 @@ def _warn_eigenvalue_growth(
             )
 
 
+class SingularPencilError(RuntimeError):
+    """The per-mode pencil λB − A is singular (det ≡ 0): true gauge freedom.
+
+    Raised by :func:`_pencil_deflate` when an (α, β) ≈ (0, 0) pair is
+    found — some state direction is genuinely undetermined by the
+    equations. There is no correct evolution for such a direction; a
+    silent choice (freeze, minimum-norm, Tikhonov) is a wrong theory
+    with exit code 0. Gauge-fix the theory (``[[gauge]]`` in the TOML)
+    or file the spec on GH #457's follow-up.
+    """
+
+
+def _pencil_deflate(  # pyright: ignore[reportUnusedFunction]  # wired in by Stage 3 (GH #457); until then exercised by tests/test_pencil_engine.py
+    A_pencil: NDArray[np.complex128],
+    B_pencil: NDArray[np.complex128],
+    *,
+    context: str = "",
+) -> tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    """Deflating-subspace reduction of one mode's pencil ``B·ẏ = A·y``.
+
+    The general engine for DAE structure of ANY index (GH #457): ordered
+    QZ separates finite eigenvalues (dynamics) from infinite ones
+    (algebraic constraint chains). For the HOMOGENEOUS free evolution the
+    infinite sector is exactly ``z_i ≡ 0`` (the nilpotent chain
+    ``T_ii·ż_i = S_ii·z_i`` with ``S_ii`` invertible forces it), so the
+    constraint manifold is the finite deflating subspace with an
+    ORTHONORMAL basis ``Z_f`` and reduced generator
+    ``G_red = T_ff⁻¹·S_ff`` (triangular solve). Conditioning note: the
+    v0.31 eigendecomposition retirement (cond(V) blowup, Higham 2008
+    §2.3) does not apply here — Q/Z are unitary and the only inversion
+    is triangular.
+
+    Returns
+    -------
+    A_eff : ndarray (n, n)
+        ``Z_f · G_red · Z_f^H`` — the evolution generator on the full
+        slot space. Off-manifold components are annihilated by ``A_eff``
+        and therefore stay frozen under ``exp(A_eff·t)`` (matching the
+        existing null-projection semantics); project the IC with
+        ``proj`` for on-manifold initialization.
+    proj : ndarray (n, n)
+        ``Z_f · Z_f^H`` — orthogonal projector onto the manifold.
+
+    Raises
+    ------
+    SingularPencilError
+        If the pencil is singular ((α, β) ≈ (0, 0) pair): true gauge
+        freedom that no evolution choice can silently resolve.
+    """
+    from scipy.linalg import ordqz, solve_triangular  # noqa: PLC0415
+
+    n = A_pencil.shape[0]
+    # Scale-normalize so the α/β magnitude tests are meaningful.
+    a_scale = float(np.max(np.abs(A_pencil))) or 1.0
+    b_scale = float(np.max(np.abs(B_pencil))) or 1.0
+    A_n = A_pencil / a_scale
+    B_n = B_pencil / b_scale
+
+    # Finite eigenvalues (|β| above threshold) sorted to the TOP-LEFT.
+    tol = 1e-10
+
+    def _is_finite_eig(
+        alpha: NDArray[np.complex128], beta: NDArray[np.complex128]
+    ) -> NDArray[np.bool_]:
+        return np.abs(beta) > tol * (np.abs(alpha) + np.abs(beta) + tol)
+
+    qz_out = ordqz(  # pyright: ignore[reportUnknownVariableType, reportCallIssue]
+        A_n,
+        B_n,
+        sort=_is_finite_eig,  # pyright: ignore[reportArgumentType]
+        output="complex",
+    )
+    s_mat = np.asarray(qz_out[0], dtype=np.complex128)
+    t_mat = np.asarray(qz_out[1], dtype=np.complex128)
+    alpha = np.asarray(qz_out[2], dtype=np.complex128)
+    beta = np.asarray(qz_out[3], dtype=np.complex128)
+    z_mat = np.asarray(qz_out[5], dtype=np.complex128)
+    singular = (np.abs(alpha) < tol) & (np.abs(beta) < tol)
+    if np.any(singular):
+        ctx = f" ({context})" if context else ""
+        msg = (
+            f"Singular pencil{ctx}: {int(np.sum(singular))} of {n} "
+            f"generalized eigenvalues have (α, β) ≈ (0, 0) — some state "
+            f"direction is genuinely undetermined by the equations (true "
+            f"gauge freedom). No evolution choice can silently resolve "
+            f"this; gauge-fix the theory ([[gauge]] in the TOML). GH #457."
+        )
+        raise SingularPencilError(msg)
+
+    finite = _is_finite_eig(alpha, beta)
+    n_fin = int(np.sum(finite))
+    # ordqz sorts selected (finite) eigenvalues to the leading block.
+    z_f = z_mat[:, :n_fin]
+    if n_fin == 0:
+        zero = np.zeros((n, n), dtype=np.complex128)
+        return zero, zero
+    t_ff = t_mat[:n_fin, :n_fin]
+    s_ff = s_mat[:n_fin, :n_fin]
+    # G_red in normalized units: T_ff ż = S_ff z with A = a_scale·A_n,
+    # B = b_scale·B_n ⇒ physical generator carries a_scale/b_scale.
+    g_red = np.asarray(solve_triangular(t_ff, s_ff), dtype=np.complex128) * (
+        a_scale / b_scale
+    )
+    a_eff = (z_f @ g_red) @ z_f.conj().T
+    proj = z_f @ z_f.conj().T
+    return np.asarray(a_eff, dtype=np.complex128), np.asarray(
+        proj, dtype=np.complex128
+    )
+
+
 def _build_m_with_null_projection(
     A_block: NDArray[np.complex128],
     B_block: NDArray[np.complex128] | None,
