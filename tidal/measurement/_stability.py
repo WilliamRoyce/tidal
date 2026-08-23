@@ -253,6 +253,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     from tidal.measurement._stability_cache import get_structural_context
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
+        SingularPencilError,
         _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
         _build_m_with_null_projection,  # type: ignore[reportPrivateUsage]
         find_independent_blocks,
@@ -322,6 +323,19 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
                 f"({type(exc).__name__}: {exc}); simulation cannot run, "
                 f"treating as tachyonic."
             ),
+        )
+    except SingularPencilError as exc:
+        # GH #467: near constraint-index breakdown (or true gauge the
+        # quotient cannot resolve). This is a NUMERICAL-VALIDITY verdict,
+        # not a growth-rejection: no double-precision operator is both
+        # faithful and integrable at this point, so any P_max would be
+        # an artifact. The message carries the diagnosis.
+        return ConversionStabilityResult(
+            stable=False,
+            max_excess=float("inf"),
+            k_tachyonic=None,
+            n_tachyonic_modes=1,
+            message=f"Not simulatable as posed: {exc}",
         )
 
     # Find independent blocks using low-k coupling structure.  block_slots

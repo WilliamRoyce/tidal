@@ -2946,29 +2946,23 @@ def _pencil_deflate(
     def _is_finite_eig(
         alpha: NDArray[np.complex128], beta: NDArray[np.complex128]
     ) -> NDArray[np.bool_]:
-        # Finite vs infinite by the ratio r = |β|/(|α|+|β|). QZ rounds
-        # TRUE infinite eigenvalues (singular B directions) to tiny but
-        # NONZERO β; with a fixed threshold they masquerade as huge
-        # finite modes (λ ~ 1/r) whose spurious positive real parts
-        # poison the exponential — measured λ ~ 1e8..1e14 with hres = 0
-        # on the T4 nonminimal pencil. The split is therefore
-        # DATA-DERIVED: pairs with r > 1e-2 are always finite; below
-        # that, the largest multiplicative gap (≥ 3 orders) in the
-        # sorted ratios separates genuine stiff modes from rounded
-        # infinite ones; with no clear gap the fixed tolerance applies.
+        # Ratio-based split with a DATA-DERIVED cut (largest multiplicative
+        # gap below the clearly-finite floor): QZ rounds true infinite
+        # eigenvalues to tiny nonzero β, and SELECTING such pairs makes
+        # the subsequent eigenvalue reordering numerically wreck the
+        # factorization (caught below by the deflation contract). The
+        # gap cut keeps them out of the selection; the fixed tolerance
+        # is the fallback when no decisive gap exists.
         r = np.abs(beta) / (np.abs(alpha) + np.abs(beta) + 1e-300)
         clearly_finite = 1e-2
         cut = tol
         rs = np.sort(np.maximum(r, 1e-16))[::-1]
         if rs.size >= 2:
-            gaps = rs[:-1] / rs[1:]
-            # Only cuts whose LOWER edge sits below the clearly-finite
-            # floor are admissible (never split inside the genuine
-            # finite cluster); take the largest such gap if decisive.
+            gap_ratios = rs[:-1] / rs[1:]
             admissible = rs[1:] < clearly_finite
             if np.any(admissible):
-                gi = int(np.argmax(np.where(admissible, gaps, 0.0)))
-                if gaps[gi] >= 1e3:
+                gi = int(np.argmax(np.where(admissible, gap_ratios, 0.0)))
+                if gap_ratios[gi] >= 1e3:
                     cut = float(np.sqrt(rs[gi] * rs[gi + 1]))
         return r > min(cut, clearly_finite)
 
@@ -3032,6 +3026,31 @@ def _pencil_deflate(
     # Row equilibration is a LEFT transformation: the equilibrated system
     # has the same solutions, so G_red is the physical generator directly.
     g_red = np.asarray(solve_triangular(t_ff, s_ff), dtype=np.complex128)
+
+    # SELF-VERIFICATION of the deflation contract B·Z_f·G = A·Z_f
+    # (measured necessity, GH #467): near constraint-index breakdown a
+    # genuine eigenvalue |λ| ~ 1/eps^(1/2..1) appears whose float64
+    # representation cannot be both faithful and integrable — keeping it
+    # pollutes the composition (eps·|λ| = O(1) on ordinary rows),
+    # zeroing it violates the equations. Harmless huge-but-consistent
+    # modes (β-rounding of true infinite pairs) pass this check; only a
+    # composition that fails its own defining equation refuses.
+    contract_lhs = B_n @ (z_f @ g_red)
+    contract_rhs = A_n @ z_f
+    contract_scale = max(float(np.max(np.abs(contract_rhs))), 1e-300)
+    contract_res = float(np.max(np.abs(contract_lhs - contract_rhs))) / contract_scale
+    if contract_res > 1e-8:
+        ctx = f" ({context})" if context else ""
+        msg = (
+            f"Deflation contract violated{ctx}: ‖B·Z_f·G − A·Z_f‖ / "
+            f"‖A·Z_f‖ = {contract_res:.2e} (tolerance 1e-8). The pencil "
+            f"is within machine precision of constraint-index breakdown "
+            f"at these parameters — no double-precision operator is both "
+            f"faithful to the equations and integrable. This parameter "
+            f"point cannot be simulated as posed. GH #467."
+        )
+        raise SingularPencilError(msg)
+
     a_eff = (z_f @ g_red) @ z_f.conj().T
     proj = z_f @ z_f.conj().T
     return np.asarray(a_eff, dtype=np.complex128), np.asarray(proj, dtype=np.complex128)

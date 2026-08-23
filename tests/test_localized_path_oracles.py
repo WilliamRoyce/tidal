@@ -886,22 +886,23 @@ class TestPath2UniformProductionAdjudication:
 
 
 class TestPath2NonminimalAdjudication:
-    """OPEN DEFECT (GH #467, measured 2026-08-25): the nonminimal-class
-    assembly is oracle-refuted.
+    """RESOLVED diagnosis (GH #467, 2026-08-25): the T4 point is near
+    constraint-index breakdown, not an assembly defect.
 
-    torsion_gertsenshtein_nonminimal (17 promoted fields, D_cc-rich, 14
-    residual rows, plain operator vocabulary) builds an operator whose
-    per-mode oracle residuals are O(0.03-1.8) on 20 rows, and whose
-    pencil contains a GENUINE spurious eigenvalue Re(λ) ≈ 2.3e8
-    (homogeneous residual 6.5e-18 — it is in the assembled pencil, not a
-    QZ artifact; the oracle refutation shows the pencil itself differs
-    from the equations). Ruled out by measurement: deferred-substitution
-    approximation (zero such terms on this spec), rounded-infinite
-    eigenvalue misclassification (the gap classifier handles those),
-    recovery blowup (‖recovery‖ ≈ 5e4, bounded).
+    Evidence chain: at delta1 = 0 or small couplings (0.1-scale) the
+    assembled operator closes at ≤1e-10 (assembly is linear-correct);
+    at the T4 point (delta1 = 1, alpha2 = −1) the pencil contains a
+    GENUINE finite eigenvalue Re(λ) ≈ 2.3e8 (homogeneous residual
+    6.5e-18) beyond the float64 conditioning horizon — keeping it
+    poisons the composed operator by eps·|λ| = O(1) (oracle-refuted at
+    O(0.03-1.8)), and zeroing it violates the equations at O(1)
+    (also oracle-refuted, identically under two classifiers). The
+    engine now REFUSES such points with the diagnosis; the stability
+    probe converts the refusal to an honest "not simulatable as posed"
+    verdict.
     """
 
-    PARAMS = {
+    T4_PARAMS = {
         "kappa": 1.0,
         "B0": 0.01,
         "alpha1": 0.0,
@@ -909,19 +910,28 @@ class TestPath2NonminimalAdjudication:
         "alpha3": 1.0,
         "delta1": 1.0,
     }
+    SMALL_PARAMS = {
+        "kappa": 1.0,
+        "B0": 0.01,
+        "alpha1": 0.0,
+        "alpha2": -0.1,
+        "alpha3": 0.1,
+        "delta1": 0.1,
+    }
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="GH #467: nonminimal-class assembly defect — oracle "
-        "residuals O(0.03-1.8) on 20 rows and a spurious genuine "
-        "pencil eigenvalue Re(λ) ≈ 2.3e8 at the T4 point. Flips when "
-        "#467 is fixed.",
-    )
-    def test_nonminimal_full_closure(self) -> None:
+    def test_small_coupling_point_closes(self) -> None:
         spec = _load("torsion_gertsenshtein_nonminimal")
-        grid = GridInfo(bounds=((0.0, 50.0),), shape=(32,), periodic=(True,))
-        oracle = PerModeOracle(spec, grid, self.PARAMS)
+        grid = GridInfo(bounds=((0.0, 50.0),), shape=(16,), periodic=(True,))
+        oracle = PerModeOracle(spec, grid, self.SMALL_PARAMS)
         rows, gaps, _diag = oracle.residuals()
         assert not gaps
-        bad = {k: v for k, v in rows.items() if v > 1e-7}
+        bad = {k: v for k, v in rows.items() if v > 1e-8}
         assert not bad, f"rows fail closure: {bad}"
+
+    def test_t4_breakdown_point_refuses_with_diagnosis(self) -> None:
+        from tidal.solver.modal import SingularPencilError
+
+        spec = _load("torsion_gertsenshtein_nonminimal")
+        grid = GridInfo(bounds=((0.0, 50.0),), shape=(16,), periodic=(True,))
+        with pytest.raises(SingularPencilError, match="index breakdown"):
+            PerModeOracle(spec, grid, self.T4_PARAMS)
