@@ -32,6 +32,9 @@
       "Read(/home/vscode/.claude/**)"
     ]
   },
+  "env": {
+    "CLAUDE_CODE_EXTRA_BODY": "{\"thinking\":{\"type\":\"adaptive\"}}"
+  },
   "hooks": {
     "PreToolUse": [
       {
