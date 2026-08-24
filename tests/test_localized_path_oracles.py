@@ -274,6 +274,14 @@ def _path4_state(
         fields[cname] = np.fft.ifft(qc_hat[ci * n : (ci + 1) * n]).real
         vels[cname] = np.fft.ifft(vc_hat[ci * n : (ci + 1) * n]).real
         accels[cname] = np.fft.ifft(ac_hat[ci * n : (ci + 1) * n]).real
+    if conv_proj is not None:
+        # GH #468 slots mode: constraint values are evolved slots; their
+        # velocities/accelerations come from the generator's rows.
+        for si, slot in enumerate(layout.slots):
+            if slot.kind == "constraint" and si in o2r:
+                red = o2r[si]
+                vels[slot.field_name] = _r(Ay, red)
+                accels[slot.field_name] = _r(AAy, red)
     return {
         "fields": fields,
         "vels": vels,
@@ -937,10 +945,24 @@ class TestPath2NonminimalAdjudication:
         bad = {k: v for k, v in rows.items() if v > 1e-8}
         assert not bad, f"rows fail closure: {bad}"
 
-    def test_t4_breakdown_point_refuses_with_diagnosis(self) -> None:
-        from tidal.solver.modal import SingularPencilError
+    def test_t4_point_closes_under_adaptive_floor(self) -> None:
+        """The T4 near-breakdown point is RESOLVED by the adaptive
+        determination floor (measured 2026-08-26, worst 4.0e-11).
 
+        History: the fixed-tolerance engine refused this point (its
+        genuine Re(λ) ≈ 2.3e8 mode could neither be kept — eps·|λ| = O(1)
+        pollution — nor classifier-zeroed — O(1) equation violation).
+        The adaptive floor instead QUOTIENTS the near-breakdown direction
+        at a raised τ: a null-space quotient is equation-consistent at
+        the τ level (unlike classifier zeroing), the deflation contract
+        certifies the retained sector, and the oracle certifies the
+        result end to end.
+        """
         spec = _load("torsion_gertsenshtein_nonminimal")
         grid = GridInfo(bounds=((0.0, 50.0),), shape=(16,), periodic=(True,))
-        with pytest.raises(SingularPencilError, match="index breakdown"):
-            PerModeOracle(spec, grid, self.T4_PARAMS)
+        with pytest.warns(UserWarning, match="determination floor"):
+            oracle = PerModeOracle(spec, grid, self.T4_PARAMS)
+        rows, gaps, _diag = oracle.residuals()
+        assert not gaps
+        bad = {k: v for k, v in rows.items() if v > 1e-8}
+        assert not bad, f"T4 rows fail closure: {bad}"

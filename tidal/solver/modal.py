@@ -2053,10 +2053,23 @@ def _build_convolution_matrix_with_constraints(
     c_idx_map: dict[str, int] = {n: i for i, n in enumerate(constraint_field_names)}
     n_c = len(constraint_field_names)
 
-    # ---- Reduced slot mapping (dynamical slots only) ----
+    # GH #468 (constraints-as-slots): when a promoted second-order sector
+    # is present, the residual constraints are NOT pre-eliminated —
+    # Schur recovery on the localized residual K_cc injects ‖·‖ ~ 1/B₀⁴
+    # entries into the pencil, collapsing the deflation's tolerance
+    # headroom (measured: genuine smin ~6e-12 on E.cal's 528-dim
+    # pencil). Instead the residual constraint fields become pencil
+    # SLOTS and their algebraic rows pure-A pencil rows: every entry
+    # stays at natural equation scale, the deferred d2_t(dyn)
+    # substitution becomes EXACT B-side content, and the deflation
+    # handles elimination + promotion + IC projection in one object.
+    # Non-promoted specs keep the classic Schur route bit-for-bit.
+    constraints_as_slots = bool(promoted_fields)
+
+    # ---- Reduced slot mapping ----
     orig_to_reduced: dict[int, int] = {}
     for si, slot in enumerate(layout.slots):
-        if slot.kind == "constraint":
+        if slot.kind == "constraint" and not constraints_as_slots:
             continue
         orig_to_reduced[si] = len(orig_to_reduced)
     n_dyn_slots = len(orig_to_reduced)
@@ -2181,7 +2194,10 @@ def _build_convolution_matrix_with_constraints(
 
     # ---- Allocate matrices ----------------------------------------------
     n_dyn_tot = n_dyn_slots * n_modes
-    n_c_tot = n_c * n_modes
+    # GH #468: in constraints-as-slots mode the residual Schur machinery
+    # (K_cc/K_cd/A_dc/recovery) is bypassed — allocate it empty so every
+    # downstream matmul no-ops naturally.
+    n_c_tot = (0 if constraints_as_slots else n_c) * n_modes
     A_dd = np.zeros((n_dyn_tot, n_dyn_tot), dtype=np.complex128)
     # GH #457: B-side mass content of the pencil B·ẏ = A·y. Collected as
     # POSITIVE contributions of RHS q̈-target terms (and promoted-row
@@ -2251,8 +2267,45 @@ def _build_convolution_matrix_with_constraints(
 
                 if base_field in c_idx_map:
                     # ----- target is a RESIDUAL algebraic field -----
-                    cj = c_idx_map[base_field]
                     total_t = t_order + (1 if is_vel_ref else 0)
+                    if constraints_as_slots:
+                        # GH #468: the residual field is a pencil SLOT.
+                        c_col = orig_to_reduced[layout.field_slot_map[base_field]]
+                        if total_t == 0:
+                            _emit_term(
+                                A_dd,
+                                vel_red,
+                                c_col,
+                                term,
+                                mult,
+                                scale=scale,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                        elif total_t == 1:
+                            # c·Ċ — exact B-side content (replaces the
+                            # velc deferral for this mode).
+                            _emit_term(
+                                B_mass,
+                                vel_red,
+                                c_col,
+                                term,
+                                mult,
+                                scale=scale,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                            has_b_mass = True
+                        else:
+                            msg = (
+                                f"classification invariant violated: row "
+                                f"{eq.field_name!r} carries {term.operator}"
+                                f"({term.field}) of residual field "
+                                f"{base_field!r} (GH #457)"
+                            )
+                            raise AssertionError(msg)
+                        continue
+                    cj = c_idx_map[base_field]
                     if total_t >= 2:
                         # Classification invariant (GH #457): an order-0
                         # field whose acceleration any row references is
@@ -2365,6 +2418,90 @@ def _build_convolution_matrix_with_constraints(
 
         if eq.time_derivative_order == 0:
             # ---------------- Algebraic constraint equation ----------------
+            if constraints_as_slots:
+                # GH #468: the residual row is a pure-A pencil row at the
+                # constraint's own slot (zero B-row — algebraic LHS).
+                # d2_t(dyn)/first_dt(v_dyn) content is EXACT B-side mass
+                # (q̈ = v̇), replacing the old A_dd-based deferred
+                # substitution approximation.
+                c_row = orig_to_reduced[layout.field_slot_map[eq.field_name]]
+                for term_idx, term in enumerate(eq.rhs_terms):
+                    target_field = term.field
+                    is_vel_ref = target_field.startswith("v_")
+                    base_field = target_field[2:] if is_vel_ref else target_field
+                    decomp = _OPERATOR_DECOMP[term.operator]
+                    mult = multiplier_cache[term.operator]
+                    t_order = decomp.time_order
+                    total_t = t_order + (1 if is_vel_ref else 0)
+
+                    if base_field in c_idx_map:
+                        if total_t > 0:
+                            msg = (
+                                f"classification invariant violated: "
+                                f"residual row {eq.field_name!r} carries "
+                                f"{term.operator}({term.field}) of residual "
+                                f"field {base_field!r} (GH #457)"
+                            )
+                            raise AssertionError(msg)
+                        tgt = orig_to_reduced[layout.field_slot_map[base_field]]
+                        _emit_term(
+                            A_dd,
+                            c_row,
+                            tgt,
+                            term,
+                            mult,
+                            eq_idx=eq_idx,
+                            term_idx=term_idx,
+                        )
+                    elif base_field in dyn_field_idx:
+                        if total_t == 0:
+                            tgt = orig_to_reduced[layout.field_slot_map[base_field]]
+                            _emit_term(
+                                A_dd,
+                                c_row,
+                                tgt,
+                                term,
+                                mult,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                        elif total_t == 1:
+                            tgt = orig_to_reduced[layout.velocity_slot_map[base_field]]
+                            _emit_term(
+                                A_dd,
+                                c_row,
+                                tgt,
+                                term,
+                                mult,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                        elif total_t == 2:
+                            tgt = orig_to_reduced[layout.velocity_slot_map[base_field]]
+                            _emit_term(
+                                B_mass,
+                                c_row,
+                                tgt,
+                                term,
+                                mult,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                            has_b_mass = True
+                        else:
+                            msg = (
+                                f"residual row {eq.field_name!r}: "
+                                f"{term.operator}({term.field}) is "
+                                f"jerk-level content — not supported "
+                                f"(GH #469)."
+                            )
+                            raise NotImplementedError(msg)
+                    else:
+                        warned_unhandled.add(
+                            (eq.field_name, term.operator, target_field),
+                        )
+                continue
+
             ci = c_idx_map[eq.field_name]
             for term_idx, term in enumerate(eq.rhs_terms):
                 target_field = term.field
@@ -2530,8 +2667,7 @@ def _build_convolution_matrix_with_constraints(
         # pencil downstream; pinv solves consistent (possibly redundant)
         # systems exactly with the documented min-norm convention.
         recovery = -(
-            np.asarray(np.linalg.pinv(K_cc, rcond=1e-10), dtype=np.complex128)
-            @ K_cd
+            np.asarray(np.linalg.pinv(K_cc, rcond=1e-10), dtype=np.complex128) @ K_cd
         )
 
     # ---- Compose A_reduced from dynamical block + constraint substitution ----
@@ -2591,6 +2727,13 @@ def _build_convolution_matrix_with_constraints(
             for m in range(n_modes):
                 idx = vel_red_p * n_modes + m
                 eye_adj[idx, idx] = 0.0
+        if constraints_as_slots:
+            # Residual constraint rows are algebraic pencil rows too.
+            for cname in constraint_field_names:
+                c_red = orig_to_reduced[layout.field_slot_map[cname]]
+                for m in range(n_modes):
+                    idx = c_red * n_modes + m
+                    eye_adj[idx, idx] = 0.0
         b_total = eye_adj - B_mass - vel_coupling_mat
         A_reduced, manifold_proj_out = _pencil_deflate(
             A_reduced, b_total, context="pos-dep evolution pencil"
@@ -2622,7 +2765,9 @@ def _build_convolution_matrix_with_constraints(
     return (
         A_reduced.astype(np.complex128, copy=False),
         recovery.astype(np.complex128, copy=False),
-        constraint_field_names,
+        # GH #468 slots mode: constraint values live in the evolved
+        # slots (o2r covers them) — no recovery-based reconstruction.
+        [] if constraints_as_slots else constraint_field_names,
         orig_to_reduced,
         manifold_proj_out,
     )
@@ -2823,6 +2968,8 @@ def _gauge_quotient_pencil(
     B_n: NDArray[np.complex128],
     probe_points: tuple[complex, ...],
     context: str,
+    *,
+    tau: float,
 ) -> tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
     """Quotient a singular pencil by its Kronecker column-chain space.
 
@@ -2850,7 +2997,7 @@ def _gauge_quotient_pencil(
     import warnings as _warnings  # noqa: PLC0415
 
     n = A_n.shape[0]
-    tol = n * 1e-12
+    tol = tau  # determination floor from the adaptive loop (GH #468)
 
     # Gauge chain space W: union of null(λ₀B − A) over generic probes.
     null_vecs: list[NDArray[np.complex128]] = []
@@ -2895,10 +3042,12 @@ def _gauge_quotient_pencil(
     b_red = u_keep @ b_rest
     _warnings.warn(
         f"Singular pencil ({context}): {w_dim} undetermined (gauge) state "
-        f"combination(s) quotiented out and set to zero — the explicit "
-        f"form of the min-norm choice the pre-#457 machinery made "
-        f"silently. Re-derive the theory without the redundancy "
-        f"(GH #465) or gauge-fix it ([[gauge]] in the TOML).",
+        f"combination(s) quotiented out and set to zero at determination "
+        f"floor τ = {tau:.1e} — the explicit form of the min-norm choice "
+        f"the pre-#457 machinery made silently. For a localized "
+        f"background this is the far-field gauge restoration (GH #468); "
+        f"for redundant equations re-derive the theory (GH #465) or "
+        f"gauge-fix it ([[gauge]] in the TOML).",
         stacklevel=4,
     )
     return a_red, b_red, c_basis
@@ -2941,8 +3090,6 @@ def _pencil_deflate(
         If the pencil is singular ((α, β) ≈ (0, 0) pair): true gauge
         freedom that no evolution choice can silently resolve.
     """
-    from scipy.linalg import ordqz, solve_triangular  # noqa: PLC0415
-
     n = A_pencil.shape[0]
     # ROW-equilibrate the pencil: each row (equation) is scaled to unit
     # max magnitude. This is a left diagonal preconditioner — it changes
@@ -2959,38 +3106,6 @@ def _pencil_deflate(
     A_n = A_pencil / row_scale[:, np.newaxis]
     B_n = B_pencil / row_scale[:, np.newaxis]
 
-    # Finite eigenvalues (|β| above threshold) sorted to the TOP-LEFT.
-    tol = 1e-10
-
-    def _is_finite_eig(
-        alpha: NDArray[np.complex128], beta: NDArray[np.complex128]
-    ) -> NDArray[np.bool_]:
-        # Ratio-based split with a DATA-DERIVED cut (largest multiplicative
-        # gap below the clearly-finite floor): QZ rounds true infinite
-        # eigenvalues to tiny nonzero β, and SELECTING such pairs makes
-        # the subsequent eigenvalue reordering numerically wreck the
-        # factorization (caught below by the deflation contract). The
-        # gap cut keeps them out of the selection; the fixed tolerance
-        # is the fallback when no decisive gap exists.
-        r = np.abs(beta) / (np.abs(alpha) + np.abs(beta) + 1e-300)
-        clearly_finite = 1e-2
-        cut = tol
-        rs = np.sort(np.maximum(r, 1e-16))[::-1]
-        if rs.size >= 2:
-            gap_ratios = rs[:-1] / rs[1:]
-            admissible = rs[1:] < clearly_finite
-            if np.any(admissible):
-                gi = int(np.argmax(np.where(admissible, gap_ratios, 0.0)))
-                if gap_ratios[gi] >= 1e3:
-                    cut = float(np.sqrt(rs[gi] * rs[gi + 1]))
-        return r > min(cut, clearly_finite)
-
-    # Regularity probe: a pencil is singular iff det(λB − A) ≡ 0 in λ.
-    # Probing the smallest singular value of (λ₀B − A) at fixed generic
-    # points detects that robustly. Per-pair (α, β) ≈ (0, 0) tests are
-    # NOT reliable here: QZ legitimately returns both components tiny for
-    # eigenvalues carried by ill-scaled rows (e.g. B0²-scale constraint
-    # rows), where only the RATIO is meaningful.
     probe_points = (0.5488 + 0.7152j, -1.3113 + 0.4227j)
 
     def _probe_smin(
@@ -3002,24 +3117,86 @@ def _pencil_deflate(
             smin = max(smin, float(sv[-1]) if sv.size else 0.0)
         return smin
 
-    if _probe_smin(A_n, B_n) < n * 1e-12:
-        # Singular pencil: some state directions are genuinely
-        # undetermined (gauge). This is either a spec-level redundancy
-        # (GH #465: byte-identical equation copies) or a parameter-
-        # coincidence gauge point (the #260 critical-point class, which
-        # sweeps legitimately cross). The pre-#457 machinery silently
-        # min-norm gauge-fixed these; the engine makes the SAME choice
-        # EXPLICITLY: quotient out the Kronecker gauge chain space
-        # (set to zero, warned), deflate the regular reduced pencil,
-        # and compose back through the complement basis.
-        a_red, b_red, c_basis = _gauge_quotient_pencil(A_n, B_n, probe_points, context)
-        a_eff_red, proj_red = _pencil_deflate(a_red, b_red, context=context)
-        a_eff_full = (c_basis @ a_eff_red) @ c_basis.conj().T
-        proj_full = (c_basis @ proj_red) @ c_basis.conj().T
-        return (
-            np.asarray(a_eff_full, dtype=np.complex128),
-            np.asarray(proj_full, dtype=np.complex128),
-        )
+    # ---- Adaptive determination-floor quotient (GH #468) ----
+    # Localized backgrounds produce a CONTINUOUS cascade of weakly
+    # determined state combinations: the Gaussian B₀(x) tail restores
+    # gauge symmetry smoothly toward the far field (measured on the
+    # E.cal constraints-as-slots pencil: singular values 2e-13 … 1e-9
+    # with no gap), so no single tolerance separates "gauge" from
+    # "weakly determined". Instead: quotient at a determination floor
+    # τ, verify the retained sector against the deflation contract, and
+    # RAISE τ decade by decade until the contract passes. Each step is
+    # SELF-VERIFIED, so the choice cannot silently violate the retained
+    # equations; the quotiented combinations are gauge-fixed to zero
+    # (the documented min-norm convention) and the warning reports the
+    # final floor and dimension. If no floor up to τ_max yields a
+    # contract-consistent operator, the last refusal propagates
+    # (genuine near-index breakdown, GH #467).
+    tau0 = n * 1e-12
+    tau_max = 1e-6
+    tau = tau0
+    last_err: SingularPencilError | None = None
+    while tau <= tau_max:
+        try:
+            if _probe_smin(A_n, B_n) < tau:
+                a_red, b_red, c_basis = _gauge_quotient_pencil(
+                    A_n, B_n, probe_points, context, tau=tau
+                )
+                a_eff_red, proj_red = _deflate_regular_pencil(
+                    a_red, b_red, context, tau
+                )
+                a_eff_full = (c_basis @ a_eff_red) @ c_basis.conj().T
+                proj_full = (c_basis @ proj_red) @ c_basis.conj().T
+                result = (
+                    np.asarray(a_eff_full, dtype=np.complex128),
+                    np.asarray(proj_full, dtype=np.complex128),
+                )
+            else:
+                result = _deflate_regular_pencil(A_n, B_n, context, tau)
+        except SingularPencilError as exc:
+            last_err = exc
+            tau *= 10.0
+            continue
+        if tau > tau0:
+            import warnings as _warnings  # noqa: PLC0415
+
+            _warnings.warn(
+                f"Pencil deflation ({context}): determination floor raised "
+                f"to τ = {tau:.1e} — state content determined more weakly "
+                f"than τ is treated as algebraic/gauge (contract-verified "
+                f"at each step; near-breakdown or far-field content beyond "
+                f"the floor is quotiented). See GH #467/#468.",
+                stacklevel=3,
+            )
+        return result
+    assert last_err is not None
+    raise last_err
+
+
+def _deflate_regular_pencil(
+    A_n: NDArray[np.complex128],
+    B_n: NDArray[np.complex128],
+    context: str,
+    tau: float,
+) -> tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    """Ordered-QZ deflation of a (nominally regular) equilibrated pencil.
+
+    ``tau`` is the determination floor: generalized-eigenvalue pairs
+    with ``|β|/(|α|+|β|) ≤ tau``-scale are classified infinite. The
+    deflation contract ``B·Z_f·G = A·Z_f`` is verified before returning
+    — its violation raises :class:`SingularPencilError` (caught by the
+    adaptive floor loop in :func:`_pencil_deflate`, which retries with a
+    larger floor; the final failure is the honest near-index-breakdown
+    refusal of GH #467).
+    """
+    from scipy.linalg import ordqz, solve_triangular  # noqa: PLC0415
+
+    n = A_n.shape[0]
+
+    def _is_finite_eig(
+        alpha: NDArray[np.complex128], beta: NDArray[np.complex128]
+    ) -> NDArray[np.bool_]:
+        return np.abs(beta) > tau * (np.abs(alpha) + np.abs(beta) + tau)
 
     qz_out = ordqz(  # pyright: ignore[reportUnknownVariableType, reportCallIssue]
         A_n,
@@ -3062,11 +3239,12 @@ def _pencil_deflate(
         ctx = f" ({context})" if context else ""
         msg = (
             f"Deflation contract violated{ctx}: ‖B·Z_f·G − A·Z_f‖ / "
-            f"‖A·Z_f‖ = {contract_res:.2e} (tolerance 1e-8). The pencil "
-            f"is within machine precision of constraint-index breakdown "
-            f"at these parameters — no double-precision operator is both "
-            f"faithful to the equations and integrable. This parameter "
-            f"point cannot be simulated as posed. GH #467."
+            f"‖A·Z_f‖ = {contract_res:.2e} (tolerance 1e-8) at "
+            f"determination floor τ = {tau:.1e}. The pencil is within "
+            f"machine precision of constraint-index breakdown at these "
+            f"parameters — no double-precision operator is both faithful "
+            f"to the equations and integrable. This parameter point "
+            f"cannot be simulated as posed. GH #467."
         )
         raise SingularPencilError(msg)
 
@@ -4061,7 +4239,19 @@ def solve_modal(
         n_full = layout.num_slots * n_pts
         snapshots = np.zeros((len(t_eval), n_full))
 
+        # GH #468 slots mode: c_names is empty and constraint values live
+        # in the evolved slots; their velocities come from the
+        # generator's constraint-slot rows below.
+        slots_mode_constraints: list[tuple[str, int]] = []
+        if conv_manifold_proj is not None:
+            for _si, _slot in enumerate(layout.slots):
+                if _slot.kind == "constraint" and _si in orig_to_reduced:
+                    slots_mode_constraints.append(
+                        (_slot.field_name, orig_to_reduced[_si])
+                    )
         for c_name in c_names:
+            constraint_vel_arrays[c_name] = np.zeros((len(t_eval), *grid.shape))
+        for c_name, _red in slots_mode_constraints:
             constraint_vel_arrays[c_name] = np.zeros((len(t_eval), *grid.shape))
 
         for ti in range(len(t_eval)):
@@ -4094,6 +4284,11 @@ def solve_modal(
                 c_phys = np.fft.ifftn(c_hat[ci].reshape(grid.shape)).ravel()
                 full_state[c_slot * n_pts : (c_slot + 1) * n_pts] = np.real(c_phys)
                 v_c_phys = np.fft.ifftn(v_c_hat[ci].reshape(grid.shape))
+                constraint_vel_arrays[c_name][ti] = np.real(v_c_phys)
+            for c_name, c_red in slots_mode_constraints:
+                # v_C = Ċ from the generator's constraint-slot row (exact).
+                vc_hat_row = dy_hat_dyn_flat[c_red * n_modes : (c_red + 1) * n_modes]
+                v_c_phys = np.fft.ifftn(vc_hat_row.reshape(grid.shape))
                 constraint_vel_arrays[c_name][ti] = np.real(v_c_phys)
 
             snapshots[ti] = full_state
