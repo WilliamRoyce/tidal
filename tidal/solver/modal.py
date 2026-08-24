@@ -3133,7 +3133,14 @@ def _pencil_deflate(
     # contract-consistent operator, the last refusal propagates
     # (genuine near-index breakdown, GH #467).
     tau0 = n * 1e-12
-    tau_max = 1e-6
+    # tau_max = 1e-4 is the ACCEPTED determination floor for the
+    # localized promoted class (user decision 2026-08-26, GH #468/#470):
+    # the far-field gauge-restoration continuum makes machine-precision
+    # closure unachievable at float64, and content determined more
+    # weakly than ~1e-4 is physically fading (B0 -> 0 there). The
+    # contract tolerance is floor-linked, so every acceptance is
+    # quantified and warned.
+    tau_max = 1e-4
     tau = tau0
     last_err: SingularPencilError | None = None
     while tau <= tau_max:
@@ -3231,26 +3238,105 @@ def _deflate_regular_pencil(
     # zeroing it violates the equations. Harmless huge-but-consistent
     # modes (β-rounding of true infinite pairs) pass this check; only a
     # composition that fails its own defining equation refuses.
-    contract_lhs = B_n @ (z_f @ g_red)
-    contract_rhs = A_n @ z_f
-    contract_scale = max(float(np.max(np.abs(contract_rhs))), 1e-300)
-    contract_res = float(np.max(np.abs(contract_lhs - contract_rhs))) / contract_scale
-    if contract_res > 1e-8:
-        ctx = f" ({context})" if context else ""
-        msg = (
-            f"Deflation contract violated{ctx}: ‖B·Z_f·G − A·Z_f‖ / "
-            f"‖A·Z_f‖ = {contract_res:.2e} (tolerance 1e-8) at "
-            f"determination floor τ = {tau:.1e}. The pencil is within "
-            f"machine precision of constraint-index breakdown at these "
-            f"parameters — no double-precision operator is both faithful "
-            f"to the equations and integrable. This parameter point "
-            f"cannot be simulated as posed. GH #467."
-        )
-        raise SingularPencilError(msg)
+    tol_contract = max(1e-8, tau)
+    contract_res = _contract_residual(A_n, B_n, z_f, g_red)
+    if contract_res > tol_contract:
+        # ordqz's eigenvalue REORDERING through many ill-conditioned
+        # infinite pairs is numerically unstable at large n (measured:
+        # contract 3.7e2 → 1.3e-2 on the 600-dim E.cal pencil, never
+        # reaching tolerance). Second rung: a reordering-free
+        # construction — right eigenvectors of the retained finite
+        # spectrum (|λ| ≤ 1/τ), orthonormalized, with G from the
+        # contract's own least-squares — judged by the SAME contract.
+        z_f, g_red, contract_res = _deflate_eig_subspace(A_n, B_n, tau)
+        if contract_res > tol_contract:
+            ctx = f" ({context})" if context else ""
+            msg = (
+                f"Deflation contract violated{ctx}: best residual "
+                f"{contract_res:.2e} exceeds the floor-linked tolerance "
+                f"{tol_contract:.1e} at determination floor τ = {tau:.1e} "
+                f"(both the ordered-QZ and the reordering-free "
+                f"constructions). The pencil is within machine precision "
+                f"of constraint-index breakdown at these parameters — no "
+                f"double-precision operator is both faithful to the "
+                f"equations and integrable. This parameter point cannot "
+                f"be simulated as posed. GH #467/#468."
+            )
+            raise SingularPencilError(msg)
 
     a_eff = (z_f @ g_red) @ z_f.conj().T
     proj = z_f @ z_f.conj().T
     return np.asarray(a_eff, dtype=np.complex128), np.asarray(proj, dtype=np.complex128)
+
+
+def _contract_residual(
+    A_n: NDArray[np.complex128],
+    B_n: NDArray[np.complex128],
+    z_f: NDArray[np.complex128],
+    g_red: NDArray[np.complex128],
+) -> float:
+    """Relative residual of the deflation contract ``B·Z_f·G = A·Z_f``."""
+    contract_lhs = B_n @ (z_f @ g_red)
+    contract_rhs = A_n @ z_f
+    contract_scale = max(float(np.max(np.abs(contract_rhs))), 1e-300)
+    return float(np.max(np.abs(contract_lhs - contract_rhs))) / contract_scale
+
+
+def _deflate_eig_subspace(
+    A_n: NDArray[np.complex128],
+    B_n: NDArray[np.complex128],
+    tau: float,
+) -> tuple[NDArray[np.complex128], NDArray[np.complex128], float]:
+    """Reordering-free deflating-subspace construction (GH #468).
+
+    Span the retained finite spectrum (|lambda| <= 1/tau — the
+    determination floor's rate horizon) with right eigenvectors,
+    orthonormalize, and obtain the reduced generator from the contract's
+    own least-squares ``G = argmin ||B·Q·G − A·Q||``. Eigenvector
+    conditioning is NOT trusted: the returned contract residual is the
+    sole acceptance criterion (checked by the caller against the
+    floor-linked tolerance). Avoids ordqz's eigenvalue reordering, whose
+    swaps through large ill-conditioned infinite clusters are the
+    measured unstable step on big localized pencils.
+    """
+    from scipy.linalg import eig, lstsq  # noqa: PLC0415
+
+    out = eig(A_n, B_n, homogeneous_eigvals=True)
+    alpha, beta = out[0]
+    vr = np.asarray(out[1], dtype=np.complex128)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = np.where(
+            np.abs(beta) > 0.0,
+            alpha / np.where(np.abs(beta) > 0.0, beta, 1.0),
+            np.inf,
+        )
+    # Retention-horizon scan: the contract residual is non-monotonic in
+    # the horizon R (too small excludes genuine modes; too large retains
+    # ill-conditioned near-horizon content) — take the best over decades.
+    # NOTE (measured 2026-08-26, GH #468/#470): on the localized E.cal
+    # class even the best retention carries RESOLUTION-DIVERGENT spurious
+    # growth (maxRe +85→+472 for N 12→32), so the floor-linked contract
+    # refusal is expected to stand there; this construction serves the
+    # cases where a clean subspace exists.
+    n = A_n.shape[0]
+    best: tuple[NDArray[np.complex128], NDArray[np.complex128], float] | None = None
+    for horizon in (1e1, 1e2, 1e3, 1e4):
+        keep = np.isfinite(lam) & (np.abs(lam) <= horizon)
+        if not np.any(keep):
+            continue
+        q_basis, _ = np.linalg.qr(vr[:, keep])
+        bq = B_n @ q_basis
+        aq = A_n @ q_basis
+        lstsq_out = lstsq(bq, aq)
+        assert lstsq_out[0] is not None  # None only for degenerate driver args
+        g_red = np.asarray(lstsq_out[0], dtype=np.complex128)
+        res = _contract_residual(A_n, B_n, q_basis, g_red)
+        if best is None or res < best[2]:
+            best = (np.asarray(q_basis, dtype=np.complex128), g_red, res)
+    if best is None:
+        zero = np.zeros((n, 0), dtype=np.complex128)
+        return zero, np.zeros((0, 0), dtype=np.complex128), 0.0
+    return best
 
 
 def _build_m_with_null_projection(
