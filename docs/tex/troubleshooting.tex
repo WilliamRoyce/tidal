@@ -470,6 +470,68 @@ parameter): reducing $\rho$ does not make the spec eligible.
 \end{itemize}
 
 
+\subsubsection{SingularPencilError: ``Deflation contract violated'' / ``not simulatable as posed''}
+\label{sec:troubleshooting-pencil-refusal}
+
+\textbf{Symptom}: \texttt{tidal simulate} (modal) raises
+\texttt{SingularPencilError} with ``Deflation contract violated \ldots
+at determination floor $\tau$'', or the stability probe reports
+\emph{not simulatable as posed}.
+
+\textbf{Cause}: no double-precision evolution operator both satisfies the
+equations (the contract of \cref{sec:pencil-engine-impl}) and is
+integrable. Two known classes: (a) a genuine near-index breakdown at the
+parameter point (nonminimal T4 class, GH \#467) --- the adaptive floor
+resolves most of these and warns with the final $\tau$; (b) the localized
+implicit-dynamical class (ungauged gravity on a position-dependent
+background, GH \#468): the far-field background restores the gauge
+freedom below machine precision and the quotient's row compression
+discards independent equations (GH \#474).
+
+\textbf{Fix}: for (b), excite only the sector you measure
+(\texttt{--ic-component}, \texttt{--ic-field}); the run then restricts
+itself to that sector's dependency closure when it is exactly closed
+(\cref{sec:pencil-general-input}), writing \texttt{restricted\_spec.json}.
+If the note says the excited sector couples into the implicit-dynamical
+sector, the general fix is the staircase reduction (GH \#473); gauge
+fixing at derivation (\cref{sec:gauge-fixing}) is a per-theory option.
+Never lower the contract tolerance --- the refusal replaces a silently
+wrong trajectory (GH \#455).
+
+\subsubsection{``field(s) \ldots were not evolved on this closure-restricted run''}
+\label{sec:troubleshooting-closure-absent}
+
+\textbf{Symptom}: \texttt{tidal measure} refuses total energy or a
+conversion source/target on a run whose \texttt{metadata.json} points at
+\texttt{restricted\_spec.json}.
+
+\textbf{Cause}: the run evolved the observable-sector closure only;
+fields outside it are absent from the outputs by design (never zero),
+and Hamiltonian terms touching them were dropped
+(\texttt{metadata.restriction} in the restricted spec records which).
+
+\textbf{Fix}: measure within the evolved sector (conversion there is
+exact), re-run exciting the field you need so it joins the closure, or
+\texttt{--no-closure-restriction} to attempt the full system (which
+refuses honestly on this class).
+
+\subsubsection{Gauge certificate ``FLAGGED''}
+\label{sec:troubleshooting-gauge-flagged}
+
+\textbf{Symptom}: \texttt{tidal measure} prints ``Gauge certificate:
+FLAGGED --- \ldots read pinned (gauge-quotiented) content''.
+
+\textbf{Cause}: the engine pinned undetermined state directions to zero
+(the explicit minimum-norm choice, see \cref{sec:pencil-quotient}) and
+the requested measurement's field support overlaps them; the value
+depends on that gauge choice.
+
+\textbf{Fix}: this is physics information, not an error --- the quantity
+is not an observable of the theory as posed. Measure a gauge-invariant
+quantity (the certified conversion channel), or gauge-fix the theory at
+derivation and re-derive; for spec-level redundancy (byte-identical
+equation copies, GH \#465) re-derive the theory (GH \#374).
+
 \subsection{Debugging Techniques}
 \label{sec:debugging-techniques}
 

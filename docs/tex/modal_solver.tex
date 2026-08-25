@@ -754,6 +754,14 @@ The algorithm eigendecomposes $M$ per mode:
 \subsubsection{Jerk Substitution}
 \label{sec:modal-jerk}
 
+\textbf{Superseded (August 2026, GH \#457/\#469).} The jerk substitution
+below is retained as history. The pencil engine of \cref{sec:pencil-engine}
+handles constraint chains of any index without it; jerk-level content on
+singular-mass or promoted (implicit-dynamical) systems now \emph{refuses}
+with an actionable error rather than executing the substitution, which
+the audit found had never been exercised by any test and was wrong on the
+affected $\tilde R^2$-class specs.
+
 After mass-matrix elimination, jerk coupling $J(k) \cdot \dddot{x}$ may remain (from \texttt{d3\_t} and \texttt{mixed\_T3\_S*} operators).  These arise in $\tilde{R}^2$ theories where the Ostrogradsky-reduced equations still contain third time derivatives of certain fields.  The jerk is eliminated algebraically by differentiating the (now-invertible) dynamical equations.
 
 \paragraph{Algorithm.}
@@ -851,7 +859,14 @@ Eigendecomposition & $\exp(\lambda \cdot t)$ & $O(1)$ time evolution \\
 
 Energy conservation after all three levels: $\max|dE/E| = 0$ (machine precision) at $t_\text{end} = 1.0$ for $\alpha_1 = 0.5$, $\alpha_2 = 0.3$, $\alpha_3 = 0.2$, $b_5 = 0.1$.
 
-\textbf{Implementation}: \texttt{\_build\_evolution\_matrices()} is the single unified reduction builder --- it handles algebraic constraint fields (\texttt{time\_order=0}) via Fourier Schur complement, rank-deficient mass matrices $M$ (e.g.\ trace projections of higher-rank tensor perturbations) via per-mode mass eigendecomposition with null-space Schur elimination, and near-singular velocity coupling $B = I - V_\text{coupling}$ via the generalized eigenvalue problem. It returns $(A_\text{rhs}, B_\text{lhs})$; when $B_\text{lhs}$ is non-\texttt{None}, \texttt{\_evolve\_per\_mode()} uses \texttt{scipy.linalg.eig(A, B)} (QZ decomposition), which is numerically stable for rank-deficient and ill-conditioned $B$; otherwise it uses \texttt{np.linalg.eig(A)}. The gauge filter $|\lambda| > 10^{12}$ catches infinite eigenvalues from null directions and freezes them at IC. Prior to the \#256 unification two competing builders coexisted (constraint-eliminated and generalized); the constraint-eliminated builder silently mis-classified \texttt{d2\_t} cross-couplings as stiffness operators and was deleted --- see \cref{sec:troubleshooting-rank-deficient-kinetic} for the failure mode and its resolution.
+\textbf{Superseded (August 2026).} The three-level Schur/QZ description
+below predates the ordered-QZ deflating-subspace engine; the
+$|\lambda| > 10^{12}$ gauge filter, the $B_\text{lhs}$ return contract
+and the per-mode \texttt{eig(A, B)} consumer no longer exist. The current
+composition, its self-verification contract and the gauge quotient are
+documented in \cref{sec:pencil-engine}.
+
+\textbf{Implementation (historical)}: \texttt{\_build\_evolution\_matrices()} is the single unified reduction builder --- it handles algebraic constraint fields (\texttt{time\_order=0}) via Fourier Schur complement, rank-deficient mass matrices $M$ (e.g.\ trace projections of higher-rank tensor perturbations) via per-mode mass eigendecomposition with null-space Schur elimination, and near-singular velocity coupling $B = I - V_\text{coupling}$ via the generalized eigenvalue problem. It returns $(A_\text{rhs}, B_\text{lhs})$; when $B_\text{lhs}$ is non-\texttt{None}, \texttt{\_evolve\_per\_mode()} uses \texttt{scipy.linalg.eig(A, B)} (QZ decomposition), which is numerically stable for rank-deficient and ill-conditioned $B$; otherwise it uses \texttt{np.linalg.eig(A)}. The gauge filter $|\lambda| > 10^{12}$ catches infinite eigenvalues from null directions and freezes them at IC. Prior to the \#256 unification two competing builders coexisted (constraint-eliminated and generalized); the constraint-eliminated builder silently mis-classified \texttt{d2\_t} cross-couplings as stiffness operators and was deleted --- see \cref{sec:troubleshooting-rank-deficient-kinetic} for the failure mode and its resolution.
 
 \textbf{References}: Golub \& Van Loan (2013), \emph{Matrix Computations}, 4th ed., \S7.7; Hairer \& Lubich (2003), ZAMM 83(1); Ostrogradsky M.V.\ (1850), Mem.\ Acad.\ St.\ Petersbourg VI 4, 385.
 

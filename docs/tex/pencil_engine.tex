@@ -1,0 +1,351 @@
+% The matrix-pencil engine: theory, design record, and the general-input
+% architecture (pin + certify, observable-sector closure).
+% Uses macros from preamble.tex
+
+\section{The Matrix-Pencil Engine and Gauge-Oblivious Simulation}
+\label{sec:pencil-engine}
+
+This section is the design record for the modal solver's constraint
+machinery as rebuilt in August 2026 (GH \#457 and its chain \#458--\#460,
+\#465, \#467, \#468, \#470, \#473, \#474). It records the theory, the
+engine, the classification rule it depends on, the alternatives that were
+measured and rejected, and the architecture that lets TIDAL evolve theory
+input whose gauge structure the user does not know in advance. It
+supersedes the constraint-handling prose of \cref{sec:modal-solver}
+(Schur levels, the $|\lambda| > 10^{12}$ gauge filter, the jerk
+substitution), which is kept there as history.
+
+\subsection{Why a pencil}
+\label{sec:pencil-why}
+
+After the Fourier transform every mode $k$ of a linear, time-independent
+system is a first-order linear differential--algebraic equation (DAE)
+\begin{equation}
+  B(k)\,\dot y = A(k)\,y ,
+  \label{eq:pencil-dae}
+\end{equation}
+over the state slots $y = (q, v, \ldots)$. Rows are equations: a
+kinematic row $\dot q = v$ has $B_{qq} = 1$, $A_{qv} = 1$; a dynamical
+row carries the row's \emph{kinetic content} on the $B$ side (the
+diagonal kinetic coefficient, and every $\texttt{d2\_t}$ cross term as
+an off-diagonal $B$ entry) and its stiffness/damping content on the $A$
+side; an algebraic row has a zero $B$ row. Putting all mass content on
+$B$ is not a convenience: it is what makes the \#444/\#458 defect class
+--- forgetting a row's $M^{-1}$ when folding a constraint coupling into
+an already-scaled velocity row --- impossible by construction, because
+no row is ever pre-scaled.
+
+The pair $(A, B)$ is a \emph{matrix pencil} $\lambda B - A$. Its
+generalized eigenvalues split into \emph{finite} ones (the dynamics) and
+\emph{infinite} ones (instantaneous algebraic relations). For the
+homogeneous free evolution, the infinite sector is exactly $z_i \equiv 0$:
+writing the ordered generalized Schur form
+$Q^H A Z = S$, $Q^H B Z = T$ with the finite block leading, the trailing
+block obeys $T_{ii}\dot z_i = S_{ii} z_i$ with $T_{ii}$ nilpotent and
+$S_{ii}$ invertible, which forces $z_i = 0$. The finite deflating
+subspace $\mathrm{span}(Z_f)$ therefore \emph{is} the constraint
+manifold, with an orthonormal basis, and the reduced generator is a
+triangular solve,
+\begin{equation}
+  G = T_{ff}^{-1} S_{ff}, \qquad
+  A_\text{eff} = Z_f\, G\, Z_f^H, \qquad
+  P = Z_f Z_f^H ,
+  \label{eq:pencil-deflation}
+\end{equation}
+so that $\dot y = A_\text{eff}\, y$ on the manifold and $P$ projects
+initial data onto it. Off-manifold components are annihilated by
+$A_\text{eff}$ and stay frozen. Because $Q$ and $Z$ are unitary and the
+only inversion is triangular, the conditioning argument that retired the
+eigendecomposition evolution path in v0.31 (\cref{sec:modal-robust-matrix-exp};
+$\mathrm{cond}(V)$ blow-up, Higham 2008 \S2.3) does not apply here.
+
+The pencil is row-equilibrated before any factorization (each equation
+scaled to unit maximum magnitude). This is a left preconditioner: it
+changes neither the solution set nor the right deflating subspaces, and
+without it rows carrying small physical scales (a $B_0^2$-weighted
+constraint) make every rank and magnitude decision unreliable --- the
+same scale blindness as the determinant-gated regularizer of \#459.
+
+\subsection{The engine}
+\label{sec:pencil-engine-impl}
+
+\texttt{\_pencil\_deflate} (\texttt{tidal/solver/modal.py}) is the single
+composition engine for every constrained or mass-singular system. Its
+contract:
+
+\begin{enumerate}
+  \item \textbf{Regularity probe.} The smallest singular value of
+    $\lambda_0 B - A$ at two fixed generic probe points decides whether
+    the pencil is regular. Per-pair $(\alpha, \beta) \approx (0, 0)$
+    tests were rejected (\cref{sec:pencil-rejected}).
+  \item \textbf{Gauge quotient} (\cref{sec:pencil-quotient}) when the
+    probe finds near-null directions at the current determination floor
+    $\tau$.
+  \item \textbf{Ordered QZ} with the finite/infinite predicate
+    $|\beta| > \tau\,(|\alpha| + |\beta| + \tau)$.
+  \item \textbf{Deflation contract.} The construction is accepted only
+    if it satisfies its own defining equation,
+    \begin{equation}
+      \frac{\lVert B Z_f G - A Z_f \rVert}{\lVert A Z_f \rVert}
+      \le \max(10^{-8}, \tau) .
+      \label{eq:pencil-contract}
+    \end{equation}
+    A second, reordering-free rung (right eigenvectors of the retained
+    spectrum, $G$ from least squares) is tried under the same contract
+    before refusing.
+  \item \textbf{Adaptive determination floor.} $\tau$ starts at
+    $n \cdot 10^{-12}$ and is raised decade by decade to $10^{-4}$
+    until the contract passes; a raised floor is reported in a warning
+    naming the final $\tau$. Content determined more weakly than $\tau$
+    is treated as gauge and pinned (\cref{sec:pencil-quotient}). This
+    resolved the nonminimal T4 point (\#467) at a residual of
+    $4\times10^{-11}$, where zeroing by a fixed classifier violated the
+    equations at $O(1)$.
+  \item \textbf{Honest refusal.} If no floor yields a
+    contract-consistent operator, \texttt{SingularPencilError} carries
+    the diagnosis (``no double-precision operator is both faithful to
+    the equations and integrable''); the stability probe converts it to
+    the verdict \emph{not simulatable as posed}. Refusal is preferred to
+    the pre-\#457 behavior of returning a plausible but wrong trajectory
+    (\#455: an operator whose spectral abscissa grew with resolution).
+\end{enumerate}
+
+A fast path keeps the common case cheap: when $B$ is invertible for
+every mode the batched solve $B^{-1}A$ is mathematically identical to
+the deflation and is used instead; singular $B$ routes through the
+engine. The convolution (position-dependent) path assembles one pencil
+over all modes and, for specs with an implicit-dynamical sector, treats
+the residual algebraic constraints as pencil \emph{slots} with pure-$A$
+rows (``constraints as slots''); this collapsed the E.cal pencil's
+dynamic range from $5.4\times10^{6}$ to~1 and made the former deferred
+acceleration substitution exact.
+
+\subsection{The implicit-dynamical sector}
+\label{sec:pencil-classification}
+
+\texttt{time\_derivative\_order} states the true left-hand-side fact of a
+row; it does not guarantee the row is algebraic. The one definition of
+the split is \texttt{EquationSystem.second\_order\_sector} (the
+\emph{implicit-dynamical sector}; the code still uses the historical
+attribute names, see GH \#468 Arc B$'$ item~9), with two rules:
+
+\begin{description}
+  \item[Rule 1 (inter-constraint time chains).] An order-0 row that
+    references a time derivative of another order-0 field (a
+    $\texttt{d2\_t}(C)$ mass coupling or a $\texttt{first\_derivative\_t}(C)$ /
+    $v_C$ damping coupling) is secretly differential. Both endpoints are
+    promoted, and the closure is taken over connected components of the
+    time-edge graph. Folding such rows as algebraic was the \#457 defect,
+    measured at $O(1)$ residuals on 20 shipped specs.
+  \item[Rule 2 (dynamical-row accelerations).] An order-0 field whose
+    \emph{acceleration} any dynamical row references is promoted, because
+    algebraic recovery cannot supply $\ddot q$ of an eliminated field
+    (the twice-differentiated recovery is jerk-level through the velocity
+    columns); promotion turns the term into ordinary $B$-side mass
+    content. Velocity references from dynamical rows deliberately do
+    \emph{not} promote --- $\dot C = R\,\dot y$ is exact as a $B$-side
+    fold. Promotion happens precisely where elimination cannot be exact.
+\end{description}
+
+Promoted fields receive field and velocity slots, a zero kinetic
+diagonal ($M_{ff} = 0$), and route through the engine; the time-domain
+backends and \texttt{modal-jax} refuse them with an actionable message.
+\emph{Vocabulary:} ``implicit-dynamical sector'' is this classification;
+``$\varepsilon$-promoted'' is reserved for the perturbative promotion of
+new degrees of freedom by $\tilde R^2$-class terms (\#321, \#464), a
+different notion that must not share the word.
+
+\subsection{Gauge quotient and its root-cause position}
+\label{sec:pencil-quotient}
+
+A singular pencil ($\det(\lambda B - A) \equiv 0$) has state directions
+the equations never determine: the Kronecker column-chain space. At a
+generic probe $\lambda_0$ the null vectors of $\lambda_0 B - A$ are
+evaluations of the polynomial null family (for the byte-identical
+equation triplets of \texttt{dark\_photon\_plasma}, GH \#465,
+$x(\lambda) = q_\text{diff} + \lambda\, v_\text{diff}$), so the union of
+null spaces over two probes spans the chain space $W$. The quotient
+pins $W$ to zero --- the explicit, warned form of the minimum-norm
+convention the pre-\#457 machinery applied silently through
+\texttt{pinv} --- restricts the pencil to the complement, and reduces the
+result to a square regular pencil handed to the deflation.
+
+Two positions are recorded with it. First, spec-level redundancy is a
+Wolfram-derivation artifact: the root fix is re-derivation of the theory
+(\#374), and the quotient is the mathematically correct interim, per the
+rule that broken symbolic output is never repaired in Python. Second,
+the row compression assumes the restricted equations have exactly
+$n_\text{red}$ independent combinations; that holds for exact chains but
+\emph{fails for near-null quotients} of localized backgrounds, where it
+discards 66--144 independent equations on the E.cal pencil and hands the
+deflation a pencil that is singular at every $\lambda$ (\#474, measured
+2026-08-27). That is the true mechanism of the \#468 refusal.
+
+\subsection{Rejected alternatives}
+\label{sec:pencil-rejected}
+
+Each alternative below was implemented or derived and failed a measured
+test; the record exists so none is re-proposed.
+
+\begin{enumerate}
+  \item \textbf{Velocity-aware Schur elimination ($R_x$, $R_v$).} The
+    hand-derivation left a residual $\tilde D_{cc}\,\dot z_c$ that
+    vanishes only when no fix is needed; a corpus scan found the rotated
+    $\tilde D_{cc} = 0$ on every shipped spec, which made the formula
+    corpus-correct but not general. Superseded by the engine, which has
+    no per-case formulas.
+  \item \textbf{Freeze-heuristic gauge completion.} Produced spurious
+    eigenvalues of $2\times10^{8}$ on the \emph{decoupled} dark photon,
+    which must be stable.
+  \item \textbf{Per-pair $(\alpha,\beta)\approx(0,0)$ singularity test.}
+    Misfires on regular pencils with $B_0^2$-scale rows (a pencil with
+    smallest singular value $4\times10^{-5}$ was flagged singular).
+  \item \textbf{$|\lambda|$ conditioning horizon.} Fires on harmless
+    rounded-infinite pairs: the small-coupling nonminimal point was
+    refused although its operator closed the oracle at $8\times10^{-11}$.
+  \item \textbf{Data-derived gap classifier.} Cannot distinguish
+    rounded-infinite from genuinely huge pairs (a mode-8/mode-9
+    counterexample), and QZ reordering through hundreds of
+    ill-conditioned infinite pairs wrecks the factorization (contract
+    residual 2.66 measured).
+  \item \textbf{Spatial gauge masking by field} (2026-08-27). Pinning the
+    far-field values of the temporal-index metric components with a
+    smooth least-squares normal form left the static residual gauge on
+    the spatial components (8--24 directions below $10^{-8}$) and any
+    smooth pin carries an inherent transition-zone continuum; refused at
+    every $\tau$.
+  \item \textbf{Single-probe paired reduction} (2026-08-27). Dropping the
+    equations that determined the pinned directions yields a
+    contract-consistent pencil (residual $3\times10^{-7}$) but the
+    dropped rows are the far-field constraint chains, which carry
+    velocity content; the retained system is a free evolution with
+    constraint-violating modes ($\max\Re\lambda$ between 19 and
+    $2\times10^{5}$, varying with $\tau$ and $N$).
+  \item \textbf{Extended precision.} Deferred (\#470): it does not
+    identify the meaningful sector and is needed only if the
+    under-determined sector itself ever becomes the observable.
+\end{enumerate}
+
+The survivor is the deflation contract of \cref{eq:pencil-contract}: it
+checks the object's own defining equation, so every failure mode above
+manifests in it, whereas no spectral threshold could separate the
+pathological cases from the harmless ones.
+
+\subsection{Gauge-oblivious simulation: pin, certify, restrict}
+\label{sec:pencil-general-input}
+
+TIDAL must accept theory input whose gauge structure the user does not
+know --- adding a term to a Lagrangian may break or keep a symmetry, and
+Appendix~H of the thesis shows that even the Lorenz-class conditions of
+linearized GR are theory-specific. Gauge fixing at derivation therefore
+remains a user option (\cref{sec:gauge-fixing}) and never a requirement.
+The architecture that meets this has one mechanism and three
+identification routes, all feeding the one engine (never a solver fork):
+
+\paragraph{Pin + certify.} Evolve the full mixed system; pin the
+genuinely undetermined directions explicitly (the quotient's
+minimum-norm zero, warned, and now \emph{recorded}: the engine's
+\texttt{PencilDiagnostics} stores, per state slot and mode, the squared
+row norm of the pinned subspace, written to the run's
+\texttt{metadata.json} as \texttt{solver\_diagnostics.pin\_overlap}). At
+measurement time \texttt{tidal measure} stamps every result with a
+\texttt{gauge\_certificate}: a measurement whose field support carries no
+pinned content is provably independent of the gauge choice
+(\emph{certified}); otherwise it is \emph{flagged} with the overlap
+magnitude and the slots involved. A flag is physics information ---
+``this quantity is not an observable of your theory'' --- not a
+failure. Pinning is without loss of generality for invariant
+observables; the certificate verifies that per output instead of
+trusting it globally, and guards the $\tau$ boundary where a direction
+judged undetermined may be genuinely determined but tiny. The integrated
+canonical energy of a gauge-invariant quadratic action on a periodic
+domain is gauge-invariant (pure-gauge directions carry no energy; only
+the local density is gauge-dependent), so on genuine pins the energy
+certificate must pass --- it doubles as a check that the pinned
+directions were pure gauge. On the dark-photon CDT spec the
+$h_5 \to a_1$ conversion is certified and the whole-state energy is
+flagged, automating what the FV$\leftrightarrow$CDT equivalence pin
+proved by hand ($4.6\times10^{-14}$).
+
+\paragraph{Route 1 --- global spectral gap.} The uniform class: the
+finite/infinite split has a gap and the quotient finds the pins.
+Shipped; full mixing included.
+
+\paragraph{Route 2 --- Kronecker-like staircase reduction (GH \#473).}
+The general in-solver mechanism for near-singular pencils: extract the
+right singular blocks $L_\varepsilon$ (gauge chains, $\varepsilon+1$
+columns and $\varepsilon$ rows), the left singular blocks
+$L_\eta^T$ (constraint chains, $\eta+1$ rows and $\eta$ columns) and the
+regular part, with rank decisions at tolerance $\tau$ and only
+orthogonal transformations (Van Dooren 1979; Demmel \& K\aa gstr\"om's
+GUPTRI; \texttt{MatrixPencils.jl}'s \texttt{klf} as the open reference
+implementation). The 2026-08-27 experiment established that single-probe
+pairing cannot represent the asymmetric block shapes; this route is the
+next numerical arc and re-enables the five \#455-pinned full-pencil
+tests.
+
+\paragraph{Route 3 --- observable-sector closure (shipped, GH \#468).}
+When the full pencil would refuse and the excited sector is exactly
+closed, evolve that sector alone. \texttt{EquationSystem.dependency\_closure}
+is the structural closure of ``the equation of $X$ references $Y$'';
+\texttt{restrict\_spec\_dict} writes the closure as a first-class spec
+JSON (\texttt{restricted\_spec.json}, the run's \texttt{spec\_path}),
+re-validated by the loader, with fields outside the closure
+\emph{absent} --- never present but wrong --- and provenance under
+\texttt{metadata.restriction}. \texttt{tidal measure} refuses total energy
+when Hamiltonian terms were dropped and conversion on omitted fields,
+naming the sector alternative. Activation is a recovery from refusal
+only; \texttt{--no-closure-restriction} attempts the full system. On the
+frozen Phase~E geometry the closure-evolved E.cal conversion reproduces
+the path-integrated Boccaletti prediction to $0.25\%$
+($P_\text{peak} = 0.003912$ vs.\ $\sin^2 0.0627 = 0.003922$),
+independent of $t_\text{end}$; the archived $0.0036$ was the
+defective-operator value (\texttt{docs/RESULTS\_AMENDMENTS.md},
+Amendment~2).
+
+\paragraph{Why the far field is hostile.} For a localized background the
+gauge-class rows read $B_0(x)^2\, g(x) + [\,O(1)\text{ operator on other
+fields}\,] = 0$: the symmetry the background breaks returns wherever the
+background vanishes. On the Phase~E geometry $B_0(x)^2$ spans ten decades
+across the grid and is below $10^{-11}$ of the $O(1)$ row terms on
+$\sim\!40\%$ of the points, independent of $N$. The weak directions are
+the full linearized-diffeomorphism orbit --- $(h_0, h_3, v_{h_3})$,
+$(h_1, h_6, v_{h_6})$, $(h_2, h_8, v_{h_8})$, all far-field localized ---
+which is why every setup with a background that vanishes somewhere
+(localized magnetic fields, plasma profiles) is in this class, and why
+the closure and staircase routes exist rather than a per-theory gauge
+choice.
+
+\subsection{Historical audit and replaced machinery}
+\label{sec:pencil-audit}
+
+The rework replaced: the SVD mass-Schur branch with the \#260 $V_\text{eff}$
+back-projection (uniform deflation; pinned by the critical-point
+continuity tests and the hand-solved rank-deficient-mass case); the
+$K_{cc}$ minimum-norm \texttt{pinv} (the explicit quotient); the
+determinant-gated $10^{-14}$ Tikhonov on $S_{cc}$ (rank-revealing
+\texttt{pinv}, \#459 --- its $1/\epsilon$ round-off amplification had
+produced a spurious $2\times10^{5}$ abscissa); the $k$-dependent
+singular-mass bare \texttt{pinv} (dead code, \#460); the path-4 one-step
+Newton for constraint accelerations (Rule~2 promotion); and the
+post-hoc $A_{dc}$ corrections with the $B_\text{lhs}$ return contract of
+\#256, whose only consumer was retired by the Pad\'e path (\#320). One
+genuine narrowing is recorded: jerk-level content on singular-mass or
+promoted systems now refuses instead of executing the old (wrong)
+substitution (\#469). Nothing tested or reachable was lost; the two
+pre-existing coverage holes found by the audit --- no in-suite
+FV$\leftrightarrow$CDT pin and no \#263-class pin --- were closed or
+filed.
+
+\subsection{Further reading}
+
+Kunkel \& Mehrmann, \emph{Differential-Algebraic Equations} (EMS 2006),
+whose strangeness-index framework and GELDA solver treat undetermined
+DAE components exactly as pins to be supplied externally; Kalman
+decomposition / structural observability for the closure route;
+ModelingToolkit.jl's \texttt{structural\_simplify} as the ecosystem
+precedent for symbolic system-to-system passes before one general
+numerical solver. Decision records: GH \#470 (the acceptance decision and
+its revisions), \#468 (route plan and measurements), \#473 (staircase
+scope), \#474 (quotient root cause), \#377 (the deferred gauge-fixed
+comparison experiment).
