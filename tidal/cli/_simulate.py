@@ -2843,6 +2843,15 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
                     np.asarray(c_vel_arr, dtype=np.float64),
                 )
             log(f"  {len(cv)} constraint velocity arrays saved")
+        # GH #468 pin + certify: real-space probes of the pinned subspace,
+        # consumed by `tidal measure` for the perturb-and-remeasure gauge
+        # certificate.
+        probes = result.get("pin_probes")  # type: ignore[typeddict-item]
+        if probes is not None:
+            np.save(
+                str(writer.output_dir / "pin_probes.npy"),
+                np.asarray(probes, dtype=np.float64),
+            )
 
     # 8. Build SimulationData — use memory-mapped directory reader when
     # snapshots were already streamed to disk (avoids double-buffering).

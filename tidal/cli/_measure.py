@@ -34,6 +34,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from argparse import Namespace
+    from collections.abc import Callable
 
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._io import SimulationData
@@ -127,7 +128,10 @@ _PIN_TOL = 1e-10  # overlap below this is round-off: the observable never reads 
 
 
 def _gauge_certificate(
-    data_path: Path, measurements: set[str], args: Namespace
+    data_path: Path,
+    measurements: set[str],
+    args: Namespace,
+    data: SimulationData | None = None,
 ) -> dict[str, Any] | None:
     """Per-observable gauge certificate from the run's pinned directions.
 
@@ -173,16 +177,118 @@ def _gauge_certificate(
         support = set(slot_names)
         scope = "whole state"
     worst = max(((overlap.get(s, 0.0), s) for s in support), default=(0.0, ""))
-    verdict = "certified" if worst[0] <= _PIN_TOL else "flagged"
     touched = sorted(s for s in support if overlap.get(s, 0.0) > _PIN_TOL)
-    return {
-        "verdict": verdict,
+    cert: dict[str, Any] = {
+        "verdict": "certified" if worst[0] <= _PIN_TOL else "flagged",
+        "method": "slot-overlap",
         "scope": scope,
         "max_pin_overlap": worst[0],
         "worst_slot": worst[1],
         "pinned_slots_in_support": touched,
         "pinned_dims": int(diag.get("pinned_dims", 0)),
         "determination_floor": float(diag.get("determination_floor", 0.0)),
+    }
+    # Direct test when the run stored probes of its pinned subspace: perturb
+    # the state along them and re-run the measurement (arc C2). This is the
+    # observable's ACTUAL dependence on the gauge choice — a measurement may
+    # read a pinned field yet be invariant (its operator annihilates the
+    # pinned combination), and a pinned combination may mix a value with a
+    # derivative; slot overlap cannot tell, sensitivity can.
+    probes_path = data_path / "pin_probes.npy"
+    scalar = _primary_scalar(measurements, args)
+    if (
+        data is not None
+        and scalar is not None
+        and cert["pinned_dims"] > 0
+        and probes_path.exists()
+    ):
+        label, fn = scalar
+        sens = _gauge_sensitivity(data, slot_names, probes_path, fn, label)
+        if sens is not None:
+            cert.update(sens)
+            cert["method"] = "perturb-and-remeasure"
+            cert["verdict"] = (
+                "certified" if sens["max_sensitivity"] <= _SENS_TOL else "flagged"
+            )
+    return cert
+
+
+_SENS_TOL = (
+    1e-6  # relative change per relative perturbation; invariants sit at round-off
+)
+_PERTURB_REL = 1e-3
+
+
+def _primary_scalar(measurements: set[str], args: Namespace) -> tuple[str, Any] | None:
+    """Return the scalar a measurement reduces to (for the sensitivity test)."""
+    if measurements & {"conversion", "mixing", "peak_conversion"} and not (
+        measurements & {"energy", "conservation", "summary", "spectrum"}
+    ):
+        src = _parse_field_list(getattr(args, "source", None))
+        tgt = _parse_field_list(getattr(args, "target", None))
+        if not src or not tgt:
+            return None
+        from tidal.measurement import compute_conversion_probability
+
+        def _peak(d: SimulationData) -> float:
+            return float(
+                np.max(compute_conversion_probability(d, src[0], tgt[0]).probability)
+            )
+
+        return f"peak conversion {src[0]}→{tgt[0]}", _peak
+    if measurements & {"energy", "conservation", "summary"}:
+        from tidal.measurement import compute_energy_timeseries
+
+        def _e0(d: SimulationData) -> float:
+            return float(compute_energy_timeseries(d)[3][0])
+
+        return "total energy at t=0", _e0
+    return None
+
+
+def _gauge_sensitivity(
+    data: SimulationData,
+    slot_names: list[str],
+    probes_path: Path,
+    fn: Callable[[SimulationData], float],
+    label: str,
+) -> dict[str, Any] | None:
+    """Measure how much scalar ``fn(data)`` moves along the pinned subspace.
+
+    Relative change per relative perturbation, maximized over the stored
+    probes; ``None`` if the probe file does not match the run's slots.
+    """
+    import dataclasses
+
+    probes = np.load(probes_path)  # (K, n_slots, *grid)
+    min_probe_axes = 3
+    if probes.ndim < min_probe_axes or probes.shape[1] != len(slot_names):
+        return None
+    base = fn(data)
+    state_scale = max(
+        [float(np.max(np.abs(a))) for a in data.fields.values()]
+        + [float(np.max(np.abs(a))) for a in data.velocities.values()]
+        + [1e-300]
+    )
+    sensitivities: list[float] = []
+    for probe in probes:
+        p_scale = float(np.max(np.abs(probe))) or 1.0
+        eps = _PERTURB_REL * state_scale / p_scale
+        fields = dict(data.fields)
+        vels = dict(data.velocities)
+        for si, name in enumerate(slot_names):
+            if name.startswith("v_") and name[2:] in vels:
+                vels[name[2:]] = np.asarray(vels[name[2:]]) + eps * probe[si][None, ...]
+            elif name in fields:
+                fields[name] = np.asarray(fields[name]) + eps * probe[si][None, ...]
+        perturbed = dataclasses.replace(data, fields=fields, velocities=vels)
+        val = fn(perturbed)
+        sensitivities.append(abs(val - base) / (abs(base) + 1e-300) / _PERTURB_REL)
+    return {
+        "observable": label,
+        "max_sensitivity": max(sensitivities),
+        "sensitivities": sensitivities,
+        "perturbation_rel": _PERTURB_REL,
     }
 
 
@@ -191,7 +297,16 @@ def _format_text_section_gauge_certificate(
 ) -> None:
     """Append the gauge-certificate section to *lines*."""
     lines.append("Gauge certificate (GH #468 pin + certify):")
-    if cert["verdict"] == "certified":
+    if cert.get("method") == "perturb-and-remeasure":
+        tag = "certified" if cert["verdict"] == "certified" else "FLAGGED"
+        lines.append(
+            f"  {tag} — {cert['observable']} changes by "
+            f"{cert['max_sensitivity']:.2e} (relative, per relative perturbation) "
+            f"along the {cert['pinned_dims']} pinned direction(s); "
+            f"{'independent of' if tag == 'certified' else 'DEPENDS on'} "
+            f"the min-norm-zero gauge choice (floor {cert['determination_floor']:.1e})."
+        )
+    elif cert["verdict"] == "certified":
         lines.append(
             f"  certified — {cert['scope']} read no pinned direction "
             f"(max pin overlap {cert['max_pin_overlap']:.1e}; "
@@ -1190,7 +1305,7 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PL
         results = outcome
 
     # GH #468 pin + certify: stamp every result with its gauge certificate.
-    certificate = _gauge_certificate(data_path, measurements, args)
+    certificate = _gauge_certificate(data_path, measurements, args, data)
     if certificate is not None:
         results["gauge_certificate"] = certificate
 

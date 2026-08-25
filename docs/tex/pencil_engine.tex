@@ -262,10 +262,19 @@ canonical energy of a gauge-invariant quadratic action on a periodic
 domain is gauge-invariant (pure-gauge directions carry no energy; only
 the local density is gauge-dependent), so on genuine pins the energy
 certificate must pass --- it doubles as a check that the pinned
-directions were pure gauge. On the dark-photon CDT spec the
-$h_5 \to a_1$ conversion is certified and the whole-state energy is
-flagged, automating what the FV$\leftrightarrow$CDT equivalence pin
-proved by hand ($4.6\times10^{-14}$).
+directions were pure gauge. The verdict is a \emph{direct} test: the
+run stores real-space probes of its pinned subspace, and
+\texttt{tidal measure} perturbs the state along them and re-runs the
+measurement, reporting the relative sensitivity (``perturb and
+remeasure''). This decides the cases a per-slot overlap cannot --- an
+observable that reads a pinned field only through a combination its
+operator annihilates, or a pinned combination that mixes a value with a
+derivative. On the dark-photon CDT spec the $h_5 \to a_1$ conversion
+and the total energy are certified (the slot overlap alone would have
+flagged the energy), while a scalar reading the pinned torsion
+component's raw value is flagged --- automating what the
+FV$\leftrightarrow$CDT equivalence pin proved by hand
+($4.6\times10^{-14}$).
 
 \paragraph{Route 1 --- global spectral gap.} The uniform class: the
 finite/infinite split has a gap and the quotient finds the pins.

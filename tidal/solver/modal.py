@@ -1333,6 +1333,8 @@ def _build_evolution_matrices(
             n_dyn_slots,
             "evolution",
             per_mode=True,
+            grid_shape=tuple(grid.shape),
+            mode_shape=tuple(rfft_shape),
         )
 
     logger.info(
@@ -2767,6 +2769,8 @@ def _build_convolution_matrix_with_constraints(
                 n_dyn_tot // n_modes,
                 "evolution",
                 per_mode=False,
+                grid_shape=tuple(grid.shape),
+                mode_shape=tuple(grid.shape),
             )
     elif has_vel_coupling:
         B_lhs = np.eye(A_reduced.shape[0], dtype=np.complex128) - vel_coupling_mat
@@ -3012,6 +3016,10 @@ class PencilDiagnostics:
         self.pin_overlap: NDArray[np.float64] | None = None  # (n_modes, n_slots)
         self.pinned_dims: int = 0
         self.determination_floor: float = 0.0
+        # Real-space probes of the pinned subspace, (K, n_slots, *grid):
+        # random combinations of the pinned directions, for the
+        # perturb-and-remeasure certificate in `tidal measure`.
+        self.probes: NDArray[np.float64] | None = None
 
     def record(
         self, tag: tuple[str, int], pinned: NDArray[np.complex128], tau: float
@@ -3061,18 +3069,29 @@ def _record_pin_overlap(
     kind: str,
     *,
     per_mode: bool,
+    grid_shape: tuple[int, ...],
+    mode_shape: tuple[int, ...],
+    max_probes: int = 8,
 ) -> None:
-    """Turn recorded pinned bases into ``pin_overlap[mode, slot]``.
+    """Turn recorded pinned bases into ``pin_overlap[mode, slot]`` and probes.
 
-    ``per_mode=True``: one pencil per mode, rows = reduced slots.
-    ``per_mode=False``: one full-FFT pencil, row ``r*n_modes + m``.
+    ``per_mode=True``: one pencil per mode (rfft bins, ``mode_shape`` =
+    rfft shape), rows = reduced slots. ``per_mode=False``: one full-FFT
+    pencil, row ``r*n_modes + m`` (``mode_shape`` = grid shape).
+
+    Probes: up to ``max_probes`` random complex combinations of ALL pinned
+    directions, transformed to real space per slot and normalized — a
+    random vector in the pinned subspace detects any observable that
+    depends on it (rank-revealing), which is what the certificate needs.
     """
     overlap = np.zeros((n_modes, n_red))
+    cols: list[tuple[int, NDArray[np.complex128]]] = []
     total = 0
     for (tag_kind, m), w, _tau in diagnostics.entries:
         if tag_kind != kind or w.shape[1] == 0:
             continue
         total += w.shape[1]
+        cols.append((m, w))
         rows = np.sum(np.abs(w) ** 2, axis=1)
         if per_mode:
             overlap[m, :] += rows
@@ -3081,6 +3100,33 @@ def _record_pin_overlap(
     diagnostics.slot_names = _reduced_slot_names(layout, orig_to_reduced, n_red)
     diagnostics.pin_overlap = overlap
     diagnostics.pinned_dims = total
+    if not cols:
+        diagnostics.probes = None
+        return
+    rng = np.random.default_rng(468)
+    k_probes = min(max_probes, total)
+    probes = np.zeros((k_probes, n_red, *grid_shape))
+    for p in range(k_probes):
+        hat = np.zeros((n_red, n_modes), dtype=np.complex128)
+        for m, w in cols:
+            coeff = rng.standard_normal(w.shape[1]) + 1j * rng.standard_normal(
+                w.shape[1]
+            )
+            vec = w @ coeff
+            if per_mode:
+                hat[:, m] += vec
+            else:
+                hat += vec.reshape(n_red, n_modes)
+        for s in range(n_red):
+            if per_mode:
+                real = np.fft.irfftn(hat[s].reshape(mode_shape), s=grid_shape)
+            else:
+                real = np.fft.ifftn(hat[s].reshape(grid_shape)).real
+            probes[p, s] = real
+        scale = float(np.max(np.abs(probes[p])))
+        if scale > 0.0:
+            probes[p] /= scale
+    diagnostics.probes = probes
 
 
 def _gauge_quotient_pencil(
@@ -4748,6 +4794,8 @@ def solve_modal(
         result["constraint_velocities"] = constraint_vel_arrays  # type: ignore[typeddict-unknown-key]
     if diagnostics.slot_names:
         result["diagnostics"] = diagnostics.to_dict()  # type: ignore[typeddict-unknown-key]
+    if diagnostics.probes is not None:
+        result["pin_probes"] = diagnostics.probes  # type: ignore[typeddict-unknown-key]
 
     # Stage 3 (v6): expose Pass 0 eigendecomposition for Pass 1 Duhamel.
     if return_eigendata:

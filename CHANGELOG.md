@@ -43,11 +43,19 @@ retroactively covered; see `git log` for the full history.
   `PencilDiagnostics`). `tidal measure` stamps every result with a
   `gauge_certificate`: `certified` when the measurement's field support
   reads no pinned content (provably independent of the gauge choice),
-  `flagged` with the overlap magnitude and slots otherwise — a value is
-  never presented as gauge-invariant when it is not. On the dark-photon
-  CDT spec (#465 redundant triplets) the h_5 → a_1 conversion is
-  certified and the whole-state energy is flagged, automating what the
-  FV↔CDT equivalence pin proved by hand.
+  `flagged` otherwise — a value is never presented as gauge-invariant
+  when it is not. The verdict is a DIRECT test ("perturb and
+  remeasure"): the run stores real-space probes of its pinned subspace
+  (`pin_probes.npy`); `measure` perturbs the state along them and re-runs
+  the measurement, reporting the relative sensitivity. This handles
+  observables that read a pinned field only through an invariant
+  combination, and pinned combinations mixing a value with a derivative,
+  which the per-slot overlap (kept as the fallback when no probes exist)
+  cannot. On the dark-photon CDT spec (#465 redundant triplets) the
+  h_5 → a_1 conversion and the total energy are certified (pure-gauge
+  directions carry no energy — the energy certificate doubles as a
+  pin-validity check), while a scalar reading the pinned torsion
+  component's raw value is flagged.
 
 ### Fixed
 
