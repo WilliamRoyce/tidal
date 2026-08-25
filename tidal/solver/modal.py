@@ -4725,6 +4725,15 @@ def solve_modal(
     if progress is not None:
         progress.finish()
 
+    # A modal run that never needed the pencil engine (invertible fast path,
+    # plain position-dependent builder) pinned nothing — say so explicitly
+    # so `tidal measure` can certify "no pins" rather than stay silent.
+    if not diagnostics.slot_names:
+        diagnostics.slot_names = [*layout.field_slot_map] + [
+            f"v_{name}" for name in layout.velocity_slot_map
+        ]
+        diagnostics.pin_overlap = np.zeros((1, len(diagnostics.slot_names)))
+
     result: SolverResult = {
         "t": times,
         "y": snapshots,
