@@ -547,3 +547,29 @@ The estimator itself was hardened in the same review round (range-coverage
 guards, machine-readable fallback/floor markers, `schema_version: 2`,
 floor-aware bar chart and TeX emitters, prior-kind coverage enforced by test) —
 see the review PR referenced from GH #432's comment thread.
+
+## 2026-08-27 Correction: localized E.cal calibration on the corrected operator (GH #449) — append-only amendment
+
+**Nothing above this line is edited; this entry records which earlier numbers are
+superseded and where the corrected ones live.** Living claim-status record:
+`docs/RESULTS_AMENDMENTS.md` Amendment 2; tracker line annotated in
+`docs/PHASE_E_TRACKER.md` 1.1.
+
+- **Defects**: the localized solver path carried the rfft convolution basis
+  (#445), the missing velocity-row mass scale on deferred constraint terms
+  (#444) and the inter-constraint time-derivative mishandling of the
+  ungauged-gravity class (#457 chain) when the Phase E calibration was
+  recorded (2026-05-24). All fixed on `feat/ws2-localized-path-audit`
+  (v0.49.x). The corrected operator showed the FULL ungauged localized pencil
+  is not evolvable in double precision (far-field gauge restoration; #474), so
+  the exactly closed observable sector is evolved instead (#468, aa8a3b38).
+- **Superseded number**: Phase E E.cal calibration P/h0² ≈ 0.0036 (tracker 1.1)
+  → **P_peak = 0.003912** at the frozen geometry (N=128, L=100, h0=0.01,
+  t_end=40), vs Boccaletti sin²(0.0627) = 0.003922: ratio 0.9975 (0.25%);
+  t_end-independent (0.003914 at t_end=80, peak at t=44); final P after the
+  sign-flipped second Gaussian 7.8e-6 (phase cancels, ∫B dz = 0). The archived
+  "within ~10%" claim stands and is strengthened.
+- **Not affected**: the manuscript's uniform-background results (never ran the
+  localized path). **Re-judged later**: the E.T2 amp run (29640051) and every
+  torsion-roster localized number, once each spec's observable closure is
+  verified (the {h_5, a_1} closure fact is pinned for E.cal only).
