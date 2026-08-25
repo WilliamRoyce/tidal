@@ -381,46 +381,41 @@ class TestPath4ECalAdjudication:
         with pytest.raises(SingularPencilError):
             _path4_state(spec, grid, PHASE_E_PARAMS)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="GH #468: the promoted localized pencil's float64 "
-        "deflation is not yet robust — the build refuses honestly "
-        "(pre-#457 measured defect numbers: h_3 0.374, h_4 0.980, "
-        "h_7 0.980, h_9 0.877). Flips when #468 lands.",
-    )
-    def test_constraint_rows_full_closure(self) -> None:
-        spec, st, oracle = self._state()
-        res, _gaps = oracle.residuals(
-            st["fields"], st["vels"], st["accels"], st["dv_dt"]
-        )
-        con = {
-            eq.field_name: res[eq.field_name]
-            for eq in spec.equations
-            if eq.time_derivative_order == 0
-        }
-        bad = {k: v for k, v in con.items() if v > 1e-8}
-        assert not bad, f"constraint rows fail full closure: {bad}"
+    def test_closure_restricted_ecal_full_closure(self) -> None:
+        """GH #468 route 3 (2026-08-27): the exactly closed observable
+        sector {h_5, a_1} evolves at machine precision through the
+        certified non-promoted path-4 machinery.
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="GH #468: the promoted localized pencil's float64 "
-        "deflation is not yet robust — the build refuses honestly "
-        "(pre-#457 measured defect numbers: h_6 0.278, h_8 0.124 from "
-        "the near-singular truncated composition). Flips when #468 "
-        "lands.",
-    )
-    def test_dynamical_rows_full_closure(self) -> None:
-        spec, st, oracle = self._state()
-        res, _gaps = oracle.residuals(
+        Re-scoped from two former strict xfails that awaited a float64
+        operator for the FULL localized pencil. The Lane 1c experiment
+        showed no such operator exists without the Kronecker-like
+        staircase reduction (GH #474 root cause, #473 the general fix);
+        what every reduction tried did reproduce was this decoupled
+        block, at 1e-11..1e-15 — the closure contract is the meaningful
+        gate for the observable that the Phase E campaign measures.
+        """
+        from tidal.symbolic.json_loader import restrict_spec_dict
+
+        path = REPO_ROOT / "examples/data/gertsenshtein_ungauged_e_dual_gaussian.json"
+        if not path.exists():
+            pytest.skip("E.cal spec not present")
+        data = json.loads(path.read_text())
+        full = EquationSystem.from_dict(data)
+        closure = full.dependency_closure({"h_5", "a_1"})
+        assert closure == {"h_5", "a_1"}, f"closure moved: {sorted(closure)}"
+        restricted, record = restrict_spec_dict(data, closure)
+        assert record.omitted
+        assert record.dropped_hamiltonian_terms > 0
+        spec = EquationSystem.from_dict(restricted)
+        assert not spec.second_order_sector.promoted
+        grid = GridInfo(bounds=((0.0, 100.0),), shape=(24,), periodic=(True,))
+        st = _path4_state(spec, grid, PHASE_E_PARAMS)
+        res, gaps = ResidualOracle(spec, grid, PHASE_E_PARAMS).residuals(
             st["fields"], st["vels"], st["accels"], st["dv_dt"]
         )
-        dyn = {
-            eq.field_name: res[eq.field_name]
-            for eq in spec.equations
-            if eq.time_derivative_order >= 2
-        }
-        bad = {k: v for k, v in dyn.items() if v > 1e-8}
-        assert not bad, f"dynamical rows fail full closure: {bad}"
+        assert not gaps, f"oracle coverage gaps: {gaps}"
+        bad = {k: v for k, v in res.items() if v > 1e-11}
+        assert not bad, f"closure-restricted E.cal rows fail to close: {bad}"
 
 
 # ---------------------------------------------------------------------------

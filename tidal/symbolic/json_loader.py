@@ -25,7 +25,7 @@ from tidal.symbolic._kinetic_eval import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from tidal.solver.operators import SideBCSpec
 
@@ -1418,9 +1418,7 @@ class EquationSystem:
         c_fields = {
             eq.field_name for eq in self.equations if eq.time_derivative_order == 0
         }
-        edges, dyn_mass_targets = _inter_constraint_time_edges(
-            self.equations, c_fields
-        )
+        edges, dyn_mass_targets = _inter_constraint_time_edges(self.equations, c_fields)
 
         # Connected components over c_fields (union-find); promoted =
         # union of components containing at least one edge, plus the
@@ -1461,6 +1459,51 @@ class EquationSystem:
             for f, tags in tag_sets.items()
         }
         return SecondOrderSector(promoted=promoted, reasons=reasons)
+
+    def dependency_closure(self, seeds: Iterable[str]) -> frozenset[str]:
+        """Fields whose equations the evolution of ``seeds`` can ever read.
+
+        The transitive closure of "the equation of X references Y" from
+        ``seeds`` (a velocity reference ``v_Y`` counts as Y). Every kept
+        equation is then complete — no kept row references an omitted
+        field — so the closure evolves EXACTLY on its own. Fields outside
+        the closure that are sourced BY it do not affect its exactness;
+        they are simply not computed (GH #468 route 3: the
+        observable-sector closure that rescues the localized
+        implicit-dynamical class from the full-pencil refusal).
+
+        Structural on purpose: an edge exists whenever a term references
+        the field, whatever its coefficient's value at the run's
+        parameters — the conservative direction (never fewer fields than
+        needed).
+
+        Raises
+        ------
+        ValueError
+            If a seed is not a component of this system.
+        """
+        names = set(self.component_names)
+        seed_list = list(seeds)
+        unknown = sorted(s for s in seed_list if s not in names)
+        if unknown:
+            msg = (
+                f"dependency_closure: unknown field(s) {unknown}; "
+                f"valid: {sorted(names)}"
+            )
+            raise ValueError(msg)
+        eq_map = self.equation_map
+        closure: set[str] = set()
+        frontier = list(seed_list)
+        while frontier:
+            field = frontier.pop()
+            if field in closure:
+                continue
+            closure.add(field)
+            for term in self.equations[eq_map[field]].rhs_terms:
+                base = term.field if term.field in names else _base_field(term.field)
+                if base not in closure:
+                    frontier.append(base)
+        return frozenset(closure)
 
     # ------------------------------------------------------------------ #
     # Perturbative-order filtering (v6 plan, Stage 2)                    #
@@ -2100,6 +2143,126 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
 
 
 # --- Public loader ---
+
+
+# --- Observable-sector restriction (GH #468 route 3) ---
+
+
+@dataclass(frozen=True)
+class SpecRestriction:
+    """Provenance of a spec restricted to a dependency closure (GH #468).
+
+    Stored under ``metadata["restriction"]`` of the restricted spec so the
+    artifact is self-describing: every downstream tool can see which
+    fields were evolved, which were omitted, and why.
+    """
+
+    parent_spec: str
+    seeds: tuple[str, ...]
+    evolved: tuple[str, ...]
+    omitted: tuple[str, ...]
+    dropped_hamiltonian_terms: int
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready form."""
+        return {
+            "parent_spec": self.parent_spec,
+            "seeds": list(self.seeds),
+            "evolved": list(self.evolved),
+            "omitted": list(self.omitted),
+            "dropped_hamiltonian_terms": self.dropped_hamiltonian_terms,
+            "reason": self.reason,
+        }
+
+
+def restrict_spec_dict(  # noqa: C901
+    data: Mapping[str, Any],
+    keep: Iterable[str],
+    *,
+    parent_spec: str = "",
+    seeds: Iterable[str] = (),
+    reason: str = "",
+) -> tuple[dict[str, Any], SpecRestriction]:
+    """Restrict a raw spec dict to the fields in ``keep`` (a dependency closure).
+
+    Dict-level on purpose: the result is a first-class spec JSON that
+    :meth:`EquationSystem.from_dict` re-validates, so every downstream
+    tool (simulate, measure, inspect, resume) works on it unchanged.
+    Fields outside ``keep`` are ABSENT from the result — never
+    present-but-wrong. Hamiltonian terms touching an omitted field are
+    dropped and counted; the energy measurement refuses when the count is
+    nonzero and names the sector quantity instead.
+
+    Raises
+    ------
+    ValueError
+        If ``keep`` names an unknown field, or is not closed (a kept
+        equation references an omitted field) — pass a
+        :meth:`EquationSystem.dependency_closure`.
+    """
+    keep_set = set(keep)
+    all_names = [str(f["name"]) for f in data["fields"]]
+    unknown = sorted(keep_set - set(all_names))
+    if unknown:
+        msg = f"restrict_spec_dict: unknown field(s) {unknown}"
+        raise ValueError(msg)
+    kept_fields = [f for f in data["fields"] if f["name"] in keep_set]
+    kept_orig_idx = [int(f["index"]) for f in kept_fields]
+
+    def _base(name: str) -> str:
+        return name if name in all_names else _base_field(name)
+
+    equations: list[Any] = []
+    for eq in data["equations"]:
+        if eq["field"] not in keep_set:
+            continue
+        for term in eq["rhs"]["terms"]:
+            if _base(str(term["field"])) not in keep_set:
+                msg = (
+                    f"restrict_spec_dict: not closed — the equation for "
+                    f"{eq['field']} references omitted field {term['field']}; "
+                    f"pass a dependency closure"
+                )
+                raise ValueError(msg)
+        equations.append(eq)
+
+    out: dict[str, Any] = dict(data)
+    out["fields"] = [{**f, "index": i} for i, f in enumerate(kept_fields)]
+    out["equations"] = equations
+    for key in (
+        "mass_matrix",
+        "coupling_matrix",
+        "mass_matrix_symbolic",
+        "coupling_matrix_symbolic",
+    ):
+        matrix = data.get(key)
+        if isinstance(matrix, list) and len(matrix) == len(all_names):
+            out[key] = [[matrix[i][j] for j in kept_orig_idx] for i in kept_orig_idx]
+
+    dropped = 0
+    canonical = data.get("canonical")
+    if canonical:
+        kept_terms: list[Any] = []
+        for term in canonical.get("hamiltonian_terms", []):
+            fa = _base(str(term["factor_a"]["field"]))
+            fb = _base(str(term["factor_b"]["field"]))
+            if fa in keep_set and fb in keep_set:
+                kept_terms.append(term)
+            else:
+                dropped += 1
+        out["canonical"] = {**canonical, "hamiltonian_terms": kept_terms}
+
+    record = SpecRestriction(
+        parent_spec=parent_spec,
+        seeds=tuple(seeds),
+        evolved=tuple(str(f["name"]) for f in kept_fields),
+        omitted=tuple(n for n in all_names if n not in keep_set),
+        dropped_hamiltonian_terms=dropped,
+        reason=reason,
+    )
+    out["metadata"] = {**data.get("metadata", {}), "restriction": record.to_dict()}
+    return out, record
 
 
 def load_equation_system(

@@ -61,6 +61,68 @@ _VALID_MEASUREMENTS = frozenset(
 # ------------------------------------------------------------------
 
 
+def _restriction_guard(
+    spec_path: Path, measurements: set[str], args: Namespace
+) -> int | None:
+    """Honest-data guard for closure-restricted runs (GH #468 route 3).
+
+    A restricted run's spec carries ``metadata.restriction``. Fields
+    outside the evolved closure are ABSENT (never zero), so measurements
+    that read them cannot be computed: conversion on an omitted source or
+    target, and total energy when Hamiltonian terms were dropped, error
+    here with the sector alternative named instead of returning a wrong
+    number. Returns an exit code when the guard fires, else ``None``.
+    """
+    import json as _json
+
+    from tidal.cli._console import error_with_hint
+
+    try:
+        restriction = (
+            _json.loads(spec_path.read_text(encoding="utf-8"))
+            .get("metadata", {})
+            .get("restriction")
+        )
+    except (OSError, ValueError):
+        return None
+    if not restriction:
+        return None
+    evolved = set(restriction.get("evolved", []))
+    omitted = list(restriction.get("omitted", []))
+    dropped = int(restriction.get("dropped_hamiltonian_terms", 0))
+    if dropped and (measurements & {"energy", "conservation", "summary"}):
+        error_with_hint(
+            f"total energy is not available on a closure-restricted run: "
+            f"{dropped} Hamiltonian term(s) touch omitted fields {omitted}",
+            [
+                f"The evolved sector is {sorted(evolved)}; its conversion "
+                f"measurement is exact (`--what conversion`)",
+                "Re-run `tidal simulate` with --no-closure-restriction to attempt "
+                "the full system (it refuses at double precision, GH #468)",
+            ],
+        )
+        return 1
+    requested: set[str] = set()
+    for attr in ("source", "target"):
+        raw = getattr(args, attr, None)
+        if raw:
+            requested.update(s.strip() for s in str(raw).split(",") if s.strip())
+    missing = sorted(requested - evolved)
+    if missing:
+        error_with_hint(
+            f"field(s) {missing} were not evolved on this closure-restricted run "
+            f"(omitted: {omitted})",
+            [
+                f"Evolved sector: {sorted(evolved)} — measure within it",
+                "Re-run `tidal simulate` exciting the field you need "
+                "(--ic-component / --ic-field) so it joins the evolved closure",
+                "Or --no-closure-restriction to attempt the full system (GH #468)",
+            ],
+        )
+        return 1
+    return None
+
+
 def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
     """Resolve the JSON spec path from CLI flag or directory metadata.
 
@@ -1012,6 +1074,10 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PL
         )
         return 1
     quiet: bool = getattr(args, "quiet", False)
+
+    guard = _restriction_guard(spec_path, measurements, args)
+    if guard is not None:
+        return guard
 
     if not quiet:
         print(f"Loading: {data_path.name}")

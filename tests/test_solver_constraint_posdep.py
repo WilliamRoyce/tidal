@@ -135,7 +135,7 @@ def _run_minimal_repro(
 
 
 @pytest.mark.skip(
-    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than marked xfail. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
+    reason="GH #455 (adjudicated 2026-08-27): the ungauged-gravity localized class\n    has an implicit-dynamical sector whose full pencil no float64 operator\n    evolves faithfully (far-field gauge restoration; the probe quotient discards\n    independent equations, GH #474). These runs drive the FULL spec through\n    solve_modal, which refuses honestly; the CLI closure route (GH #468 route 3)\n    evolves the exact {h_5, a_1} sector instead. Re-enable with re-derived\n    expectations once the Kronecker-like staircase reduction lands (GH #473)."
 )
 def test_gh379_minimal_repro_does_not_diverge() -> None:
     """At α=δ=0.001 the broken theory must produce smooth perturbative dynamics.
@@ -163,7 +163,7 @@ def test_gh379_minimal_repro_does_not_diverge() -> None:
 
 
 @pytest.mark.skip(
-    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than marked xfail. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
+    reason="GH #455 (adjudicated 2026-08-27): the ungauged-gravity localized class\n    has an implicit-dynamical sector whose full pencil no float64 operator\n    evolves faithfully (far-field gauge restoration; the probe quotient discards\n    independent equations, GH #474). These runs drive the FULL spec through\n    solve_modal, which refuses honestly; the CLI closure route (GH #468 route 3)\n    evolves the exact {h_5, a_1} sector instead. Re-enable with re-derived\n    expectations once the Kronecker-like staircase reduction lands (GH #473)."
 )
 def test_gh379_alpha_zero_baseline() -> None:
     """At α=0 the torsion sector decouples; output must match Gertsenshtein."""
@@ -175,7 +175,7 @@ def test_gh379_alpha_zero_baseline() -> None:
 
 
 @pytest.mark.skip(
-    reason="GH #455: the corrected #444 velocity-row scale exposes a near-singular\n    velocity-coupling composition on the ungauged-gravity spec class (operator\n    abscissa 0.51 -> 1594, alpha-independent). These expectations were recorded\n    against the pre-#444 defective operator; on the corrected code the outcomes\n    are resolution-dependent (fail/diverge/hang), so they are skipped rather\n    than marked xfail. Re-enable with re-derived expectations once #455 adjudicates\n    truncation-vs-degeneracy (WS2 constraint-residual oracle)."
+    reason="GH #455 (adjudicated 2026-08-27): the ungauged-gravity localized class\n    has an implicit-dynamical sector whose full pencil no float64 operator\n    evolves faithfully (far-field gauge restoration; the probe quotient discards\n    independent equations, GH #474). These runs drive the FULL spec through\n    solve_modal, which refuses honestly; the CLI closure route (GH #468 route 3)\n    evolves the exact {h_5, a_1} sector instead. Re-enable with re-derived\n    expectations once the Kronecker-like staircase reduction lands (GH #473)."
 )
 def test_gh379_torsion_scales_linearly_with_alpha() -> None:
     """Torsion-field peak scales linearly with α (perturbative regime).
@@ -606,7 +606,7 @@ class TestGH444ECalRosterValidation:
     ECAL_JSON = REPO_ROOT / "examples/data/gertsenshtein_ungauged_e_dual_gaussian.json"
 
     @pytest.mark.skip(
-        reason="GH #455: E.cal shares the ungauged-gravity near-singular composition\n        (identical operator numbers to the nonminimal spec); skipped pending #455."
+        reason="GH #455 (adjudicated 2026-08-27): the FULL E.cal pencil refuses at\n        float64 (GH #474 root cause); the CLI closure route evolves the exact\n        {h_5, a_1} sector (tests/test_cli_closure_restriction.py). Re-enable once\n        the Kronecker-like staircase reduction lands (GH #473)."
     )
     def test_ecal_runs_under_modal_post_444(self) -> None:
         from tidal.solver.modal import solve_modal

@@ -15,6 +15,7 @@ from tidal.cli._console import error as _cerror
 from tidal.cli._console import error_with_hint as _cerror_hint
 from tidal.cli._console import log as _clog
 from tidal.cli._console import warn as _cwarn
+from tidal.symbolic.json_loader import EquationSystem
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -25,7 +26,6 @@ if TYPE_CHECKING:
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import AxisBCSpec, BCSpec
-    from tidal.symbolic.json_loader import EquationSystem
 
 # Default grid shapes per spatial dimension
 _DEFAULT_SHAPES: dict[int, list[int]] = {
@@ -1850,6 +1850,114 @@ def _compute_cfl_dt(
     return float(_CFL_FACTOR * dx_min)
 
 
+def _closure_seeds(args: Namespace, spec: EquationSystem) -> set[str]:
+    """Components the requested IC excites (seeds of the dependency closure).
+
+    ``--ic file`` cannot be inspected here and yields an empty set (no
+    restriction); ``--ic zero`` contributes nothing on its own; per-field
+    overrides (``--ic-field NAME:...`` or ``v_NAME``) always count.
+    """
+    if args.ic == "file":
+        return set()
+    seeds: set[str] = set()
+    if args.ic != "zero":
+        seeds.add(args.ic_component or spec.component_names[0])
+    for item in getattr(args, "ic_field", None) or []:
+        name = str(item).split(":", 1)[0].strip()
+        if name not in spec.component_names and name.startswith("v_"):
+            name = name[2:]
+        seeds.add(name)
+    return seeds & set(spec.component_names)
+
+
+def _maybe_restrict_to_observable_sector(
+    args: Namespace,
+    spec: EquationSystem,
+    json_path: Path,
+    log: Callable[[str], None],
+) -> EquationSystem:
+    """GH #468 route 3: evolve the exactly closed observable sector.
+
+    Activation is a RECOVERY FROM REFUSAL, never a default: only the
+    localized implicit-dynamical class (position-dependent coefficients
+    plus a nonempty second-order sector), whose full pencil the modal
+    builder refuses at double precision (GH #468/#474), is considered.
+    Seeds are the IC-excited components; if their dependency closure
+    avoids the implicit-dynamical sector, the run is restricted to that
+    closure — written as a first-class ``restricted_spec.json`` in the
+    output directory (which becomes the run's ``spec_path``), with the
+    omitted fields ABSENT from the outputs and the provenance recorded
+    under the spec's ``metadata.restriction``. ``--no-closure-restriction``
+    disables it, in which case the full system is attempted and refuses.
+    """
+    from tidal.solver.modal import (
+        _has_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    promoted = spec.second_order_sector.promoted
+    applies = (
+        not getattr(args, "no_closure_restriction", False)
+        and args.resume is None
+        and bool(promoted)
+        and _has_position_dependent_terms(spec)
+    )
+    if not applies:
+        return spec
+    seeds = _closure_seeds(args, spec)
+    if not seeds:
+        if args.ic == "file":
+            log(
+                "  Note: --ic file excites unknown components; "
+                "no closure restriction (GH #468)"
+            )
+        return spec
+    closure = spec.dependency_closure(seeds)
+    coupled = sorted(closure & promoted)
+    if coupled:
+        log(
+            f"  Note: the excited sector {sorted(seeds)} couples into the "
+            f"implicit-dynamical sector {coupled}; the full localized pencil "
+            f"must be evolved and currently refuses (GH #468/#474)",
+        )
+        return spec
+    if len(closure) == len(spec.component_names):
+        return spec
+
+    import json as _json
+
+    from tidal.symbolic.json_loader import restrict_spec_dict
+
+    data = _json.loads(json_path.read_text(encoding="utf-8"))
+    restricted, record = restrict_spec_dict(
+        data,
+        closure,
+        parent_spec=str(json_path),
+        seeds=sorted(seeds),
+        reason=(
+            "localized implicit-dynamical class: the full pencil refuses at "
+            "float64 (GH #468/#474); the excited sector is exactly closed and "
+            "is evolved on its own — omitted fields are absent, not zero"
+        ),
+    )
+    new_spec = EquationSystem.from_dict(restricted)
+    log(
+        f"  Closure restriction (GH #468): evolving the exactly closed sector "
+        f"{sorted(closure)}; omitted (absent from outputs): "
+        f"{list(record.omitted)}; {record.dropped_hamiltonian_terms} "
+        f"Hamiltonian term(s) dropped — total energy unavailable on this run. "
+        f"Disable with --no-closure-restriction.",
+    )
+    if args.output:
+        out_dir = Path(args.output)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        restricted_path = out_dir / "restricted_spec.json"
+        restricted_path.write_text(
+            _json.dumps(restricted, indent=2) + "\n", encoding="utf-8"
+        )
+        args.json_path = str(restricted_path)
+    return new_spec
+
+
 def _has_dissipation(spec: EquationSystem) -> bool:
     """Check if the system has dissipative terms (``first_derivative_t``).
 
@@ -2942,6 +3050,10 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
     # produce an equivalent but different-looking equation system that
     # some downstream code (energy measurement, constraint IC solver)
     # may not handle correctly.
+
+    # Step 3c: GH #468 route 3 — observable-sector closure restriction
+    # (activates only where the full localized pencil would refuse).
+    spec = _maybe_restrict_to_observable_sector(args, spec, json_path, log)
 
     # All simulation goes through the native IDA/leapfrog path
     try:

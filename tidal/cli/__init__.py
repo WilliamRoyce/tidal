@@ -413,6 +413,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Path to .npy file or simulation output directory for --ic=file.",
     )
     sim_parser.add_argument(
+        "--no-closure-restriction",
+        action="store_true",
+        help="Disable the observable-sector closure restriction (GH #468). For "
+        "localized theories with an implicit-dynamical sector whose full pencil "
+        "cannot be evolved at double precision, tidal evolves the exactly closed "
+        "sector excited by the IC and omits the rest (written as "
+        "restricted_spec.json). With this flag the full system is attempted "
+        "and refuses honestly.",
+    )
+    sim_parser.add_argument(
         "--ic-noise-seed",
         type=int,
         default=None,

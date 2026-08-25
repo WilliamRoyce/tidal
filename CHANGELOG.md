@@ -12,6 +12,30 @@ retroactively covered; see `git log` for the full history.
 
 ## [Unreleased]
 
+### Added
+
+- **Observable-sector closure for the localized implicit-dynamical class
+  (#468, route 3)**. Specs with position-dependent coefficients AND an
+  implicit-dynamical sector (order-0 rows proven dynamical by the #457
+  classification — the ungauged localized Einstein–Maxwell roster) have
+  a full pencil that no double-precision operator can evolve faithfully:
+  the far-field background restores the linearized-diffeomorphism
+  freedom below machine precision, and the probe-based gauge quotient
+  discards independent equations there (#474). `tidal simulate` now
+  computes the dependency closure of the IC-excited components
+  (`EquationSystem.dependency_closure`); when that closure avoids the
+  implicit-dynamical sector, the run is restricted to it via
+  `restrict_spec_dict`, written as a first-class `restricted_spec.json`
+  that becomes the run's `spec_path`. Fields outside the closure are
+  ABSENT from the outputs (never zero), provenance lives under the spec's
+  `metadata.restriction`, and `tidal measure` refuses total energy (when
+  Hamiltonian terms were dropped) and conversion on omitted fields with
+  the sector alternative named. Activation is a recovery from refusal
+  only; `--no-closure-restriction` attempts the full system. Measured on
+  E.cal: the {h_5, a_1} conversion sector closes the residual oracle at
+  machine precision. The general in-solver mechanism (Kronecker-like
+  staircase reduction) is tracked on #473.
+
 ### Fixed
 
 - **Marginal D_KL is now computed in the space where each prior is uniform
