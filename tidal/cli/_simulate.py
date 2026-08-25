@@ -2826,6 +2826,9 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     _check_result_finite(result)
 
     if writer is not None:
+        diag = result.get("diagnostics")  # type: ignore[typeddict-item]
+        if diag:
+            writer.extra_metadata = cast("dict[str, Any]", diag)
         writer.close()
         log(f"  {writer.count} snapshots streamed to: {writer.output_dir.resolve()}")
 

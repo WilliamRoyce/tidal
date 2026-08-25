@@ -123,6 +123,90 @@ def _restriction_guard(
     return None
 
 
+_PIN_TOL = 1e-10  # overlap below this is round-off: the observable never reads a pin
+
+
+def _gauge_certificate(
+    data_path: Path, measurements: set[str], args: Namespace
+) -> dict[str, Any] | None:
+    """Per-observable gauge certificate from the run's pinned directions.
+
+    GH #468 "pin + certify": the modal solver records, per state slot,
+    how much of the gauge-quotiented (pinned, min-norm-zero) subspace
+    lives on that slot (``solver_diagnostics.pin_overlap_max`` in
+    ``metadata.json``). A measurement whose field support carries no
+    pinned content is provably independent of the pin — ``certified``;
+    otherwise it is ``flagged`` with the overlap magnitude and the slots
+    involved, so the number is never presented as gauge-invariant when
+    it is not. Returns ``None`` when the run carries no diagnostics
+    (non-modal backends, older runs).
+    """
+    import json as _json
+
+    meta_path = data_path / "metadata.json" if data_path.is_dir() else None
+    if meta_path is None or not meta_path.exists():
+        return None
+    try:
+        diag = _json.loads(meta_path.read_text(encoding="utf-8")).get(
+            "solver_diagnostics"
+        )
+    except (OSError, ValueError):
+        return None
+    if not diag or not diag.get("slot_names"):
+        return None
+    slot_names: list[str] = list(diag["slot_names"])
+    overlap_max: list[float] = [float(v) for v in diag.get("pin_overlap_max", [])]
+    overlap = dict(zip(slot_names, overlap_max, strict=False))
+
+    field_scoped = measurements & {"conversion", "mixing", "peak_conversion"}
+    whole_state = measurements & {"energy", "conservation", "summary", "spectrum"}
+    support: set[str]
+    if field_scoped and not whole_state:
+        bases: set[str] = set()
+        for attr in ("source", "target"):
+            raw = getattr(args, attr, None)
+            if raw:
+                bases.update(s.strip() for s in str(raw).split(",") if s.strip())
+        support = {s for s in slot_names if s in bases or s[2:] in bases}
+        scope = f"fields {sorted(bases)}"
+    else:
+        support = set(slot_names)
+        scope = "whole state"
+    worst = max(((overlap.get(s, 0.0), s) for s in support), default=(0.0, ""))
+    verdict = "certified" if worst[0] <= _PIN_TOL else "flagged"
+    touched = sorted(s for s in support if overlap.get(s, 0.0) > _PIN_TOL)
+    return {
+        "verdict": verdict,
+        "scope": scope,
+        "max_pin_overlap": worst[0],
+        "worst_slot": worst[1],
+        "pinned_slots_in_support": touched,
+        "pinned_dims": int(diag.get("pinned_dims", 0)),
+        "determination_floor": float(diag.get("determination_floor", 0.0)),
+    }
+
+
+def _format_text_section_gauge_certificate(
+    lines: list[str], cert: dict[str, Any]
+) -> None:
+    """Append the gauge-certificate section to *lines*."""
+    lines.append("Gauge certificate (GH #468 pin + certify):")
+    if cert["verdict"] == "certified":
+        lines.append(
+            f"  certified — {cert['scope']} read no pinned direction "
+            f"(max pin overlap {cert['max_pin_overlap']:.1e}; "
+            f"{cert['pinned_dims']} pinned dim(s) in the run)"
+        )
+    else:
+        lines.append(
+            f"  FLAGGED — {cert['scope']} read pinned (gauge-quotiented) content: "
+            f"max overlap {cert['max_pin_overlap']:.2e} on {cert['worst_slot']}; "
+            f"slots {cert['pinned_slots_in_support']}. The value depends on the "
+            f"min-norm-zero gauge choice (floor {cert['determination_floor']:.1e})."
+        )
+    lines.append("")
+
+
 def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
     """Resolve the JSON spec path from CLI flag or directory metadata.
 
@@ -851,6 +935,8 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
         _format_text_section_asymptotic(lines, results["asymptotic"])
     if "peak_conversion" in results:
         _format_text_section_peak_conversion(lines, results["peak_conversion"])
+    if "gauge_certificate" in results:
+        _format_text_section_gauge_certificate(lines, results["gauge_certificate"])
 
     lines.append("=" * 64)
     return "\n".join(lines)
@@ -1102,6 +1188,11 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PL
         if isinstance(outcome, int):
             return outcome
         results = outcome
+
+    # GH #468 pin + certify: stamp every result with its gauge certificate.
+    certificate = _gauge_certificate(data_path, measurements, args)
+    if certificate is not None:
+        results["gauge_certificate"] = certificate
 
     # Output
     output_path: str | None = getattr(args, "output", None)

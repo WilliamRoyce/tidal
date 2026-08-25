@@ -208,3 +208,36 @@ class TestSingularPencilGaugeCompletion:
         np.testing.assert_allclose(dy[0], -0.2, atol=1e-10)
         np.testing.assert_allclose(dy[1], -0.7, atol=1e-10)
         assert SingularPencilError is not None  # class stays exported
+
+    def test_pinned_directions_are_recorded_per_slot(self) -> None:
+        """GH #468 pin + certify: the quotient reports WHAT it pinned.
+
+        The orphan (qc, vc) pair is the Kronecker chain x(λ) = (0,0,1,λ);
+        both of its slots are pinned, the oscillator's slots are not — so
+        a measurement on (qφ, vφ) is certifiable and one on (qc, vc) is
+        flagged. The per-slot overlap is the squared row norm of the
+        recorded orthonormal pinned basis.
+        """
+        from tidal.solver.modal import PencilDiagnostics
+
+        A = np.zeros((4, 4), dtype=np.complex128)
+        B = np.zeros((4, 4), dtype=np.complex128)
+        B[0, 0] = 1.0
+        A[0, 1] = 1.0
+        B[1, 1] = 1.0
+        A[1, 0] = -1.0
+        B[2, 2] = 1.0
+        A[2, 3] = 1.0
+        diag = PencilDiagnostics()
+        with pytest.warns(UserWarning, match="quotiented out"):
+            _pencil_deflate(
+                A, B, context="unit test", diagnostics=diag, tag=("evolution", 0)
+            )
+        assert len(diag.entries) == 1
+        (tag, pinned, tau) = diag.entries[0]
+        assert tag == ("evolution", 0)
+        assert tau > 0
+        assert pinned.shape == (4, 2)
+        row_overlap = np.sum(np.abs(pinned) ** 2, axis=1)
+        np.testing.assert_allclose(row_overlap[:2], 0.0, atol=1e-12)
+        np.testing.assert_allclose(row_overlap[2:], 1.0, atol=1e-12)

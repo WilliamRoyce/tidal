@@ -35,6 +35,19 @@ retroactively covered; see `git log` for the full history.
   E.cal: the {h_5, a_1} conversion sector closes the residual oracle at
   machine precision. The general in-solver mechanism (Kronecker-like
   staircase reduction) is tracked on #473.
+- **Measurement-time gauge certificate ("pin + certify", #468)**. The
+  modal engine's gauge quotient pins undetermined state directions to
+  zero (the explicit min-norm choice); the run now records, per state slot
+  and mode, how much of the pinned subspace lives on that slot
+  (`solver_diagnostics.pin_overlap` in `metadata.json`, via
+  `PencilDiagnostics`). `tidal measure` stamps every result with a
+  `gauge_certificate`: `certified` when the measurement's field support
+  reads no pinned content (provably independent of the gauge choice),
+  `flagged` with the overlap magnitude and slots otherwise — a value is
+  never presented as gauge-invariant when it is not. On the dark-photon
+  CDT spec (#465 redundant triplets) the h_5 → a_1 conversion is
+  certified and the whole-state energy is flagged, automating what the
+  FV↔CDT equivalence pin proved by hand.
 
 ### Fixed
 

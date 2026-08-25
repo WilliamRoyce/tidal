@@ -778,6 +778,7 @@ def _build_evolution_matrices(
     coeff_eval: object,  # CoefficientEvaluator
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
+    diagnostics: PencilDiagnostics | None = None,
 ) -> tuple[
     NDArray[np.complex128],  # A_rhs (n_modes, n_dyn_slots, n_dyn_slots)
     NDArray[np.complex128] | None,  # B_lhs (n_modes, n_dyn, n_dyn) or None
@@ -1247,7 +1248,11 @@ def _build_evolution_matrices(
         proj_out = np.zeros_like(A_p)
         for m in range(n_modes):
             A_out[m], proj_out[m] = _pencil_deflate(
-                A_p[m], B_p[m], context=f"{what}, mode {m}"
+                A_p[m],
+                B_p[m],
+                context=f"{what}, mode {m}",
+                diagnostics=diagnostics,
+                tag=(what, m),
             )
         return A_out, proj_out
 
@@ -1319,6 +1324,16 @@ def _build_evolution_matrices(
 
     # ---- Final composition ----
     A_rhs, manifold_proj = _compose(a_fold, b_fold, "evolution")
+    if diagnostics is not None:
+        _record_pin_overlap(
+            diagnostics,
+            layout,
+            orig_to_reduced,
+            n_modes,
+            n_dyn_slots,
+            "evolution",
+            per_mode=True,
+        )
 
     logger.info(
         "Generalized evolution: %d residual constraint fields, %d dynamical "
@@ -1962,6 +1977,7 @@ def _build_convolution_matrix_with_constraints(
     coeff_eval: CoefficientEvaluator,
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
+    diagnostics: PencilDiagnostics | None = None,
 ) -> tuple[
     NDArray[np.complex128],  # A_reduced (n_dyn_tot x n_dyn_tot)
     NDArray[np.complex128],  # recovery (n_c_tot x n_dyn_tot)
@@ -2736,8 +2752,22 @@ def _build_convolution_matrix_with_constraints(
                     eye_adj[idx, idx] = 0.0
         b_total = eye_adj - B_mass - vel_coupling_mat
         A_reduced, manifold_proj_out = _pencil_deflate(
-            A_reduced, b_total, context="pos-dep evolution pencil"
+            A_reduced,
+            b_total,
+            context="pos-dep evolution pencil",
+            diagnostics=diagnostics,
+            tag=("evolution", 0),
         )
+        if diagnostics is not None:
+            _record_pin_overlap(
+                diagnostics,
+                layout,
+                orig_to_reduced,
+                n_modes,
+                n_dyn_tot // n_modes,
+                "evolution",
+                per_mode=False,
+            )
     elif has_vel_coupling:
         B_lhs = np.eye(A_reduced.shape[0], dtype=np.complex128) - vel_coupling_mat
         try:
@@ -2963,6 +2993,96 @@ class SingularPencilError(RuntimeError):
     """
 
 
+class PencilDiagnostics:
+    """Pinned (gauge-quotiented) directions recorded during deflation.
+
+    GH #468 "pin + certify": every state direction the gauge quotient
+    sets to zero (the explicit min-norm choice) is recorded here, and the
+    builders turn the records into ``pin_overlap[mode, slot]`` — the
+    squared norm of the pinned subspace's rows on that state slot. A
+    measurement whose field support carries no pinned content is
+    provably independent of the pin (certified); one that does is
+    flagged with the magnitude by ``tidal measure`` instead of being
+    reported as if it were gauge-invariant.
+    """
+
+    def __init__(self) -> None:
+        self.entries: list[tuple[tuple[str, int], NDArray[np.complex128], float]] = []
+        self.slot_names: list[str] = []
+        self.pin_overlap: NDArray[np.float64] | None = None  # (n_modes, n_slots)
+        self.pinned_dims: int = 0
+        self.determination_floor: float = 0.0
+
+    def record(
+        self, tag: tuple[str, int], pinned: NDArray[np.complex128], tau: float
+    ) -> None:
+        """Record one deflation's pinned basis (``(n, w_dim)``, may be empty)."""
+        self.entries.append((tag, pinned, tau))
+        self.determination_floor = max(self.determination_floor, tau)
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready summary for run metadata (``solver_diagnostics``)."""
+        overlap = (
+            self.pin_overlap
+            if self.pin_overlap is not None
+            else np.zeros((0, len(self.slot_names)))
+        )
+        return {
+            "slot_names": list(self.slot_names),
+            "pin_overlap_max": [
+                float(v) for v in (overlap.max(axis=0) if overlap.size else [])
+            ],
+            "pin_overlap": [[float(v) for v in row] for row in overlap],
+            "pinned_dims": int(self.pinned_dims),
+            "determination_floor": float(self.determination_floor),
+        }
+
+
+def _reduced_slot_names(
+    layout: StateLayout, orig_to_reduced: dict[int, int], n_red: int
+) -> list[str]:
+    """Names of the reduced state slots (fields and ``v_``-velocities)."""
+    names = [""] * n_red
+    for name, s in layout.field_slot_map.items():
+        if s in orig_to_reduced:
+            names[orig_to_reduced[s]] = name
+    for name, s in layout.velocity_slot_map.items():
+        if s in orig_to_reduced:
+            names[orig_to_reduced[s]] = f"v_{name}"
+    return names
+
+
+def _record_pin_overlap(
+    diagnostics: PencilDiagnostics,
+    layout: StateLayout,
+    orig_to_reduced: dict[int, int],
+    n_modes: int,
+    n_red: int,
+    kind: str,
+    *,
+    per_mode: bool,
+) -> None:
+    """Turn recorded pinned bases into ``pin_overlap[mode, slot]``.
+
+    ``per_mode=True``: one pencil per mode, rows = reduced slots.
+    ``per_mode=False``: one full-FFT pencil, row ``r*n_modes + m``.
+    """
+    overlap = np.zeros((n_modes, n_red))
+    total = 0
+    for (tag_kind, m), w, _tau in diagnostics.entries:
+        if tag_kind != kind or w.shape[1] == 0:
+            continue
+        total += w.shape[1]
+        rows = np.sum(np.abs(w) ** 2, axis=1)
+        if per_mode:
+            overlap[m, :] += rows
+        else:
+            overlap += rows.reshape(n_red, n_modes).T
+    diagnostics.slot_names = _reduced_slot_names(layout, orig_to_reduced, n_red)
+    diagnostics.pin_overlap = overlap
+    diagnostics.pinned_dims = total
+
+
 def _gauge_quotient_pencil(
     A_n: NDArray[np.complex128],
     B_n: NDArray[np.complex128],
@@ -2970,7 +3090,12 @@ def _gauge_quotient_pencil(
     context: str,
     *,
     tau: float,
-) -> tuple[NDArray[np.complex128], NDArray[np.complex128], NDArray[np.complex128]]:
+) -> tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
     """Quotient a singular pencil by its Kronecker column-chain space.
 
     For a singular pencil, ``λ₀B − A`` is singular at EVERY λ₀, and its
@@ -2984,9 +3109,17 @@ def _gauge_quotient_pencil(
     pre-#457 machinery documented for undetermined modes), restrict the
     pencil to W's orthogonal complement C, and row-compress the
     restricted equations to a square regular pencil. Returns
-    ``(A_red, B_red, C)`` with the reduced pencil expressed in the
-    C-basis; the caller composes the generator back through C and uses
-    ``C·C^H`` as the (gauge-zeroing) part of the IC projection.
+    ``(A_red, B_red, C, W)`` with the reduced pencil expressed in the
+    C-basis and ``W`` the orthonormal basis of the pinned (zeroed)
+    directions; the caller composes the generator back through C, uses
+    ``C·C^H`` as the (gauge-zeroing) part of the IC projection, and
+    records ``W`` for the measurement-time gauge certificate (GH #468).
+
+    KNOWN LIMIT (GH #474): the row compression assumes the restricted
+    equations have exactly ``n_red`` independent combinations — true for
+    exact chains (GH #465), false for near-null quotients of localized
+    backgrounds, where it discards genuine equations; the general fix is
+    the Kronecker-like staircase reduction (GH #473).
 
     Emits a warning — a spec that hits this every run should be
     re-derived without the redundancy (GH #465) or gauge-fixed in the
@@ -3050,7 +3183,7 @@ def _gauge_quotient_pencil(
         f"gauge-fix it ([[gauge]] in the TOML).",
         stacklevel=4,
     )
-    return a_red, b_red, c_basis
+    return a_red, b_red, c_basis, u_w[:, :w_dim]
 
 
 def _pencil_deflate(
@@ -3058,6 +3191,8 @@ def _pencil_deflate(
     B_pencil: NDArray[np.complex128],
     *,
     context: str = "",
+    diagnostics: PencilDiagnostics | None = None,
+    tag: tuple[str, int] = ("pencil", 0),
 ) -> tuple[NDArray[np.complex128], NDArray[np.complex128]]:
     """Deflating-subspace reduction of one mode's pencil ``B·ẏ = A·y``.
 
@@ -3144,9 +3279,10 @@ def _pencil_deflate(
     tau = tau0
     last_err: SingularPencilError | None = None
     while tau <= tau_max:
+        pinned = np.zeros((n, 0), dtype=np.complex128)
         try:
             if _probe_smin(A_n, B_n) < tau:
-                a_red, b_red, c_basis = _gauge_quotient_pencil(
+                a_red, b_red, c_basis, pinned = _gauge_quotient_pencil(
                     A_n, B_n, probe_points, context, tau=tau
                 )
                 a_eff_red, proj_red = _deflate_regular_pencil(
@@ -3164,6 +3300,8 @@ def _pencil_deflate(
             last_err = exc
             tau *= 10.0
             continue
+        if diagnostics is not None:
+            diagnostics.record(tag, pinned, tau)
         if tau > tau0:
             import warnings as _warnings  # noqa: PLC0415
 
@@ -3328,7 +3466,7 @@ def _deflate_eig_subspace(
         bq = B_n @ q_basis
         aq = A_n @ q_basis
         lstsq_out = lstsq(bq, aq)
-        assert lstsq_out[0] is not None  # None only for degenerate driver args
+        assert lstsq_out is not None  # scipy stubs type the result Optional
         g_red = np.asarray(lstsq_out[0], dtype=np.complex128)
         res = _contract_residual(A_n, B_n, q_basis, g_red)
         if best is None or res < best[2]:
@@ -4197,6 +4335,10 @@ def solve_modal(
 
     has_pos_dep = _has_position_dependent_terms(spec)
     has_time_ops = _has_time_derivative_operators(spec)
+    # GH #468 "pin + certify": the builders record every gauge-quotiented
+    # (pinned) direction here; the per-slot overlap goes into the run's
+    # metadata so `tidal measure` can certify each observable.
+    diagnostics = PencilDiagnostics()
 
     # Single evolution-matrix builder handles:
     #   - algebraic constraint fields (time_derivative_order=0) via Schur
@@ -4266,6 +4408,7 @@ def solve_modal(
             coeff_eval,
             k_grid_full,
             full_shape,
+            diagnostics=diagnostics,
         )
         recovery_matrix = recovery_2d
         c_names = c_names_list
@@ -4405,6 +4548,7 @@ def solve_modal(
             coeff_eval,
             k_grid,
             rfft_shape,
+            diagnostics=diagnostics,
         )
 
         n_dyn = A_reduced.shape[1]
@@ -4593,6 +4737,8 @@ def solve_modal(
     # systems, constraint_vel_arrays is empty.
     if constraint_vel_arrays:
         result["constraint_velocities"] = constraint_vel_arrays  # type: ignore[typeddict-unknown-key]
+    if diagnostics.slot_names:
+        result["diagnostics"] = diagnostics.to_dict()  # type: ignore[typeddict-unknown-key]
 
     # Stage 3 (v6): expose Pass 0 eigendecomposition for Pass 1 Duhamel.
     if return_eigendata:
