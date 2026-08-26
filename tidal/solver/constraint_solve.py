@@ -1001,16 +1001,16 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
     from tidal.solver.state import StateLayout  # noqa: PLC0415
 
     # Collect the RESIDUAL constraint equations. Promoted order-0 rows
-    # (GH #457, spec.second_order_sector) are second-order-sector members
+    # (GH #457, spec.implicit_dynamical_sector) are second-order-sector members
     # whose consistency the modal builder enforces exactly via the
     # constraint-manifold projection of the IC — solving their TRUNCATED
     # form here (this solver drops acceleration operators,
     # _ACCEL_AND_HIGHER_OPS) would enforce a different equation and fight
     # that projection.
-    promoted = spec.second_order_sector.promoted
+    promoted = spec.implicit_dynamical_sector.fields
     if promoted:
         logger.info(
-            "Constraint IC: fields %s are promoted to the second-order "
+            "Constraint IC: fields %s are in the implicit-dynamical "
             "sector (GH #457); their consistency is enforced by the modal "
             "manifold projection, not the algebraic IC solve.",
             sorted(promoted),

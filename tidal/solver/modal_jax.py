@@ -228,13 +228,13 @@ def _solve_modal_jax_constrained(  # noqa: PLR0917
     )
 
     # GH #457: this path folds B via a plain batched solve with no null
-    # projection, so a promoted second-order sector would silently produce
+    # projection, so a implicit-dynamical sector would silently produce
     # wrong operators (the numpy path uses QZ / null-frozen semantics).
     # Refuse until the pencil machinery is ported (GH #463 tracks parity).
-    promoted = spec.second_order_sector.promoted
+    promoted = spec.implicit_dynamical_sector.fields
     if promoted:
         msg = (
-            f"modal-jax cannot evolve specs with a promoted second-order "
+            f"modal-jax cannot evolve specs with an implicit-dynamical "
             f"sector (fields: {sorted(promoted)}); the numpy modal solver "
             f"handles them. See GH #457."
         )

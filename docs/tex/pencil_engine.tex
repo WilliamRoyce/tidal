@@ -125,9 +125,10 @@ acceleration substitution exact.
 
 \texttt{time\_derivative\_order} states the true left-hand-side fact of a
 row; it does not guarantee the row is algebraic. The one definition of
-the split is \texttt{EquationSystem.second\_order\_sector} (the
-\emph{implicit-dynamical sector}; the code still uses the historical
-attribute names, see GH \#468 Arc B$'$ item~9), with two rules:
+the split is \texttt{EquationSystem.implicit\_dynamical\_sector} (renamed from the
+historical \texttt{second\_order\_sector} on 2026-08-28;
+\texttt{StateLayout.implicit\_dynamical\_fields} likewise), with two
+rules:
 
 \begin{description}
   \item[Rule 1 (inter-constraint time chains).] An order-0 row that

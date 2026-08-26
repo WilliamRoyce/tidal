@@ -798,7 +798,7 @@ def _build_evolution_matrices(
 
     plus residual algebraic rows, uniformly (GH #457 rework):
 
-    1. The promoted second-order sector (``spec.second_order_sector``) —
+    1. The implicit-dynamical sector (``spec.implicit_dynamical_sector``) —
        order-0 rows carrying inter-constraint time derivatives — joins the
        dynamical field set with pure off-diagonal mass rows; only RESIDUAL
        rows are Schur-eliminated (``recovery = −S_cc⁻¹·S_cd``).
@@ -857,11 +857,11 @@ def _build_evolution_matrices(
 
     # ---- Identify constraint and dynamical fields ----
     # GH #457: order-0 rows carrying inter-constraint time derivatives
-    # (the promoted second-order sector, per the ONE classification in
-    # EquationSystem.second_order_sector) are NOT algebraic — they join
+    # (the implicit-dynamical sector, per the ONE classification in
+    # EquationSystem.implicit_dynamical_sector) are NOT algebraic — they join
     # the dynamical sector below. Only the residual rows are Schur-
     # eliminated here.
-    promoted_fields = spec.second_order_sector.promoted
+    promoted_fields = spec.implicit_dynamical_sector.fields
     constraint_field_names: list[str] = [
         eq.field_name
         for eq in spec.equations
@@ -945,7 +945,7 @@ def _build_evolution_matrices(
     for fi, fname in enumerate(dyn_field_names):
         eq_f = eq_for_field[fname]
         if fname in promoted_fields:
-            # GH #457: a promoted row has an ALGEBRAIC LHS — there is no
+            # GH #457: a implicit-dynamical row has an ALGEBRAIC LHS — there is no
             # ẍ_self term, so its mass-matrix diagonal is exactly 0 (its
             # mass content is the off-diagonal d2_t cross terms collected
             # in the term loop below). The M = 1 JSON convention applies
@@ -1042,7 +1042,7 @@ def _build_evolution_matrices(
                         f"classification invariant violated: residual row "
                         f"{eq.field_name!r} carries a time reference "
                         f"{term.operator}({term.field}) to residual field "
-                        f"{res_base!r} — second_order_sector should have "
+                        f"{res_base!r} — implicit_dynamical_sector should have "
                         f"promoted both (GH #457)"
                     )
                     raise AssertionError(msg)
@@ -1111,7 +1111,7 @@ def _build_evolution_matrices(
                 else:
                     # Classification invariant (GH #457): an order-0
                     # field whose acceleration any row references is
-                    # promoted by second_order_sector (algebraic recovery
+                    # promoted by implicit_dynamical_sector (algebraic recovery
                     # cannot supply q̈), so it cannot be in c_idx_map
                     # here. The OLD dispatch folded q̈_c as q_c
                     # (t_order-blind — GH #458).
@@ -1120,7 +1120,7 @@ def _build_evolution_matrices(
                         f"{eq.field_name!r} carries {term.operator}"
                         f"({term.field}) (total time order {total_t}) of "
                         f"residual field {base_field!r} — "
-                        f"second_order_sector should have promoted it "
+                        f"implicit_dynamical_sector should have promoted it "
                         f"(GH #457)"
                     )
                     raise AssertionError(msg)
@@ -1160,7 +1160,7 @@ def _build_evolution_matrices(
     # The dynamical-sector rows form a first-order pencil  B·ẏ = A·y  over
     # the reduced slots, with ALL mass content on the B side: the LHS
     # kinetic on the velocity-row diagonal, RHS d2_t/accel cross terms
-    # off-diagonal (moved to the LHS), and promoted rows (GH #457)
+    # off-diagonal (moved to the LHS), and implicit-dynamical rows (GH #457)
     # carrying no kinetic at all. K/D content sits RAW on the A side — the
     # row scale lives in B, which makes the residual-constraint couplings
     # (A_dc, folded in below) scale-correct by construction: the old
@@ -1181,7 +1181,7 @@ def _build_evolution_matrices(
     if use_engine:
         logger.info(
             "Pencil composition: QZ deflating-subspace engine "
-            "(singular mass: %s; promoted sector: %s)",
+            "(singular mass: %s; implicit-dynamical sector: %s)",
             has_singular_M,
             sorted(promoted_fields) if promoted_fields else "none",
         )
@@ -1192,7 +1192,7 @@ def _build_evolution_matrices(
         if use_engine:
             msg = (
                 "Jerk (d3_t) terms combined with a singular mass matrix or "
-                "a promoted second-order sector are not supported — the "
+                "a implicit-dynamical sector are not supported — the "
                 "jerk substitution needs M⁻¹. GH #457."
             )
             raise NotImplementedError(msg)
@@ -1989,7 +1989,7 @@ def _build_convolution_matrix_with_constraints(
 ]:
     """Build reduced evolution matrix for pos-dep theories with constraints.
 
-    GH #457: promoted order-0 rows (``spec.second_order_sector``) join
+    GH #457: implicit-dynamical order-0 rows (``spec.implicit_dynamical_sector``) join
     the dynamical sector as pencil rows with mass content on the B side;
     the composition runs the deflating-subspace engine when B is
     singular, returning the manifold projector for on-manifold ICs.
@@ -2054,9 +2054,9 @@ def _build_convolution_matrix_with_constraints(
     n_modes = int(np.prod(rfft_shape))
 
     # ---- Classify equations ----
-    # GH #457: promoted order-0 rows (second_order_sector) join the
+    # GH #457: implicit-dynamical order-0 rows (implicit_dynamical_sector) join the
     # dynamical sector; only RESIDUAL rows are Schur-eliminated.
-    promoted_fields = spec.second_order_sector.promoted
+    promoted_fields = spec.implicit_dynamical_sector.fields
     dyn_field_names: list[str] = [
         eq.field_name
         for eq in spec.equations
@@ -2071,7 +2071,7 @@ def _build_convolution_matrix_with_constraints(
     c_idx_map: dict[str, int] = {n: i for i, n in enumerate(constraint_field_names)}
     n_c = len(constraint_field_names)
 
-    # GH #468 (constraints-as-slots): when a promoted second-order sector
+    # GH #468 (constraints-as-slots): when a implicit-dynamical sector
     # is present, the residual constraints are NOT pre-eliminated —
     # Schur recovery on the localized residual K_cc injects ‖·‖ ~ 1/B₀⁴
     # entries into the pencil, collapsing the deflation's tolerance
@@ -2081,7 +2081,8 @@ def _build_convolution_matrix_with_constraints(
     # stays at natural equation scale, the deferred d2_t(dyn)
     # substitution becomes EXACT B-side content, and the deflation
     # handles elimination + promotion + IC projection in one object.
-    # Non-promoted specs keep the classic Schur route bit-for-bit.
+    # Specs without an implicit-dynamical sector keep the classic Schur
+    # route bit-for-bit.
     constraints_as_slots = bool(promoted_fields)
 
     # ---- Reduced slot mapping ----
@@ -2218,9 +2219,9 @@ def _build_convolution_matrix_with_constraints(
     n_c_tot = (0 if constraints_as_slots else n_c) * n_modes
     A_dd = np.zeros((n_dyn_tot, n_dyn_tot), dtype=np.complex128)
     # GH #457: B-side mass content of the pencil B·ẏ = A·y. Collected as
-    # POSITIVE contributions of RHS q̈-target terms (and promoted-row
+    # POSITIVE contributions of RHS q̈-target terms (and implicit-dynamical-row
     # mass); composed below as B = I_adj − B_mass − vel_coupling, where
-    # I_adj has 0 on promoted velocity-row diagonals (their LHS is
+    # I_adj has 0 on implicit-dynamical velocity-row diagonals (their LHS is
     # algebraic — no v̇_self term).
     B_mass = np.zeros((n_dyn_tot, n_dyn_tot), dtype=np.complex128)
     has_b_mass = bool(promoted_fields)
@@ -2417,7 +2418,7 @@ def _build_convolution_matrix_with_constraints(
                     else:
                         # d2_t(dyn_field): q̈ cross coupling = mass-side
                         # content of the pencil B·ẏ = A·y (GH #457) —
-                        # this includes the promoted rows' M_cc terms.
+                        # this includes the implicit-dynamical rows' M_cc terms.
                         target_red = orig_to_reduced[
                             layout.velocity_slot_map[base_field]
                         ]
@@ -2731,10 +2732,10 @@ def _build_convolution_matrix_with_constraints(
     # ---- Final composition of the pencil B·ẏ = A·y ----------------------
     #   A = A_dd + A_dc_field·recovery   (accumulated above)
     #   B = I_adj − B_mass − vel_coupling_mat
-    # where I_adj zeroes the promoted velocity-row diagonals (their LHS is
+    # where I_adj zeroes the implicit-dynamical velocity-row diagonals (their LHS is
     # algebraic — no v̇_self, GH #457). When B has mass content the pencil
     # is composed by the deflating-subspace engine (singular B: the
-    # promoted sector's constraint chains are deflated exactly, with the
+    # implicit-dynamical sector's constraint chains are deflated exactly, with the
     # manifold projector returned for on-manifold ICs); when only velocity
     # coupling is present, B = I − vc is the classic invertible pre-solve.
     manifold_proj_out: NDArray[np.complex128] | None = None
@@ -3315,7 +3316,7 @@ def _pencil_deflate(
     # (genuine near-index breakdown, GH #467).
     tau0 = n * 1e-12
     # tau_max = 1e-4 is the ACCEPTED determination floor for the
-    # localized promoted class (user decision 2026-08-26, GH #468/#470):
+    # localized implicit-dynamical class (user decision 2026-08-26, GH #468/#470):
     # the far-field gauge-restoration continuum makes machine-precision
     # closure unachievable at float64, and content determined more
     # weakly than ~1e-4 is physically fading (B0 -> 0 there). The
@@ -4489,7 +4490,7 @@ def solve_modal(
         for orig_si, red_pos in orig_to_reduced.items():
             y0_hat_dyn[red_pos] = y0_hat_full[orig_si]
 
-        # GH #457: promoted second-order sector — project the IC onto
+        # GH #457: implicit-dynamical sector — project the IC onto
         # the constraint manifold (off-manifold directions are frozen by
         # the deflated generator; a component left off the manifold
         # would persist as a constant constraint violation).
@@ -4606,7 +4607,7 @@ def solve_modal(
         for orig_si, red_pos in orig_to_reduced.items():
             y0_hat_dyn[red_pos] = y0_hat[orig_si]
 
-        # GH #457: when the pencil engine reduced the sector (promoted or
+        # GH #457: when the pencil engine reduced the sector (implicit-dynamical or
         # singular-mass), project the IC onto the constraint manifold —
         # off-manifold directions are frozen by the generator, so a
         # component left off the manifold would persist as a constant constraint

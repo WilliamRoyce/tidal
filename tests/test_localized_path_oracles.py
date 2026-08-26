@@ -219,7 +219,7 @@ class ResidualOracle:
 # ---------------------------------------------------------------------------
 
 
-def _path4_state(
+def _path4_state(  # noqa: C901
     spec: EquationSystem,
     grid: GridInfo,
     params: dict[str, float],
@@ -407,7 +407,7 @@ class TestPath4ECalAdjudication:
         assert record.omitted
         assert record.dropped_hamiltonian_terms > 0
         spec = EquationSystem.from_dict(restricted)
-        assert not spec.second_order_sector.promoted
+        assert not spec.implicit_dynamical_sector.fields
         grid = GridInfo(bounds=((0.0, 100.0),), shape=(24,), periodic=(True,))
         st = _path4_state(spec, grid, PHASE_E_PARAMS)
         res, gaps = ResidualOracle(spec, grid, PHASE_E_PARAMS).residuals(

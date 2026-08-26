@@ -121,7 +121,7 @@ def operator_time_order(name: str) -> int:
     velocity slot (``v_``-prefixed field name).
 
     This is the single symbolic-side source of truth used by
-    :attr:`EquationSystem.second_order_sector` (GH #457); solver-side
+    :attr:`EquationSystem.implicit_dynamical_sector` (GH #457); solver-side
     operator decompositions must agree with it.
     """
     if name == "first_derivative_t":
@@ -965,7 +965,7 @@ def _inter_constraint_time_edges(
 
 
 @dataclass(frozen=True)
-class SecondOrderSector:
+class ImplicitDynamicalSector:
     """Constraint-classified rows that carry second-order structure.
 
     ``time_derivative_order == 0`` states the true LHS fact of a row; it
@@ -976,7 +976,7 @@ class SecondOrderSector:
     (Schur) elimination cannot represent — folding them as algebraic is
     the GH #457 defect, measured at O(1) residuals on 20 shipped specs.
 
-    ``promoted`` is the closure of that subsystem: the connected
+    ``fields`` is the closure of that subsystem: the connected
     components (over order-0 rows, with an edge for every inter-constraint
     time reference) that contain at least one edge. Promoted rows must be
     routed through the rank-deficient-mass machinery (state slots, mass
@@ -986,16 +986,16 @@ class SecondOrderSector:
     stored LHS fact.
 
     ONE-DEFINITION RULE: this accessor is the only source of the
-    promoted/residual split. Routing or layout code must consult it —
+    implicit-dynamical/residual split. Routing or layout code must consult it —
     never test ``time_derivative_order == 0`` directly for a routing
     decision, and never introduce a second classification path.
 
     Attributes
     ----------
-    promoted : frozenset[str]
-        Field names of the promoted order-0 rows.
+    fields : frozenset[str]
+        Field names of the implicit-dynamical order-0 rows.
     reasons : Mapping[str, str]
-        Per promoted field, why it is in the sector: ``carries M_cc`` /
+        Per implicit-dynamical field, why it is in the sector: ``carries M_cc`` /
         ``carries D_cc`` (the row references another constraint's
         acceleration / velocity), ``mass-targeted`` / ``velocity-targeted``
         (another constraint row references this field's acceleration /
@@ -1003,7 +1003,7 @@ class SecondOrderSector:
         Multiple tags are ``+``-joined in sorted order.
     """
 
-    promoted: frozenset[str]
+    fields: frozenset[str]
     reasons: Mapping[str, str]
 
 
@@ -1399,10 +1399,10 @@ class EquationSystem:
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
 
     @cached_property
-    def second_order_sector(self) -> SecondOrderSector:
+    def implicit_dynamical_sector(self) -> ImplicitDynamicalSector:
         """Promoted order-0 rows carrying second-order structure (GH #457).
 
-        See :class:`SecondOrderSector` for semantics and the
+        See :class:`ImplicitDynamicalSector` for semantics and the
         one-definition rule. The classification is provenance-agnostic:
         it reads whatever equations this system holds, so JSON-native
         order-0 rows and ε-demoted base-spec rows are treated
@@ -1458,7 +1458,7 @@ class EquationSystem:
             f: "+".join(sorted(tags)) if tags else "closure"
             for f, tags in tag_sets.items()
         }
-        return SecondOrderSector(promoted=promoted, reasons=reasons)
+        return ImplicitDynamicalSector(fields=promoted, reasons=reasons)
 
     def dependency_closure(self, seeds: Iterable[str]) -> frozenset[str]:
         """Fields whose equations the evolution of ``seeds`` can ever read.

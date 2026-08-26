@@ -149,7 +149,7 @@ class ConversionStabilityResult:
     :data:`PROBE_PROFILE_NAME` for results produced by this module."""
 
 
-def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
+def check_conversion_stability(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0914, PLR0915
     spec: EquationSystem,
     grid: GridInfo,
     parameters: dict[str, float],

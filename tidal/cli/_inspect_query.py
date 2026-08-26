@@ -195,10 +195,10 @@ def _equation_lines(  # noqa: PLR0913
 
     if equation.time_derivative_order:
         lhs = f"d{equation.time_derivative_order}_t({field})"
-    elif field in spec.second_order_sector.promoted:
+    elif field in spec.implicit_dynamical_sector.fields:
         # Algebraic LHS carrying inter-constraint time derivatives: the
         # row belongs to the second-order sector (GH #457).
-        lhs = f"{field} (algebraic LHS — promoted to second-order sector, GH #457)"
+        lhs = f"{field} (algebraic LHS — implicit-dynamical sector, GH #457)"
     else:
         lhs = f"{field} (constraint)"
     text = [

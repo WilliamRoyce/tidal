@@ -65,11 +65,11 @@ class RHSEvaluator:
         # represent. Refuse HERE — the shared entry of IDA/CVODE/leapfrog/
         # scipy — instead of failing later with a missing-v_-slot KeyError
         # or silently evaluating a truncated equation.
-        promoted = spec.second_order_sector.promoted
+        promoted = spec.implicit_dynamical_sector.fields
         if promoted:
             msg = (
                 f"This spec's constraint closure couples second-order "
-                f"structure among its order-0 rows (promoted fields: "
+                f"structure among its order-0 rows (implicit-dynamical fields: "
                 f"{sorted(promoted)}). Time-domain backends cannot represent "
                 f"inter-constraint time-derivative terms; use the modal "
                 f"solver (auto-selected for flat-metric periodic specs). "

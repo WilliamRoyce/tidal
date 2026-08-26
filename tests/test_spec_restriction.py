@@ -147,13 +147,13 @@ class TestECalCorpusPin:
 
     def test_observable_sector_is_exactly_closed(self, ecal) -> None:
         _data, spec = ecal
-        assert spec.second_order_sector.promoted  # the class that refuses
+        assert spec.implicit_dynamical_sector.fields  # the class that refuses
         assert spec.dependency_closure({"h_5", "a_1"}) == {"h_5", "a_1"}
 
     def test_counter_case_pulls_the_implicit_dynamical_sector(self, ecal) -> None:
         _data, spec = ecal
         closure = spec.dependency_closure({"a_2"})
-        assert closure & spec.second_order_sector.promoted
+        assert closure & spec.implicit_dynamical_sector.fields
 
     def test_restricted_ecal_has_no_implicit_dynamical_sector(self, ecal) -> None:
         data, spec = ecal
@@ -165,6 +165,6 @@ class TestECalCorpusPin:
             "a_1",
             "h_5",
         }
-        assert not sub.second_order_sector.promoted
+        assert not sub.implicit_dynamical_sector.fields
         assert record.dropped_hamiltonian_terms > 0
         assert set(record.omitted) == set(spec.component_names) - {"h_5", "a_1"}

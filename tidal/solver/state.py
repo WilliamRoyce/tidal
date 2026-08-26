@@ -86,8 +86,8 @@ class StateLayout:
     field_slot_map: dict[str, int]
     velocity_slot_map: dict[str, int]
     dynamical_fields: tuple[str, ...]
-    promoted: frozenset[str] = frozenset()
-    """Order-0 fields promoted to the second-order sector (GH #457).
+    implicit_dynamical_fields: frozenset[str] = frozenset()
+    """Order-0 fields in the implicit-dynamical sector (GH #457).
 
     These have field + velocity slots like ``order >= 2`` fields (their
     inter-constraint time-derivative couplings make them dynamical), but
@@ -106,12 +106,13 @@ class StateLayout:
 
         Follows the same ordering as py-pde FieldCollection:
         for each equation, emit a field slot; if second-order — or
-        promoted to the second-order sector (GH #457) — also emit a
+        in the implicit-dynamical sector (GH #457) — also emit a
         velocity slot immediately after. There is ONE layout rule for
-        all backends; backends that cannot represent the promoted
-        sector refuse at their entry (RHSEvaluator / modal_jax).
+        all backends; backends that cannot represent the
+        implicit-dynamical sector refuse at their entry
+        (RHSEvaluator / modal_jax).
         """
-        promoted = spec.second_order_sector.promoted
+        promoted = spec.implicit_dynamical_sector.fields
         slots: list[SlotInfo] = []
         field_slot_map: dict[str, int] = {}
         velocity_slot_map: dict[str, int] = {}
@@ -161,7 +162,7 @@ class StateLayout:
             field_slot_map=field_slot_map,
             velocity_slot_map=velocity_slot_map,
             dynamical_fields=tuple(dynamical_fields),
-            promoted=promoted,
+            implicit_dynamical_fields=promoted,
         )
 
     @cached_property

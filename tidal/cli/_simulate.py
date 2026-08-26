@@ -1894,7 +1894,7 @@ def _maybe_restrict_to_observable_sector(
         _has_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
     )
 
-    promoted = spec.second_order_sector.promoted
+    promoted = spec.implicit_dynamical_sector.fields
     applies = (
         not getattr(args, "no_closure_restriction", False)
         and args.resume is None
@@ -2406,7 +2406,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
         with contextlib.suppress(ValueError, NotImplementedError):
             # May raise ValueError for systems with time-derivative operators
             # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
-            # cannot handle, or NotImplementedError for promoted second-order
+            # cannot handle, or NotImplementedError for implicit-dynamical
             # sectors (GH #457). These are simulated by the modal solver's
             # generalized mass-matrix path which works directly in Fourier
             # space — the diagnostic is optional there.

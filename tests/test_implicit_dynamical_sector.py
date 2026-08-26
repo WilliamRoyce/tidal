@@ -1,7 +1,7 @@
 """GH #457 Stage 1: the second-order-sector classification (json_loader).
 
-``EquationSystem.second_order_sector`` is the ONE definition of the
-promoted/residual split of order-0 rows (see :class:`SecondOrderSector`
+``EquationSystem.implicit_dynamical_sector`` is the ONE definition of the
+promoted/residual split of order-0 rows (see :class:`ImplicitDynamicalSector`
 for the one-definition rule). These tests are its regression contract:
 
 * unit tests pin the predicate (edge seeding, closure, deliberate
@@ -107,8 +107,8 @@ class TestClassificationPredicate:
                 "phi": (2, [("laplacian_x", "phi")]),
             }
         )
-        s = spec.second_order_sector
-        assert s.promoted == frozenset({"c_a", "c_b"})
+        s = spec.implicit_dynamical_sector
+        assert s.fields == frozenset({"c_a", "c_b"})
         assert s.reasons["c_a"] == "carries M_cc"
         assert s.reasons["c_b"] == "mass-targeted"
 
@@ -120,8 +120,8 @@ class TestClassificationPredicate:
                 "phi": (2, []),
             }
         )
-        s = spec.second_order_sector
-        assert s.promoted == frozenset({"c_a", "c_b"})
+        s = spec.implicit_dynamical_sector
+        assert s.fields == frozenset({"c_a", "c_b"})
         assert s.reasons["c_a"] == "carries D_cc"
         assert s.reasons["c_b"] == "velocity-targeted"
 
@@ -133,7 +133,7 @@ class TestClassificationPredicate:
                 "phi": (2, []),
             }
         )
-        assert spec.second_order_sector.promoted == frozenset({"c_a", "c_b"})
+        assert spec.implicit_dynamical_sector.fields == frozenset({"c_a", "c_b"})
 
     def test_velocity_of_velocity_counts_as_mass(self) -> None:
         # first_derivative_t(v_C) = ẍ_C: total time order 2 → M_cc
@@ -144,7 +144,7 @@ class TestClassificationPredicate:
                 "phi": (2, []),
             }
         )
-        s = spec.second_order_sector
+        s = spec.implicit_dynamical_sector
         assert s.reasons["c_a"] == "carries M_cc"
         assert s.reasons["c_b"] == "mass-targeted"
 
@@ -159,7 +159,7 @@ class TestClassificationPredicate:
                 "phi": (2, []),
             }
         )
-        assert spec.second_order_sector.promoted == frozenset({"c_a", "c_b", "c_c"})
+        assert spec.implicit_dynamical_sector.fields == frozenset({"c_a", "c_b", "c_c"})
 
     def test_spatial_only_coupling_never_promotes(self) -> None:
         # Inter-constraint SPATIAL coupling is S_cc's legitimate job.
@@ -170,7 +170,7 @@ class TestClassificationPredicate:
                 "phi": (2, []),
             }
         )
-        assert spec.second_order_sector.promoted == frozenset()
+        assert spec.implicit_dynamical_sector.fields == frozenset()
 
     def test_constraint_time_ref_of_dynamical_never_promotes(self) -> None:
         # Handled by S_cd velocity slots / deferred substitution — a
@@ -181,7 +181,7 @@ class TestClassificationPredicate:
                 "phi": (2, []),
             }
         )
-        assert spec.second_order_sector.promoted == frozenset()
+        assert spec.implicit_dynamical_sector.fields == frozenset()
 
     def test_dynamical_row_velocity_refs_never_seed(self) -> None:
         # First-order references from dynamical rows are exact through
@@ -192,7 +192,7 @@ class TestClassificationPredicate:
                 "phi": (2, [("first_derivative_t", "c_a"), ("gradient_x", "v_c_a")]),
             }
         )
-        assert spec.second_order_sector.promoted == frozenset()
+        assert spec.implicit_dynamical_sector.fields == frozenset()
 
     def test_dynamical_row_acceleration_ref_promotes_target(self) -> None:
         # q̈ of an eliminated field is jerk-level through a velocity-
@@ -204,21 +204,21 @@ class TestClassificationPredicate:
                 "phi": (2, [("d2_t", "c_a")]),
             }
         )
-        s2 = spec.second_order_sector
-        assert s2.promoted == frozenset({"c_a"})
+        s2 = spec.implicit_dynamical_sector
+        assert s2.fields == frozenset({"c_a"})
         assert s2.reasons["c_a"] == "mass-targeted"
 
     def test_identity_self_term_creates_no_edge(self) -> None:
         # Every row of the factory carries identity(self) — including the
         # demotion-injected self-term shape. Must never promote alone.
         spec = _mini_spec({"c_a": (0, []), "c_b": (0, []), "phi": (2, [])})
-        assert spec.second_order_sector.promoted == frozenset()
+        assert spec.implicit_dynamical_sector.fields == frozenset()
 
     def test_time_self_edge_promotes_single_field(self) -> None:
         # A constraint row carrying d2_t of ITSELF is second-order content.
         spec = _mini_spec({"c_a": (0, [("d2_t", "c_a")]), "phi": (2, [])})
-        s = spec.second_order_sector
-        assert s.promoted == frozenset({"c_a"})
+        s = spec.implicit_dynamical_sector
+        assert s.fields == frozenset({"c_a"})
         assert s.reasons["c_a"] == "carries M_cc+mass-targeted"
 
 
@@ -411,12 +411,12 @@ class TestCorpusScan:
     @pytest.mark.parametrize("name", sorted(CORPUS_EXPECTED))
     def test_promoted_set_pinned(self, name: str) -> None:
         spec = _load_spec(name)
-        assert spec.second_order_sector.promoted == CORPUS_EXPECTED[name]
+        assert spec.implicit_dynamical_sector.fields == CORPUS_EXPECTED[name]
 
     @pytest.mark.parametrize("name", sorted(CORPUS_EMPTY))
     def test_empty_specs_stay_empty(self, name: str) -> None:
         spec = _load_spec(name)
-        assert spec.second_order_sector.promoted == frozenset()
+        assert spec.implicit_dynamical_sector.fields == frozenset()
 
     def test_corpus_is_fully_pinned(self) -> None:
         """Every loadable spec in examples/data/ has a pinned expectation.
@@ -441,12 +441,12 @@ class TestDemotionInteraction:
     def test_torsion_base_spec_promotes_demoted_mass_rows(self) -> None:
         spec = _load_spec("torsion_gertsenshtein")
         base = spec.base_spec(small_parameters=["b5"])
-        s = base.second_order_sector
+        s = base.implicit_dynamical_sector
         # Demotion moves h_4/h_7/h_9 (order 4 → 0, keeping their κ⁻²
         # ε⁰ d2_t cross terms) into C₀; they join the closure. The
         # demoted t_6/t_13/t_20 rows are pure identity — no edges.
-        assert s.promoted >= E_CLASS
-        assert {"t_6", "t_13", "t_20"}.isdisjoint(s.promoted)
+        assert s.fields >= E_CLASS
+        assert {"t_6", "t_13", "t_20"}.isdisjoint(s.fields)
 
     def test_gap_b_single_constraint_stays_empty(self) -> None:
         """The single-constraint demotion shape (Gap-B h/φ class): no
@@ -460,7 +460,7 @@ class TestDemotionInteraction:
                 "phi": (2, [("laplacian_x", "phi")]),
             }
         )
-        assert spec.second_order_sector.promoted == frozenset()
+        assert spec.implicit_dynamical_sector.fields == frozenset()
 
 
 class TestIndexTwoPreScan:
@@ -475,7 +475,7 @@ class TestIndexTwoPreScan:
 
     @staticmethod
     def _risky(spec: EquationSystem) -> frozenset[str]:
-        s = spec.second_order_sector
+        s = spec.implicit_dynamical_sector
         return frozenset(
             f
             for f, r in s.reasons.items()
@@ -588,5 +588,5 @@ class TestStage2Refusals:
             pytest.skip("spec not present")
         assert main(["inspect", str(path), "--equation", "h_3"]) == 0
         out = capsys.readouterr().out
-        assert "promoted to second-order sector" in out
+        assert "implicit-dynamical sector" in out
         assert "GH #457" in out

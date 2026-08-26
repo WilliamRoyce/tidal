@@ -256,7 +256,7 @@ def _render_equation(
     equation: ComponentEquation,
     *,
     summary: bool = False,
-    promoted: frozenset[str] = frozenset(),
+    implicit_fields: frozenset[str] = frozenset(),
 ) -> list[str]:
     """Render one equation as lines, kinetic coefficient on the left-hand side.
 
@@ -302,11 +302,11 @@ def _render_equation(
     kinetic = equation.kinetic_coefficient_symbolic
     if order:
         head = f"d{order}_t({name})"
-    elif name in promoted:
+    elif name in implicit_fields:
         # Algebraic LHS, but the row carries (or is targeted by) inter-
         # constraint time derivatives: it belongs to the second-order
         # sector and cannot be Schur-eliminated as algebraic (GH #457).
-        head = f"{name} (algebraic LHS — promoted to second-order sector, GH #457)"
+        head = f"{name} (algebraic LHS — implicit-dynamical sector, GH #457)"
     else:
         head = f"{name} (constraint)"
     kinetic_shown = _COORD_CALL.sub(r"\1", kinetic) if kinetic else None
@@ -353,7 +353,7 @@ def _print_equations(spec: object, *, detail: str = "full") -> None:
     if not isinstance(spec, EquationSystem):
         return
 
-    promoted = spec.second_order_sector.promoted
+    implicit_fields = spec.implicit_dynamical_sector.fields
     if detail != "summary":
         print(
             f"Fields ({spec.n_components} "
@@ -362,8 +362,8 @@ def _print_equations(spec: object, *, detail: str = "full") -> None:
         for eq in spec.equations:
             if eq.time_derivative_order > 0:
                 kind = "dynamical"
-            elif eq.field_name in promoted:
-                kind = "promoted"  # second-order sector, GH #457
+            elif eq.field_name in implicit_fields:
+                kind = "implicit-dynamical"  # GH #457 sector
             else:
                 kind = "constraint"
             print(
@@ -376,7 +376,7 @@ def _print_equations(spec: object, *, detail: str = "full") -> None:
     )
     for eq in spec.equations:
         for line in _render_equation(
-            eq, summary=detail == "summary", promoted=promoted
+            eq, summary=detail == "summary", implicit_fields=implicit_fields
         ):
             print(line)
     print()

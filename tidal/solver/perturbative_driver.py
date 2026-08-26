@@ -104,7 +104,7 @@ class PerturbativeResult:
     full_spec : EquationSystem | None
         The unreduced spec as loaded from JSON (pre-Gap-B). Kept for
         diagnostic purposes — e.g. inspecting original ``order_in_eps``
-        tags or reconstructing the promoted field's kinetic
+        tags or reconstructing the implicit-dynamical field's kinetic
         coefficient.
     """
 
@@ -462,7 +462,7 @@ class PerturbativeSolver:
             if full_eq.time_derivative_order > 0 and eq.time_derivative_order == 0
         }
         promoted_overlap = sorted(
-            demoted_fields & self.base_spec.second_order_sector.promoted
+            demoted_fields & self.base_spec.implicit_dynamical_sector.fields
         )
         if promoted_overlap:
             msg = (
@@ -470,7 +470,7 @@ class PerturbativeSolver:
                 f"{promoted_overlap} are both ε-demoted and promoted to "
                 f"the second-order sector (GH #457) — their O(ε¹) "
                 f"corrections would need Pass-1 routing through the "
-                f"promoted state slots, which belongs to the deferred "
+                f"implicit-dynamical state slots, which belongs to the deferred "
                 f"R̃²/constraint-promotion program (GH #321). Run the ε⁰ "
                 f"base theory with plain modal (no [perturbation] "
                 f"section), or see #464 for status."

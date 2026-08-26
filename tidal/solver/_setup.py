@@ -34,7 +34,7 @@ def warn_frozen_constraints(
         for s in layout.slots
         if s.kind == "field"
         and s.time_order == 0
-        and s.field_name not in layout.promoted
+        and s.field_name not in layout.implicit_dynamical_fields
     ]
     if constraint_fields:
         warnings.warn(
