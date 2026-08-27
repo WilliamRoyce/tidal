@@ -156,6 +156,40 @@ rows and chain samples could not be joined; and the sweep copy passed
 was omitted, raising \texttt{TypeError} into a bare \texttt{except} ---
 so those sweeps ran no probe at all and recorded no diagnostic columns.
 
+\paragraph{The probe runs on the solver's grid (GH~\#479).}  The probe
+resolves \texttt{--grid-shape} and \texttt{--bounds} through the same
+functions the simulation uses, so it describes the system that is about
+to be evolved.  It previously carried three private fallbacks for the
+absent-flag case --- 256 points on $(0,100)$ from the sweep path, 64 on
+$(0,50)$ from inference, 256 on $(0,100)$ again in the prior-stability
+sweep --- and all three disagreed with the simulation's own default of
+64 on $(0,10)$.  Because those boxes were \emph{larger} without a
+matching point count, the probe's Nyquist came out \emph{below} the
+solver's:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & $N$ & $L$ & $k_{\max} = \pi N / L$ \\
+\midrule
+simulation (default)  & 64  & 10  & \textbf{20.1} \\
+old sweep probe       & 256 & 100 & 8.0 \\
+old inference probe   & 64  & 50  & 4.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Modes between the probe's cutoff and the solver's were evolved and never
+examined, so a tachyonic onset in that band was invisible to a probe
+whose entire design principle (\S\ref{sec:why-all-k}) is that it must
+scan \emph{every} $k$ rather than risk a false negative.  This compounds
+with the measured box-dependence of probe verdicts (GH~\#344, a 2.8-nat
+amplification shift between $L = 50$ and $L = 100$): probing the wrong
+box is not a small error.  Recorded campaign chains are unaffected --- every
+landscape and rescue template passes both flags explicitly --- and a
+regression test now asserts the probe's Nyquist is never below the
+solver's.
+
 \subsection{Why the v2 campaign rejected tachyonic samples: the
 historical rationale}
 \label{sec:tachyonic-physical}
