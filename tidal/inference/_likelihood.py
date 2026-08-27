@@ -579,8 +579,6 @@ def _evaluate_likelihood(
         source=source,
         target=target,
         measurements=measurements,
-        default_grid_n=64,
-        default_bounds=((0.0, 50.0),),
         unavailable_meta=_posdep_probe_unavailable_meta,
     )
     if (

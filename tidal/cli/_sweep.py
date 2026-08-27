@@ -963,7 +963,9 @@ def _run_single(  # noqa: PLR0913, PLR0917
     # into ``GridInfo``, which raises ``TypeError``, and the broad except
     # below swallowed it at DEBUG.  Since ``--bounds`` defaults to None in
     # every subparser, such sweeps got neither a block nor the diagnostic
-    # columns.  ``default_bounds`` restores the probe there.
+    # columns.  The probe now resolves the grid the same way the
+    # simulation does (GH #479), so it runs there and describes the
+    # system that is about to be evolved.
     stability, sweep_stability_meta = probe_for_run(
         spec_path,
         base_args,
@@ -972,8 +974,6 @@ def _run_single(  # noqa: PLR0913, PLR0917
         target=target,
         measurements=measurements,
         grid_shape_override=grid_shape_override,
-        default_grid_n=256,
-        default_bounds=((0.0, 100.0),),
     )
     if (
         stability is not None
