@@ -14,6 +14,30 @@ retroactively covered; see `git log` for the full history.
 
 ### Fixed
 
+- **The stability probe now runs on the grid the simulation will actually use
+  (#479)**. The probe built its grid from private fallbacks when `--grid-shape`
+  / `--bounds` were absent — 256 on `(0, 100)` from the sweep path, 64 on
+  `(0, 50)` from inference, 256 on `(0, 100)` again in the prior-stability
+  sweep — and all three disagreed with the simulation's own default of 64 on
+  `(0, 10)`. Because the probe's box was *larger* while its point count was
+  not, its Nyquist came out **below** the solver's: k_max 8.0 and 4.0
+  respectively against the solver's 20.1. Modes between those and the
+  solver's cutoff were evolved and never examined — a false negative in a
+  probe whose stated design principle is never to risk one, and which
+  compounds with the measured box-dependence of probe verdicts (#344). The
+  grid now comes from `_parse_grid_shape` / `_parse_bounds` via the
+  `_run_stages` seam, so probe and solver describe the same system, and a
+  test asserts the probe's Nyquist is never below the solver's. Recorded
+  campaign chains are unaffected: every landscape/rescue template passes both
+  flags explicitly.
+- **`tidal sample` writes its prior-stability overlay again (#479)**. The
+  prior-stability sweep read `int(getattr(base_args, "grid_shape", 256))`, but
+  `--grid-shape` defaults to `None`, so the `getattr` default never fired and
+  this was `int(None)` — a `TypeError` caught by the caller and reported as
+  `Prior stability sweep skipped: ...`. Every run without an explicit
+  `--grid-shape` therefore produced no `_rejected_prior.csv` and no
+  prior-stability overlay on its corner plot. It is now a fourth caller of the
+  shared probe stage rather than a third copy of it.
 - **`tidal sweep` no longer blocks simulations on the tachyonic probe
   (#454)**. The v3 architecture made the pre-flight probe a metadata-only
   diagnostic on 2026-05-10 (`60cb70d8`) — but that commit rewrote the inference

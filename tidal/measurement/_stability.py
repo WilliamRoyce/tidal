@@ -703,8 +703,6 @@ def probe_for_run(  # noqa: PLR0913
     target: tuple[str, ...] | None,
     measurements: set[str],
     grid_shape_override: int | None = None,
-    default_grid_n: int,
-    default_bounds: tuple[tuple[float, float], ...],
     unavailable_meta: Callable[[BaseException], dict[str, Any]] | None = None,
 ) -> tuple[ConversionStabilityResult | None, dict[str, Any]]:
     """Run the pre-flight conversion-stability probe for one parameter point.
@@ -722,19 +720,19 @@ def probe_for_run(  # noqa: PLR0913
     and per campaign policy no caller does so by default — growth cannot
     be classified as physics or artifact without theory-level analysis.
 
+    The grid comes from the simulation's own resolution logic
+    (:func:`tidal.measurement._run_stages.parse_grid_shape` /
+    :func:`~tidal.measurement._run_stages.parse_bounds`), so the probe
+    describes the system that will actually be evolved.  Callers used to
+    supply their own fallbacks for the ``--grid-shape`` / ``--bounds``
+    absent case — 256 on ``(0, 100)`` from sweep, 64 on ``(0, 50)`` from
+    inference — and both disagreed with the simulation's 64 on
+    ``(0, 10)``, giving the probe a Nyquist 2.5-5x BELOW the solver's.
+    Modes the solver evolves were then never examined, which is a false
+    negative in a probe designed never to risk one (GH #479).
+
     Parameters
     ----------
-    default_grid_n, default_bounds
-        Used when ``base_args`` carries no ``--grid-shape`` / ``--bounds``.
-        Required rather than defaulted because the two callers disagree:
-        sweep has always fallen back to 256 points on ``(0, 100)`` and
-        inference to 64 points on ``(0, 50)``, and since ``--grid-shape``
-        defaults to ``None`` in every subparser, that fallback is the
-        common case.  The probe therefore runs at different resolutions
-        on the two paths.  Passing the values explicitly preserves each
-        caller's recorded behavior and keeps the divergence visible
-        instead of burying it in a default; unifying it would silently
-        change what archived configurations do.
     unavailable_meta
         Called with the ``NotImplementedError`` raised by the probe for a
         spec the modal per-mode engines cannot represent (GH #421,
@@ -758,7 +756,11 @@ def probe_for_run(  # noqa: PLR0913
         return None, {}
 
     try:
-        from tidal.measurement._run_stages import parse_params
+        from tidal.measurement._run_stages import (
+            parse_bounds,
+            parse_grid_shape,
+            parse_params,
+        )
         from tidal.solver.grid import GridInfo
         from tidal.symbolic._spec_cache import load_spec_cached
 
@@ -766,21 +768,26 @@ def probe_for_run(  # noqa: PLR0913
         base_p = parse_params(list(getattr(base_args, "param", []) or []), raw_spec)
         params = {**base_p, **param_overrides}
 
-        grid_n_raw = getattr(base_args, "grid_shape", None)
-        grid_n = grid_shape_override or (
-            int(grid_n_raw) if grid_n_raw is not None else default_grid_n
+        # The simulation's own answer to "what grid", not a private
+        # fallback (GH #479).  ``--bounds``/``--grid-shape`` may arrive as
+        # already-parsed sequences from a programmatic caller, so accept
+        # both forms.
+        spatial_dim = raw_spec.spatial_dimension
+        raw_shape = getattr(base_args, "grid_shape", None)
+        shape = parse_grid_shape(
+            str(raw_shape) if raw_shape is not None else None, spatial_dim
         )
-        bounds = getattr(base_args, "bounds", None)
-        if isinstance(bounds, str):
-            parts = bounds.split(":")
-            bounds_tuple: tuple[tuple[float, float], ...] = (
-                (float(parts[0]), float(parts[1])),
-            )
-        elif bounds is not None:
-            bounds_tuple = tuple(bounds)
+        raw_bounds = getattr(base_args, "bounds", None)
+        if raw_bounds is None or isinstance(raw_bounds, str):
+            bounds_list = parse_bounds(raw_bounds, spatial_dim)
         else:
-            bounds_tuple = default_bounds
-        grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
+            bounds_list = [tuple(b) for b in raw_bounds]  # type: ignore[misc]
+
+        # The probe is a 1-D Fourier-mode analysis: it examines the first
+        # axis, and ``periodic`` is a modeling assumption of the k-space
+        # formulation rather than a fallback for a missing flag.
+        grid_n = grid_shape_override or shape[0]
+        grid = GridInfo(shape=(grid_n,), bounds=(bounds_list[0],), periodic=(True,))
 
         ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
         ic_k: float | None = None

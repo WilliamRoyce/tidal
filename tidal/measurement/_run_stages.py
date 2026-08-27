@@ -58,6 +58,8 @@ __all__ = [
     "PROBE_METADATA_KEYS",
     "measure_from_sim_data",
     "measure_run",
+    "parse_bounds",
+    "parse_grid_shape",
     "parse_params",
     "probe_for_run",
     "probe_metadata",
@@ -80,6 +82,36 @@ def parse_params(
     )
 
     return _parse_params(param_specs, spec)
+
+
+def parse_grid_shape(raw: str | None, spatial_dim: int) -> list[int]:
+    """Resolve ``--grid-shape``, including the default when it is absent.
+
+    The simulation's own resolution logic
+    (``tidal.cli._simulate._parse_grid_shape``), exposed so that anything
+    reasoning about the run — notably the stability probe — describes the
+    grid the simulation will actually use.  Three separate hardcoded
+    fallbacks (256, 64, 256) used to stand in for this and all three
+    disagreed with the simulation's 64 (GH #479).
+    """
+    from tidal.cli._simulate import (
+        _parse_grid_shape,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    return _parse_grid_shape(raw, spatial_dim)
+
+
+def parse_bounds(raw: str | None, spatial_dim: int) -> list[tuple[float, float]]:
+    """Resolve ``--bounds``, including the default when it is absent.
+
+    Companion to :func:`parse_grid_shape`; see it for why callers must
+    not supply their own fallback (GH #479).
+    """
+    from tidal.cli._simulate import (
+        _parse_bounds,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    return _parse_bounds(raw, spatial_dim)
 
 
 def simulate_run(  # noqa: PLR0913

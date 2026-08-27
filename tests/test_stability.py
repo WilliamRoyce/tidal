@@ -23,6 +23,7 @@ Stage C investigation for the empirical foundations.
 from __future__ import annotations
 
 import csv
+import math
 import time
 import warnings
 from argparse import Namespace
@@ -386,8 +387,6 @@ class TestProbeForRunSharedStage:
             source=("a_1",),
             target=("a_2",),
             measurements={"energy"},
-            default_grid_n=64,
-            default_bounds=((0.0, 50.0),),
         )
         assert result is None
         assert meta == {}
@@ -402,8 +401,6 @@ class TestProbeForRunSharedStage:
             source=None,
             target=None,
             measurements={"conversion"},
-            default_grid_n=64,
-            default_bounds=((0.0, 50.0),),
         )
         assert result is None
         assert meta == {}
@@ -427,8 +424,6 @@ class TestProbeForRunSharedStage:
             source=("a_1",),
             target=("a_2",),
             measurements={"conversion"},
-            default_grid_n=64,
-            default_bounds=((0.0, 50.0),),
         )
         assert set(meta) == set(PROBE_METADATA_KEYS)
         # k_tachyonic is NaN, never absent, when nothing is tachyonic —
@@ -453,11 +448,66 @@ class TestProbeForRunSharedStage:
             source=("a_1",),
             target=("a_2",),
             measurements={"conversion"},
-            default_grid_n=32,
-            default_bounds=((0.0, 50.0),),
         )
         assert result is not None, "probe silently skipped without --bounds"
         assert meta
+
+    def test_probe_grid_matches_the_grid_the_simulation_will_use(self) -> None:
+        """GH #479: the probe must describe the system that gets evolved.
+
+        Three private fallbacks (256, 64, 256) stood in for this and all
+        three disagreed with the simulation's own default of 64 points on
+        (0, 10), giving the probe a Nyquist 2.5-5x BELOW the solver's —
+        so modes the solver evolves were never examined. That is a false
+        negative in a probe whose design principle is never to risk one.
+        """
+        from tidal.measurement._run_stages import parse_bounds, parse_grid_shape
+        from tidal.symbolic._spec_cache import load_spec_cached
+
+        captured: dict[str, GridInfo] = {}
+        import tidal.measurement._stability as stability_mod
+
+        original = stability_mod.check_conversion_stability
+
+        def _capture(
+            _spec: object, grid: GridInfo, *_a: object, **_k: object
+        ) -> object:
+            captured["grid"] = grid
+            return original(_spec, grid, *_a, **_k)  # type: ignore[arg-type]
+
+        stability_mod.check_conversion_stability = _capture  # type: ignore[assignment]
+        try:
+            stability_mod.probe_for_run(
+                T1_SPEC,
+                self._args(grid_shape=None, bounds=None),
+                T1_PARAMS,
+                source=("a_1",),
+                target=("a_2",),
+                measurements={"conversion"},
+            )
+        finally:
+            stability_mod.check_conversion_stability = original  # type: ignore[assignment]
+
+        spec = load_spec_cached(T1_SPEC)
+        sim_shape = parse_grid_shape(None, spec.spatial_dimension)
+        sim_bounds = parse_bounds(None, spec.spatial_dimension)
+
+        probe_grid = captured["grid"]
+        assert probe_grid.shape[0] == sim_shape[0]
+        assert probe_grid.bounds[0] == sim_bounds[0]
+
+        # The property that actually matters: the probe must not examine a
+        # narrower band of k than the solver will evolve.
+        probe_k_max = (
+            math.pi
+            * probe_grid.shape[0]
+            / (probe_grid.bounds[0][1] - probe_grid.bounds[0][0])
+        )
+        sim_k_max = math.pi * sim_shape[0] / (sim_bounds[0][1] - sim_bounds[0][0])
+        assert probe_k_max >= sim_k_max, (
+            f"probe Nyquist {probe_k_max:.2f} < solver Nyquist {sim_k_max:.2f}: "
+            "tachyonic modes in the gap would be invisible to the probe"
+        )
 
     def test_unavailable_meta_hook_is_used(self) -> None:
         """The GH #421 posdep-kinetic refusal keeps its warn-once marker."""
@@ -483,8 +533,6 @@ class TestProbeForRunSharedStage:
                 source=("a_1",),
                 target=("a_2",),
                 measurements={"conversion"},
-                default_grid_n=32,
-                default_bounds=((0.0, 50.0),),
                 unavailable_meta=_marker,
             )
         finally:
