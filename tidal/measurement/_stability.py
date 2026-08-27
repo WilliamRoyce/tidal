@@ -87,11 +87,15 @@ from __future__ import annotations
 
 import dataclasses
 import math
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
 if TYPE_CHECKING:
+    from argparse import Namespace
+    from collections.abc import Callable
+    from pathlib import Path
+
     from numpy.typing import NDArray
 
     from tidal.solver.grid import GridInfo
@@ -652,3 +656,169 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
         block_results=tuple(block_results),
         message=msg,
     )
+
+
+# ---------------------------------------------------------------------------
+# Shared pre-flight probe stage (GH #454)
+# ---------------------------------------------------------------------------
+
+#: Metadata columns emitted for every applicable probe call.  Fixed key set
+#: by design: a sweep row and a chain sample at the same parameter point must
+#: be directly comparable, which they were not while the two call sites
+#: assembled their own dicts (sweep recorded three keys, one of them under a
+#: different name; inference recorded five).
+PROBE_METADATA_KEYS: tuple[str, ...] = (
+    "stability_profile",
+    "borderline_stability",
+    "tachyonic_excess",
+    "k_tachyonic",
+    "n_tachyonic_modes",
+)
+
+
+def probe_metadata(result: ConversionStabilityResult) -> dict[str, Any]:
+    """Flatten a probe result into its recorded metadata columns.
+
+    Keys are always :data:`PROBE_METADATA_KEYS`; ``k_tachyonic`` is NaN
+    rather than absent when no tachyonic mode was found, so the column
+    exists in every row.
+    """
+    return {
+        "stability_profile": result.profile_name,
+        "borderline_stability": bool(result.borderline),
+        "tachyonic_excess": float(result.max_excess),
+        "k_tachyonic": (
+            float(result.k_tachyonic) if result.k_tachyonic is not None else math.nan
+        ),
+        "n_tachyonic_modes": int(result.n_tachyonic_modes),
+    }
+
+
+def probe_for_run(  # noqa: PLR0913
+    spec_path: Path,
+    base_args: Namespace,
+    param_overrides: dict[str, float],
+    *,
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    measurements: set[str],
+    grid_shape_override: int | None = None,
+    default_grid_n: int,
+    default_bounds: tuple[tuple[float, float], ...],
+    unavailable_meta: Callable[[BaseException], dict[str, Any]] | None = None,
+) -> tuple[ConversionStabilityResult | None, dict[str, Any]]:
+    """Run the pre-flight conversion-stability probe for one parameter point.
+
+    The single definition of the probe stage, shared by ``tidal sweep``
+    (:mod:`tidal.cli._sweep`) and ``tidal sample``
+    (:mod:`tidal.inference._likelihood`).  Both used to carry their own
+    copy of this preamble, and the copies drifted into two different
+    tachyonic policies for four months (GH #454) — so resolving
+    parameters, building the grid, parsing the IC wavevector and calling
+    :func:`check_conversion_stability` all live here, once.
+
+    This function is a **diagnostic**: it never decides that a point
+    should be skipped.  Acting on the verdict is the caller's business,
+    and per campaign policy no caller does so by default — growth cannot
+    be classified as physics or artifact without theory-level analysis.
+
+    Parameters
+    ----------
+    default_grid_n, default_bounds
+        Used when ``base_args`` carries no ``--grid-shape`` / ``--bounds``.
+        Required rather than defaulted because the two callers disagree:
+        sweep has always fallen back to 256 points on ``(0, 100)`` and
+        inference to 64 points on ``(0, 50)``, and since ``--grid-shape``
+        defaults to ``None`` in every subparser, that fallback is the
+        common case.  The probe therefore runs at different resolutions
+        on the two paths.  Passing the values explicitly preserves each
+        caller's recorded behavior and keeps the divergence visible
+        instead of burying it in a default; unifying it would silently
+        change what archived configurations do.
+    unavailable_meta
+        Called with the ``NotImplementedError`` raised by the probe for a
+        spec the modal per-mode engines cannot represent (GH #421,
+        position-dependent kinetics), and its return value is used as the
+        metadata.  Lets the inference path keep its warn-once marker
+        without this module importing from :mod:`tidal.inference`.
+
+    Returns
+    -------
+    tuple[ConversionStabilityResult | None, dict[str, Any]]
+        ``(result, metadata)``.  ``result`` is ``None`` when the probe
+        does not apply (the run measures no conversion, or has no
+        source/target) or could not run; ``metadata`` is then either
+        empty or the ``unavailable_meta`` marker.
+    """
+    # Applicability: the probe describes a conversion channel, so it means
+    # nothing without a conversion measurement and both endpoints.
+    if not ({"conversion", "peak_conversion"} & measurements):
+        return None, {}
+    if not source or not target:
+        return None, {}
+
+    try:
+        from tidal.measurement._run_stages import parse_params
+        from tidal.solver.grid import GridInfo
+        from tidal.symbolic._spec_cache import load_spec_cached
+
+        raw_spec = load_spec_cached(spec_path)
+        base_p = parse_params(list(getattr(base_args, "param", []) or []), raw_spec)
+        params = {**base_p, **param_overrides}
+
+        grid_n_raw = getattr(base_args, "grid_shape", None)
+        grid_n = grid_shape_override or (
+            int(grid_n_raw) if grid_n_raw is not None else default_grid_n
+        )
+        bounds = getattr(base_args, "bounds", None)
+        if isinstance(bounds, str):
+            parts = bounds.split(":")
+            bounds_tuple: tuple[tuple[float, float], ...] = (
+                (float(parts[0]), float(parts[1])),
+            )
+        elif bounds is not None:
+            bounds_tuple = tuple(bounds)
+        else:
+            bounds_tuple = default_bounds
+        grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
+
+        ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
+        ic_k: float | None = None
+        if ic_wavevector_str:
+            try:
+                ic_k = float(str(ic_wavevector_str).split(",")[0])
+            except (ValueError, IndexError):
+                ic_k = None
+
+        result = check_conversion_stability(
+            raw_spec,
+            grid,
+            params,
+            source=source[0],
+            target=target[0],
+            ic_wavevector=ic_k,
+        )
+    except NotImplementedError as exc:
+        # GH #421: the per-mode engines cannot represent a
+        # position-dependent kinetic coefficient.  The probe is
+        # unavailable, which is a different statement from "the probe
+        # found nothing" — record which.
+        if unavailable_meta is not None:
+            return None, unavailable_meta(exc)
+        return None, {"stability_profile": "unavailable-posdep-kinetic"}
+    except Exception as exc:  # noqa: BLE001
+        # Non-critical: fall through to the simulation, which is the
+        # authority anyway.  Name the exception type — an unnamed swallow
+        # is how GH #420 and GH #447 stayed hidden.
+        import logging
+
+        logging.getLogger(__name__).debug(
+            "Pre-flight stability probe failed (non-critical, falling "
+            "through to simulation): %s: %s",
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
+        return None, {}
+
+    return result, probe_metadata(result)

@@ -83,13 +83,13 @@ def run_prior_stability_sweep(
         output_path.write_text("", encoding="utf-8")
         return 0
 
-    from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
+    from tidal.measurement._run_stages import parse_params
     from tidal.measurement._stability import check_conversion_stability
     from tidal.solver.grid import GridInfo
     from tidal.symbolic._spec_cache import load_spec_cached
 
     raw_spec = load_spec_cached(spec_path)
-    base_p = _parse_params(list(getattr(base_args, "param", []) or []), raw_spec)
+    base_p = parse_params(list(getattr(base_args, "param", []) or []), raw_spec)
     grid_n = int(getattr(base_args, "grid_shape", 256))
     bounds_str = getattr(base_args, "bounds", "0:100")
     if isinstance(bounds_str, str):
