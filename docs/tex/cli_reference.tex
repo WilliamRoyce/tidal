@@ -344,9 +344,20 @@ Flag & Default & Description \\
 \texttt{--adaptive-threshold T}   & 0.01 & Stop when max interval score $< T$ \\
 \texttt{--dry-run}                & ---  & Print sweep plan without executing \\
 \texttt{--force-large-sweep}      & ---  & Allow sweeps with $> 10{,}000$ runs \\
+\texttt{--gated}                  & ---  & Reproduce the pre-v0.49.5 hard rejection: points the stability probe calls tachyonic are recorded as \texttt{run\_status=tachyonic\_gated} and never simulated \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\texttt{--gated} is a \textbf{reproducibility affordance for archived
+sweeps, not a physics option}.  By default every point is simulated and
+the probe's verdict is recorded as metadata
+(\texttt{stability\_profile}, \texttt{borderline\_stability},
+\texttt{tachyonic\_excess}, \texttt{k\_tachyonic},
+\texttt{n\_tachyonic\_modes}) --- the same columns and the same flag
+name as \texttt{tidal sample}.  See
+\S\ref{sec:probe-is-diagnostic} for why rejection on numerical growth
+was abandoned.
 
 All \texttt{tidal simulate} flags (\texttt{--param}, \texttt{--grid-shape}, \texttt{--bounds}, \texttt{--ic}, etc.)\ are passed through unchanged.
 

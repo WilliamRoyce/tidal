@@ -14,6 +14,33 @@ retroactively covered; see `git log` for the full history.
 
 ### Fixed
 
+- **`tidal sweep` no longer blocks simulations on the tachyonic probe
+  (#454)**. The v3 architecture made the pre-flight probe a metadata-only
+  diagnostic on 2026-05-10 (`60cb70d8`) — but that commit rewrote the inference
+  path and never touched `tidal/cli/_sweep.py`, whose blocking pre-check dates
+  from 2026-04-08 (`c2afda64`, #238). For four months a sweep returned
+  `run_status="tachyonic"` with `wall_time_s = 0.0` and no measurement, while
+  `tidal sample` recorded the same verdict as metadata and simulated the point.
+  Rejection on numerical growth is abandoned as policy: growth cannot be
+  classified as physics or artifact without theory-level analysis (PSALTer,
+  #360), and numerical divergence is addressed through `t_end` and localized-B
+  geometry. **Behavior change:** points that previously produced a blocked row
+  are now simulated and produce a real measurement plus the probe columns.
+  `--gated` (now on both `sweep` and `sample`) reproduces the old rows for
+  archived configurations and is not a physics option. Recorded sweeps are not
+  re-run and keep their blocked rows.
+- **The probe stage lives once (#454)**. Both entry points carried a copy of the
+  ~40-line preamble; the copy is what let the policy change reach only one of
+  them. It now lives in `tidal.measurement._stability.probe_for_run`, and
+  `tidal/measurement/_run_stages.py` is a named seam for the stages both paths
+  share — `tidal/inference/` and `tidal/measurement/` no longer import private
+  names out of a CLI module. Two defects surfaced with the merge: the two paths
+  recorded **different metadata key sets** (three columns vs five, one under a
+  different name), so sweep rows and chain samples could not be joined — now a
+  fixed key set asserted by test; and the sweep copy passed `bounds=None` into
+  `GridInfo` whenever `--bounds` was omitted, raising `TypeError` into a bare
+  `except`, so **those sweeps ran no probe at all** and silently recorded no
+  diagnostic columns.
 - **Marginal D_KL is now computed in the space where each prior is uniform
   (#420)**. `compute_parameter_importance` transformed only `log_uniform`
   columns; `arctan_uniform`, `normal` and `radial_angular` were histogrammed
