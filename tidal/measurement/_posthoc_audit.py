@@ -337,8 +337,8 @@ def _evaluate_sample(
     """Run one audit simulation at ``2·t_base`` and classify."""
     import copy
 
-    from tidal.cli._sweep import run_inference_step
     from tidal.measurement._conversion import compute_conversion_probability
+    from tidal.measurement._run_stages import run_inference_step
 
     audit_args = copy.copy(base_args)
     audit_args.t_end = 2.0 * t_base
@@ -575,13 +575,11 @@ def run_posthoc_audit(
         }
         # Merge in any --param fixed values from base_args so the audit
         # sim runs with the same fixed parameters as the original.
-        from tidal.cli._simulate import (
-            _parse_params,  # pyright: ignore[reportPrivateUsage]
-        )
+        from tidal.measurement._run_stages import parse_params
         from tidal.symbolic.json_loader import load_equation_system
 
         spec = load_equation_system(spec_path)
-        base_p = _parse_params(list(getattr(base_args, "param", []) or []), spec)
+        base_p = parse_params(list(getattr(base_args, "param", []) or []), spec)
         full_params = {**base_p, **params}
         borderline_flag = False
         if borderline_arr is not None:
