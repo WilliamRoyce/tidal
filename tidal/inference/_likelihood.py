@@ -1,7 +1,7 @@
 """Simulation-based likelihood function for Bayesian inference.
 
-Wraps the existing ``_run_single`` + ``_measure_run`` pipeline from
-:mod:`tidal.cli._sweep` as a callable ``log_likelihood(theta) -> float``.
+Wraps the shared run stages (:mod:`tidal.measurement._run_stages`) as a
+callable ``log_likelihood(theta) -> float``.
 
 Each likelihood evaluation runs one PDE simulation and extracts a scalar
 metric (e.g. ``P_max``).
@@ -528,15 +528,16 @@ def _evaluate_likelihood(
     tuple[float, dict]
         ``(log_likelihood, metadata)`` where ``metadata`` always contains
         a ``run_status`` key with one of:
-        ``"success"``, ``"tachyonic"``, ``"simulation_failed"``,
+        ``"success"``, ``"tachyonic_gated"``, ``"simulation_failed"``,
         ``"metric_missing"``, ``"exception"``.  When the rejection is
         tachyonic, ``metadata["tachyonic_excess"]`` carries the maximum
         Re(λ) found (a positive growth rate).  For successful evaluations,
         ``metadata`` may also include the measured metric value.
     """
-    from tidal.cli._sweep import (
-        _measure_run,  # pyright: ignore[reportPrivateUsage]
-        _simulate_run,  # pyright: ignore[reportPrivateUsage]
+    from tidal.measurement._run_stages import (
+        measure_run,
+        probe_for_run,
+        simulate_run,
     )
 
     # Build parameter overrides
@@ -559,91 +560,38 @@ def _evaluate_likelihood(
         run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
         run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Pre-flight tachyonic guard — mirrors _run_row_inner in _sweep.py.
-    # Rejects parameter points where the source-containing block has growing
-    # eigenvalues (Re(λ) > threshold) before running any simulation.
-    # Uses conservative=True: when cond(V) is too high to trust the IC-coupling
-    # filter (typical for CDT/PGT models), counts the growing mode as tachyonic
-    # rather than risk a false-negative.  Cost: microseconds per evaluation.
-    stability_meta: dict[str, Any] = {}
-    if source and target and ({"conversion", "peak_conversion"} & measurements):
-        try:
-            from tidal.cli._simulate import (
-                _parse_params,  # pyright: ignore[reportPrivateUsage]
-            )
-            from tidal.measurement._stability import check_conversion_stability
-            from tidal.solver.grid import GridInfo
-            from tidal.symbolic._spec_cache import load_spec_cached
-
-            raw_spec = load_spec_cached(spec_path)
-            base_p = _parse_params(
-                list(getattr(base_args, "param", []) or []), raw_spec
-            )
-            params = {**base_p, **param_overrides}
-            grid_n_raw = getattr(base_args, "grid_shape", None)
-            grid_n = int(grid_n_raw) if grid_n_raw is not None else 64
-            bounds_str = getattr(base_args, "bounds", None)
-            if isinstance(bounds_str, str):
-                bparts = bounds_str.split(":")
-                bounds_tuple: tuple[tuple[float, float], ...] = (
-                    (float(bparts[0]), float(bparts[1])),
-                )
-            elif bounds_str is not None:
-                bounds_tuple = tuple(bounds_str)
-            else:
-                bounds_tuple = ((0.0, 50.0),)
-            grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
-            ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
-            ic_k: float | None = None
-            if ic_wavevector_str:
-                try:
-                    ic_k = float(str(ic_wavevector_str).split(",")[0])
-                except (ValueError, IndexError):
-                    ic_k = None
-            stability = check_conversion_stability(
-                raw_spec,
-                grid,
-                params,
-                source=source[0],
-                target=target[0],
-                ic_wavevector=ic_k,
-            )
-            # Always record probe diagnostics in metadata (chain CSVs surface
-            # gamma_eff / k_tachyonic / n_tachyonic_modes / borderline_stability
-            # for post-hoc filtering).  Whether the verdict gates the sample
-            # depends on ``likelihood_config.permissive``.
-            stability_meta = {
-                "stability_profile": stability.profile_name,
-                "borderline_stability": bool(stability.borderline),
-                "tachyonic_excess": float(stability.max_excess),
-                "k_tachyonic": (
-                    float(stability.k_tachyonic)
-                    if stability.k_tachyonic is not None
-                    else float("nan")
-                ),
-                "n_tachyonic_modes": int(stability.n_tachyonic_modes),
-            }
-            if not stability.stable and not likelihood_config.permissive:
-                # Gated mode (``--gated`` CLI flag) reproduces the v2 / canonical-
-                # probe hard-rejection behavior for reproducibility.  Default v3
-                # is permissive: sim continues, tachyon-permissive sampling maps
-                # the structure of the unstable regions.
-                return -math.inf, {
-                    "run_status": "tachyonic_gated",
-                    **stability_meta,
-                }
-        except NotImplementedError as exc:
-            # GH #421 guard (position-dependent kinetic): record the marker
-            # and warn once — see _posdep_probe_unavailable_meta.
-            stability_meta = _posdep_probe_unavailable_meta(exc)
-        except Exception:  # noqa: BLE001
-            import logging
-
-            logging.getLogger("tidal.inference").debug(
-                "Pre-flight tachyonic check failed (non-critical), "
-                "falling through to simulation",
-                exc_info=True,
-            )
+    # Pre-flight stability probe — DIAGNOSTIC ONLY by default (v3).
+    # Records gamma_eff / k_tachyonic / n_tachyonic_modes so chain CSVs
+    # support post-hoc filtering; ``--gated`` (permissive=False) restores
+    # the v2 hard rejection for reproducing archived chains, and is not a
+    # physics policy.  The probe itself is deliberately conservative:
+    # when cond(V) is too high to trust the IC-coupling filter (typical
+    # for CDT/PGT), a growing mode counts as tachyonic rather than risk a
+    # false negative.  Cost: microseconds per evaluation.
+    #
+    # The stage lives in tidal.measurement._stability because tidal sweep
+    # runs the identical preamble; it used to be copy-pasted here, and the
+    # copies drifted into two different policies (GH #454).
+    stability, stability_meta = probe_for_run(
+        spec_path,
+        base_args,
+        param_overrides,
+        source=source,
+        target=target,
+        measurements=measurements,
+        default_grid_n=64,
+        default_bounds=((0.0, 50.0),),
+        unavailable_meta=_posdep_probe_unavailable_meta,
+    )
+    if (
+        stability is not None
+        and not stability.stable
+        and not likelihood_config.permissive
+    ):
+        return -math.inf, {
+            "run_status": "tachyonic_gated",
+            **stability_meta,
+        }
 
     try:
         if backend == "memory":
@@ -658,8 +606,8 @@ def _evaluate_likelihood(
             # metadata (~µs allocation, irrelevant vs the ~2 s simulate).
             import dataclasses as _dc
 
-            from tidal.cli._sweep import (
-                _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
+            from tidal.measurement._run_stages import (
+                measure_from_sim_data,
                 run_inference_step,
             )
             from tidal.symbolic._spec_cache import (
@@ -681,7 +629,7 @@ def _evaluate_likelihood(
                 spec=spec_with_bsm,
             )
             spec = sim_data.spec
-            metrics = _measure_from_sim_data(
+            metrics = measure_from_sim_data(
                 sim_data,
                 measurements,
                 source,
@@ -691,7 +639,7 @@ def _evaluate_likelihood(
         else:
             # Run simulation (disk path — preserved for rollback)
             assert run_dir is not None  # set when backend == "disk"
-            exit_code, _wall_time, spec = _simulate_run(
+            exit_code, _wall_time, spec = simulate_run(
                 base_args,
                 spec_path,
                 param_overrides,
@@ -712,7 +660,7 @@ def _evaluate_likelihood(
                 }
 
             # Extract metrics
-            metrics = _measure_run(
+            metrics = measure_run(
                 run_dir,
                 spec_path,
                 measurements,
@@ -757,18 +705,16 @@ def _evaluate_likelihood(
         # at ``docs/meetings/2026-05-08_supervisor.md``.
 
         # Build eval_params for formula-based likelihoods.
-        # Merge order (same as _simulate_run): spec.metadata["parameters"]
+        # Merge order (same as simulate_run): spec.metadata["parameters"]
         # defaults -> CLI --param overrides -> swept theta.  Without the
         # first two, formulas like "sin(kappa * B0 * t_end / 2)**2" fail
         # with NameError, _eval_baseline returns None, and every logL
         # collapses to -inf (see #270).
         eval_params: dict[str, float] | None = None
         if likelihood_config.baseline_formula:
-            from tidal.cli._simulate import (
-                _parse_params,  # pyright: ignore[reportPrivateUsage]
-            )
+            from tidal.measurement._run_stages import parse_params
 
-            eval_params = _parse_params(
+            eval_params = parse_params(
                 list(getattr(base_args, "param", []) or []),
                 spec,
             )
@@ -844,11 +790,9 @@ _LIKELIHOOD_CONFIG: dict[str, Any] = {}
 
 def _likelihood_worker_init(config: dict[str, Any]) -> None:  # pyright: ignore[reportUnusedFunction]
     """Initialize worker process with likelihood config."""
-    from tidal.cli._sweep import (
-        _set_single_thread_blas,  # pyright: ignore[reportPrivateUsage]
-    )
+    from tidal.measurement._run_stages import set_single_thread_blas
 
-    _set_single_thread_blas()
+    set_single_thread_blas()
     _LIKELIHOOD_CONFIG.update(config)
 
 
