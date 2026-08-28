@@ -14,6 +14,40 @@ retroactively covered; see `git log` for the full history.
 
 ### Added
 
+- **Research record: two closed attempts at a general fix for the
+  localized implicit-dynamical class (#473, #477)**. Both are preserved
+  under `scripts/research/` with READMEs carrying every measured table;
+  neither ships production code, and the localized class continues to
+  refuse honestly.
+  - `klf_staircase/` — a faithful, *verified* port of the
+    MatrixPencils.jl Kronecker-like staircase (kernel equivalence and
+    structure postconditions exact on random rank-deficient windows; a
+    known scrambled Kronecker canonical form recovered exactly; synthetic
+    gates at machine precision). It cannot deliver a usable operator
+    here: shallow tolerances march the staircase through the physical
+    sector, deep ones leave far-field directions live with unphysical
+    rates, and the usable window moves with resolution. It does certify
+    a full-system operator at deep tolerance (contract ~1e-10 against
+    ordered QZ's 2.66), which settles #474's construction defect and
+    shows identification was the deeper obstruction.
+  - `gauge_orbit/` — symbolic gauge-structure discovery. The linearized
+    Noether identity makes the chain defect exactly linear in the
+    background-EOM violation, so exact gauge structure requires a
+    self-consistent background. Measured: the diffeomorphism orbit
+    chains annihilate the vacuum pencil at 1e-17; the defect scales as
+    the identity demands (1.000 on photon rows, 1.999 on metric rows);
+    the symbolic orbit *is* the numerically weak sector (within 6e-3
+    rad); and a grading told nothing about the background rediscovers
+    far-field localization. Pinning those directions is nonetheless not
+    viable — they carry ~20% of the true motion (1.6e-15 in the
+    exact-symmetry control), so pinning deletes dynamics rather than
+    approximating it.
+  - Consequence recorded in `docs/tex/pencil_engine.tex`: for the
+    localized class the observable-sector closure route is the correct
+    treatment rather than a rescue, and no general float64 route is
+    known (extended precision, #470, is the surviving candidate).
+
+
 - **Observable-sector closure for the localized implicit-dynamical class
   (#468, route 3)**. Specs with position-dependent coefficients AND an
   implicit-dynamical sector (order-0 rows proven dynamical by the #457

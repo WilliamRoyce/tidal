@@ -7,7 +7,7 @@
 
 This section is the design record for the modal solver's constraint
 machinery as rebuilt in August 2026 (GH \#457 and its chain \#458--\#460,
-\#465, \#467, \#468, \#470, \#473, \#474). It records the theory, the
+\#465, \#467, \#468, \#470, \#473, \#474, \#477). It records the theory, the
 engine, the classification rule it depends on, the alternatives that were
 measured and rejected, and the architecture that lets TIDAL evolve theory
 input whose gauge structure the user does not know in advance. It
@@ -281,22 +281,115 @@ FV$\leftrightarrow$CDT equivalence pin proved by hand
 finite/infinite split has a gap and the quotient finds the pins.
 Shipped; full mixing included.
 
-\paragraph{Route 2 --- Kronecker-like staircase reduction (GH \#473).}
-The general in-solver mechanism for near-singular pencils: extract the
-right singular blocks $L_\varepsilon$ (gauge chains, $\varepsilon+1$
-columns and $\varepsilon$ rows), the left singular blocks
-$L_\eta^T$ (constraint chains, $\eta+1$ rows and $\eta$ columns) and the
-regular part, with rank decisions at tolerance $\tau$ and only
-orthogonal transformations (Van Dooren 1979; Demmel \& K\aa gstr\"om's
-GUPTRI; \texttt{MatrixPencils.jl}'s \texttt{klf} as the open reference
-implementation). The 2026-08-27 experiment established that single-probe
-pairing cannot represent the asymmetric block shapes; this route is the
-next numerical arc and re-enables the five \#455-pinned full-pencil
-tests.
+\paragraph{Route 2 --- Kronecker-like staircase reduction (GH \#473):
+BUILT, VERIFIED, AND CLOSED.} The idea was to extract the right singular
+blocks $L_\varepsilon$ (gauge chains, $\varepsilon+1$ columns and
+$\varepsilon$ rows), the left singular blocks $L_\eta^T$ (constraint
+chains) and the regular part, with rank decisions at tolerance $\tau$ and
+only orthogonal transformations (Van Dooren 1979; Demmel \&
+K\aa gstr\"om's GUPTRI; \texttt{MatrixPencils.jl}'s \texttt{klf} as the
+open reference implementation). A faithful port was written and
+\emph{verified correct} --- kernel equivalence and structure
+postconditions exact on random rank-deficient windows, a known scrambled
+Kronecker canonical form recovered exactly, synthetic gates at machine
+precision --- and it is preserved at
+\texttt{scripts/research/klf\_staircase/}.
+
+It does not deliver a usable operator on the localized class, and the
+reason is not the implementation. Measured on E.cal at $N=16/24/32$ over
+$\tau \in [10^{-12}, 10^{-5}]$: shallow $\tau$ marches the right-block
+staircase through the physical sector (finite dimension collapses from 64
+to $\le 14$), while deep $\tau$ leaves the weakly determined far-field
+directions live with unphysical rates ($\max\Re\lambda \approx
++0.5\ldots+4.5$, fluctuating with $\tau$ and $N$) and $10^{-4}\ldots0.3$
+cross-coupling into the physical block; the usable window moves with $N$.
+The weak pairs carry $O(1)$ content on the $B$ side through their
+velocity identities while the $\varepsilon$-weakness sits on the $A$ side,
+so they can never present as right (no-$E$) chains at any float64
+tolerance. This is the Kronecker form's known discontinuity made concrete:
+the staircase computes the exact structure of a \emph{nearby} pencil, and
+on a determination continuum ``nearby structure'' is $\tau$-unstable.
+
+Two results survive. First, at deep $\tau$ the construction \emph{does}
+certify a full-system operator (deflation contract $\sim\!10^{-10}$ where
+ordered QZ measured $2.66$, with the $\{h_5, a_1\}$ block exact to
+$\sim\!10^{-13}$): GH \#474's \emph{construction} defect is solved, and
+identification was the deeper obstruction. Second, a durable semantic
+point: the deflation contract certifies consistency with the
+$\tau$-truncated equations, \emph{not} rate fidelity in the weakly
+determined directions. A certified operator can still be honestly
+unusable --- which is why the refusal-over-plausible-trajectory
+discipline is right rather than over-cautious.
+
+\paragraph{Route 0 --- symbolic gauge-structure discovery (GH \#477):
+ATTEMPTED AND PARKED.} If tolerance cannot \emph{identify} the gauge
+sector, the symbols can. Expanding the exact Noether identity
+$E_i R^i{}_\alpha \equiv 0$ to first order about a background gives
+\begin{equation}
+  R^i{}_\alpha L_{ij} + E_i(\bar\Phi)\,\bigl(\partial_j R^i{}_\alpha\bigr) = 0 ,
+  \label{eq:linearized-noether}
+\end{equation}
+with $E[\bar\Phi]$ the \emph{background EOM residual} and $L$ the
+linearized operator. Since $L$ is the Hessian of a quadratic action, the
+same coefficients give both the gauge orbit (right/column structure) and
+the Noether identity (left/row structure), each annihilated up to a defect
+\emph{exactly linear in the background-EOM violation}. Hence exact gauge
+structure $\iff$ self-consistent background. E.cal violates that twice by
+construction --- flat metric against EM stress $T^{\mathrm{EM}} \sim
+B_0^2$, and a dual-Gaussian $B_0(z)$ requiring an external current
+$J \sim \partial_z B_0$ --- which is the literature-standard
+externally-imposed treatment, leaving the physics intact but making the
+symmetry \emph{approximately} broken instead of an exact null space.
+
+The identification half works, and was measured
+(\texttt{scripts/research/gauge\_orbit/}): the hand-derived
+diffeomorphism orbit chains annihilate the vacuum ($B_{\mathrm{peak}}=0$)
+pencil at $10^{-17}$ for every gauge-profile mode at $N=16/24/32$; the
+defect on the full pencil scales exactly as
+\cref{eq:linearized-noether} demands (slope $1.000$ on the photon rows
+from the Maxwell violation, $1.999$ on the metric rows from the Einstein
+violation); and the symbolically derived orbit \emph{is} the numerically
+weak sector --- the weakest right singular vectors of $A - \lambda B$ sit
+within $6\times10^{-3}$ radians of the orbit span, and a grading told
+nothing about $B_0(z)$ places the least-determined gauge profiles at zero
+near-Gaussian energy share against $0.998$ for the most-determined. The
+U(1) chain is the control and breaks at $O(1)$ even at
+$B_{\mathrm{peak}}=0$, which correctly attributes that breaking to this
+spec's Lorenz term in the action rather than to the background.
+
+What fails is the \emph{pinning}, and this is a statement about the class
+rather than about any construction. Two corrections came out of the
+experiment, each caught by a control. Dropping rows to square up the
+quotient is refuted: this pencil has no redundant rows (minimum row
+singular value $0.62$) because it carries velocity-definition rows that no
+Noether identity touches, so after pinning the column excess outruns the
+row redundancy roughly five to one and any row removal discards real
+equations. And the quotient must \emph{allow} the gauge drift and project
+it out rather than forbid it --- forbidding it costs $0.21$ even when the
+symmetry is exact. Corrected, the quotient is well-posed at $2\times
+10^{-15}$ and discards no equation, so GH \#474's failure mode is
+structurally impossible in it; the $\{h_5,a_1\}$ block is reproduced to
+$10^{-15}$ with $10^{-14}$ cross-coupling. But the pinned directions carry
+$\approx\!20\%$ of the true motion, $\tau$- and $N$-independently, against
+$1.6\times10^{-15}$ in the exact-symmetry control. \emph{Weakly determined
+is not weakly excited}: the far-field modes are nearly free, hence easy to
+excite and large in amplitude, so pinning them to zero does not approximate
+the dynamics --- it deletes a fifth of it.
+
+Two consequences carry forward. No pinning-based construction can satisfy
+a full-system contract on this class. And what such a construction
+\emph{does} do exactly is evolve the decoupled physical sector --- which
+reclassifies route 3 below: for the localized class the closure route is
+not a rescue for a refusal but the correct treatment, because the
+remaining directions carry genuine dynamics that pinning would fabricate.
+No general float64 route is known; the surviving candidate is extended
+precision (GH \#470), now with a measured target --- the determination
+continuum is about eleven decades deep and $N$-independent.
 
 \paragraph{Route 3 --- observable-sector closure (shipped, GH \#468).}
 When the full pencil would refuse and the excited sector is exactly
-closed, evolve that sector alone. \texttt{EquationSystem.dependency\_closure}
+closed, evolve that sector alone. For the localized class this is not a
+fallback but the correct treatment, per the route-0 measurements above. \texttt{EquationSystem.dependency\_closure}
 is the structural closure of ``the equation of $X$ references $Y$'';
 \texttt{restrict\_spec\_dict} writes the closure as a first-class spec
 JSON (\texttt{restricted\_spec.json}, the run's \texttt{spec\_path}),
@@ -323,8 +416,10 @@ the full linearized-diffeomorphism orbit --- $(h_0, h_3, v_{h_3})$,
 $(h_1, h_6, v_{h_6})$, $(h_2, h_8, v_{h_8})$, all far-field localized ---
 which is why every setup with a background that vanishes somewhere
 (localized magnetic fields, plasma profiles) is in this class, and why
-the closure and staircase routes exist rather than a per-theory gauge
-choice.
+the closure route exists rather than a per-theory gauge choice. The
+2026-08-26 symbolic experiment (GH \#477) confirmed this orbit
+analytically and added the reason it cannot simply be pinned away: these
+directions carry a fifth of the true motion.
 
 \subsection{Historical audit and replaced machinery}
 \label{sec:pencil-audit}
@@ -357,5 +452,6 @@ ModelingToolkit.jl's \texttt{structural\_simplify} as the ecosystem
 precedent for symbolic system-to-system passes before one general
 numerical solver. Decision records: GH \#470 (the acceptance decision and
 its revisions), \#468 (route plan and measurements), \#473 (staircase
-scope), \#474 (quotient root cause), \#377 (the deferred gauge-fixed
-comparison experiment).
+scope, verification and closing evidence), \#474 (quotient root cause),
+\#477 (symbolic gauge-structure discovery: measurements and the parking
+record), \#377 (the deferred gauge-fixed comparison experiment).
