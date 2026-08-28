@@ -369,6 +369,19 @@ def _eval_baseline(
 
     Reuses the same ``FORMULA_NAMESPACE`` (sin, cos, sqrt, pi, etc.)
     as the sweep-results derived-columns computation.
+
+    Returns
+    -------
+    float | None
+        The baseline, or ``None`` when no formula is configured.  A
+        formula that evaluates to a non-positive number returns it
+        unchanged: that is a legitimate parameter-space outcome and the
+        caller soft-floors it.
+
+    Both exception types propagate from ``safe_formula_eval``: a name
+    nothing supplies raises ``ValueError``, a disallowed construct
+    ``TypeError``.  Those are configuration errors, not physics results,
+    and are deliberately not swallowed here — see GH #407.
     """
     if formula is None:
         return None
@@ -381,20 +394,19 @@ def _eval_baseline(
     if params:
         ns.update(params)
 
-    try:
-        from tidal.cli._simulate import safe_formula_eval
+    from tidal.cli._simulate import safe_formula_eval
 
-        return float(safe_formula_eval(formula, ns))  # type: ignore[arg-type]
-    except Exception as exc:  # noqa: BLE001
-        import logging
-
-        logging.getLogger("tidal.inference").warning(
-            "Baseline formula '%s' failed: %s (params: %s)",
-            formula,
-            exc,
-            sorted(ns.keys()) if params else "none",
-        )
-        return None
+    # Deliberately NOT wrapped in a bare except returning None.  Callers
+    # treat a None baseline exactly like a baseline of zero — both give
+    # -inf, which v3 soft-floors — so swallowing here made a CONFIGURATION
+    # error (a name nothing supplies) indistinguishable from a legitimate
+    # physics outcome (a baseline that genuinely evaluates to zero), and an
+    # inference chain ran to completion on floor values (GH #407).
+    #
+    # The launch-time check in tidal/cli/_sample.py, _plot_command.py and
+    # _analyze.py makes an unresolvable formula unreachable here; this is
+    # the backstop, and it is loud.
+    return float(safe_formula_eval(formula, ns))  # type: ignore[arg-type]
 
 
 class SimulationLikelihood:

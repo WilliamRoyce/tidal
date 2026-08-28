@@ -54,6 +54,31 @@ retroactively covered; see `git log` for the full history.
 
 ### Fixed
 
+- **`--baseline-formula` is refused at launch instead of collapsing a chain onto
+  the soft floor (#407)**. A formula referencing spec constants that were never
+  passed via `--param` failed per evaluation, was swallowed to `None` by
+  `_eval_baseline`, became `-inf`, and landed on the v3 soft floor — so
+  `tidal sample` **ran to completion and produced a posterior built entirely
+  from floor values**. #270 fixed half of this by merging spec defaults into
+  `eval_params`, but that half is inert for production: only **6 of 48**
+  committed specs carry a `metadata.parameters` block and none is a PGT or
+  dark-photon theory, so `--param` is the only working channel for every
+  campaign spec. #270's own prescribed remedy — raise if the formula
+  references an unresolvable name — is now implemented.
+
+  `unresolved_formula_names` reports **every** missing name at once rather
+  than the first, and `sample`, `plot` and `analyze` each check before doing
+  any work. The available set is built per entry point rather than by a shared
+  resolver, because they genuinely differ (sampled priors vs sweep columns vs
+  recorded chain metadata) — a common resolver would be a false commonality.
+  Sampled parameter names count as available: a formula over a swept coupling
+  is legitimate and must not be rejected.
+
+  `_eval_baseline` also stops returning `None` for "could not evaluate".
+  Callers read that identically to a baseline of zero, so a **configuration**
+  error was indistinguishable from a legitimate physics outcome. A formula
+  evaluating to a non-positive number still soft-floors exactly as before.
+
 - **One `run_status` vocabulary, and divergence is finally distinguishable
   (#480)**. `run_status` is the column that tells a reader whether a row is
   usable, and it had no single definition: sweep emitted `success`,
