@@ -14,8 +14,8 @@ so PolyChord sees a gradient in the failure region.  The Hwang-Noh
 perturbativity gate (``P_max > 0.5 -> -inf``) is removed entirely; large
 ``P_max`` is faithful linearized-PDE output, not a probability-conservation
 violation.  The pre-flight tachyonic probe is run as a metadata measurement
-only — its verdict no longer gates samples (``--gated`` flag preserves the
-v2 hard-rejection behavior for reproducibility).
+only — nothing acts on its verdict (GH #454; the ``--gated`` escape hatch
+was removed in v0.49.6).
 """
 
 from __future__ import annotations
@@ -150,10 +150,6 @@ class LikelihoodConfig:
     sigma: float = 1.0
     min_value: float = 0.0
     baseline_formula: str | None = None
-    permissive: bool = True
-    """v3 default: don't gate on the pre-flight probe.  When False,
-    tachyonic samples return ``-inf`` (preserves v2 / canonical-probe
-    behavior, opt-in via ``--gated`` CLI flag for reproducibility)."""
     soft_floor_noise_sigma: float = 1.0
     """Standard deviation of the Gaussian noise added to the soft penalty
     floor (sim divergence / NaN / exception).  Default 1.0 gives the
@@ -203,7 +199,6 @@ def parse_likelihood(
     spec: str,
     *,
     baseline_formula: str | None = None,
-    permissive: bool = True,
     soft_floor_noise_sigma: float = 1.0,
     soft_floor_logl: float = SOFT_FLOOR_LOGL,
     noise_seed: int = 0,
@@ -227,11 +222,6 @@ def parse_likelihood(
     baseline_formula : str | None
         Baseline formula for ``extremize`` type (passed separately via
         ``--baseline-formula`` CLI flag).
-    permissive : bool
-        v3 default ``True``: pre-flight tachyonic probe is recorded as
-        metadata only, doesn't gate samples.  Set to ``False`` (via the
-        ``--gated`` CLI flag) to reproduce v2 / canonical-probe hard-
-        rejection behavior.
     soft_floor_noise_sigma : float
         Standard deviation of the Gaussian noise added to the soft penalty
         floor (sim divergence / NaN / exception).  Default 1.0; set to 0
@@ -251,7 +241,6 @@ def parse_likelihood(
     ltype = parts[1]
 
     common = {
-        "permissive": permissive,
         "soft_floor_noise_sigma": soft_floor_noise_sigma,
         "soft_floor_logl": soft_floor_logl,
         "noise_seed": noise_seed,
@@ -535,10 +524,12 @@ def _evaluate_likelihood(
         ``metadata`` may also include the measured metric value.
     """
     from tidal.measurement._run_stages import (
+        RunStatus,
         measure_run,
         probe_for_run,
         simulate_run,
     )
+    from tidal.solver import KineticEvaluationError, SimulationDivergedError
 
     # Build parameter overrides
     param_overrides = {name: float(theta[i]) for i, name in enumerate(param_names)}
@@ -560,11 +551,13 @@ def _evaluate_likelihood(
         run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
         run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Pre-flight stability probe — DIAGNOSTIC ONLY by default (v3).
+    # Pre-flight stability probe — DIAGNOSTIC ONLY, unconditionally.
     # Records gamma_eff / k_tachyonic / n_tachyonic_modes so chain CSVs
-    # support post-hoc filtering; ``--gated`` (permissive=False) restores
-    # the v2 hard rejection for reproducing archived chains, and is not a
-    # physics policy.  The probe itself is deliberately conservative:
+    # support post-hoc filtering.  Nothing acts on the verdict: rejection
+    # on tachyonic growth was abandoned as policy (growth cannot be called
+    # physics or artifact without theory-level analysis — PSALTer, GH
+    # #360) and the ``--gated`` escape hatch was removed in v0.49.6.
+    # The probe itself is deliberately conservative:
     # when cond(V) is too high to trust the IC-coupling filter (typical
     # for CDT/PGT), a growing mode counts as tachyonic rather than risk a
     # false negative.  Cost: microseconds per evaluation.
@@ -572,7 +565,7 @@ def _evaluate_likelihood(
     # The stage lives in tidal.measurement._stability because tidal sweep
     # runs the identical preamble; it used to be copy-pasted here, and the
     # copies drifted into two different policies (GH #454).
-    stability, stability_meta = probe_for_run(
+    _stability, stability_meta = probe_for_run(
         spec_path,
         base_args,
         param_overrides,
@@ -581,16 +574,6 @@ def _evaluate_likelihood(
         measurements=measurements,
         unavailable_meta=_posdep_probe_unavailable_meta,
     )
-    if (
-        stability is not None
-        and not stability.stable
-        and not likelihood_config.permissive
-    ):
-        return -math.inf, {
-            "run_status": "tachyonic_gated",
-            **stability_meta,
-        }
-
     try:
         if backend == "memory":
             # GH #384 Phase B: pass the already-cached spec through so
@@ -652,7 +635,7 @@ def _evaluate_likelihood(
                     likelihood_config.soft_floor_logl,
                     _floor_rng(likelihood_config.noise_seed, theta),
                 ), {
-                    "run_status": "simulation_failed",
+                    "run_status": RunStatus.SIMULATION_FAILED,
                     "exit_code": int(exit_code),
                     **stability_meta,
                 }
@@ -675,7 +658,7 @@ def _evaluate_likelihood(
             # plan, this is distinct from a NaN/Inf metric value (handled
             # below as ``metric_nan`` with the soft floor).
             return -math.inf, {
-                "run_status": "metric_missing",
+                "run_status": RunStatus.METRIC_MISSING,
                 "missing_metric": likelihood_config.metric,
             }
 
@@ -691,7 +674,7 @@ def _evaluate_likelihood(
                 likelihood_config.soft_floor_logl,
                 _floor_rng(likelihood_config.noise_seed, theta),
             ), {
-                "run_status": "metric_nan",
+                "run_status": RunStatus.METRIC_NAN,
                 likelihood_config.metric: metric_value_f,
                 **stability_meta,
             }
@@ -728,7 +711,7 @@ def _evaluate_likelihood(
             eval_params,
         )
         success_meta: dict[str, Any] = {
-            "run_status": "success",
+            "run_status": RunStatus.SUCCESS,
             likelihood_config.metric: float(metric_value),
             **stability_meta,
         }
@@ -747,7 +730,7 @@ def _evaluate_likelihood(
                 _floor_rng(likelihood_config.noise_seed, theta),
             ), {
                 **success_meta,
-                "run_status": "logl_minus_inf",
+                "run_status": RunStatus.LOGL_MINUS_INF,
             }
         # Distinct tag for samples whose simulation succeeded but logL fell
         # below the soft-floor sentinel — typically P_max ~ 1e-44 or smaller
@@ -756,8 +739,35 @@ def _evaluate_likelihood(
         # clamping); only the run_status tag changes so post-chain analysis
         # can filter these from "physical" min/max summaries.
         if math.isfinite(logl) and logl < SOFT_FLOOR_LOGL:
-            return logl, {**success_meta, "run_status": "below_noise_floor"}
+            return logl, {**success_meta, "run_status": RunStatus.BELOW_NOISE_FLOOR}
         return logl, success_meta  # noqa: TRY300
+
+    except SimulationDivergedError:
+        # The failure mode the campaign actually watches for, now that the
+        # probe is a diagnostic and gates nothing (GH #454).  It used to
+        # fall into the bare except below and be tagged "exception",
+        # indistinguishable from a KeyError in measurement code — and
+        # docs/V3_ARCHITECTURE.md has promised this tag since May 2026
+        # without any code emitting it (GH #480).
+        #
+        # Identical soft floor to the generic branch: the logL is
+        # unchanged, only the tag is finer, so no chain can move.
+        return _soft_floor_logl(
+            likelihood_config.soft_floor_noise_sigma,
+            likelihood_config.soft_floor_logl,
+            _floor_rng(likelihood_config.noise_seed, theta),
+        ), {"run_status": RunStatus.SIMULATION_DIVERGED, **stability_meta}
+
+    except KineticEvaluationError:
+        # A CONFIGURATION error (typically a parameter missing from
+        # --param), not a physics result. Distinct tag for the same reason
+        # GH #447 made this a RuntimeError rather than a ValueError: so
+        # nothing downstream can relabel it as a physics verdict.
+        return _soft_floor_logl(
+            likelihood_config.soft_floor_noise_sigma,
+            likelihood_config.soft_floor_logl,
+            _floor_rng(likelihood_config.noise_seed, theta),
+        ), {"run_status": RunStatus.KINETIC_ERROR, **stability_meta}
 
     except Exception:  # noqa: BLE001
         import logging
@@ -774,7 +784,7 @@ def _evaluate_likelihood(
             likelihood_config.soft_floor_noise_sigma,
             likelihood_config.soft_floor_logl,
             _floor_rng(likelihood_config.noise_seed, theta),
-        ), {"run_status": "exception"}
+        ), {"run_status": RunStatus.EXCEPTION}
 
     finally:
         if run_dir is not None and not keep_sims and run_dir.exists():
