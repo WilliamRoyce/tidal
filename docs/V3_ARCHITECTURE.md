@@ -55,7 +55,21 @@ The campaign output shifts from headline log Z and A_max numbers to per-coupling
 | Metric missing from sim output | `-inf` | `-inf` (genuine bug, not parameter-space signal) | `metric_missing` |
 | Sim returns finite logL **below** `SOFT_FLOOR_LOGL` | n/a (no analogue in v2) | logL kept verbatim (no clamp); distinct tag so post-chain analysis can filter sub-noise-floor samples from "physical" min/max summaries. Issue #356. | `below_noise_floor` |
 
-Default `σ_explore = 1.0` nat; tunable via `--soft-floor-noise SIGMA`. The `--gated` flag preserves v2 hard-rejection behavior for reproducibility.
+Default `σ_explore = 1.0` nat; tunable via `--soft-floor-noise SIGMA`.
+
+> **Amendment (2026-08-27, additive — the table above is preserved as written):**
+> two corrections. (1) The `simulation_diverged` tag was aspirational until
+> v0.49.6: `SimulationDivergedError` actually fell into the bare `except` and was
+> recorded as `exception`, indistinguishable from a bug in measurement code. It is
+> now emitted as documented, and `kinetic_error` joins it so a missing `--param`
+> is not recorded as a physics verdict (GH #480). (2) The `--gated` flag described
+> here was **removed in v0.49.6**: rejection on tachyonic growth is abandoned
+> policy — growth cannot be classified as physics or artifact without theory-level
+> analysis (PSALTer, GH #360) — so the probe is unconditionally a diagnostic and
+> there is no gate to re-enable. Chains recorded with `--gated` between 2026-05-10
+> and v0.49.6 may contain `tachyonic_gated` rows; that value is retained in the
+> `RunStatus` enumeration as archive-only.
+> The vocabulary's source of truth is `tidal.measurement._run_stages.RunStatus`.
 
 `below_noise_floor` is observational metadata only — sample weights at logL ≈ −101 are ~1e−50 (vs ~1e−2 at MAP), so posterior inference is unaffected. The tag protects diagnostic summaries (corner-plot A-range, headline tables) from quoting numerical-noise floors as physical bounds. The simulation's effective noise floor scales with IC amplitude and solver precision; for typical IC=1e−2 and double-precision modal solver, P_max ≈ 1e−34 is the natural threshold and SOFT_FLOOR_LOGL = −100 (P_max ≈ 1e−44) provides a comfortable margin.
 

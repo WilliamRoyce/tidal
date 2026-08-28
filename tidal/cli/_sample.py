@@ -144,9 +144,10 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     from tidal.inference._likelihood import parse_likelihood
 
     baseline_formula: str | None = getattr(args, "baseline_formula", None)
-    # v3 architecture: --gated reverts to v2 hard-rejection; --soft-floor-noise
-    # tunes the Normal(0, sigma) noise on the soft penalty floor.
-    gated: bool = bool(getattr(args, "gated", False))
+    # v3 architecture: --soft-floor-noise tunes the Normal(0, sigma) noise
+    # on the soft penalty floor.  (There is no probe gate to configure:
+    # rejection on tachyonic growth was abandoned as policy and the
+    # --gated flag removed in v0.49.6 — see docs/tex/stability_probe.tex.)
     soft_floor_noise: float = float(getattr(args, "soft_floor_noise", 1.0))
     from tidal.inference._likelihood import SOFT_FLOOR_LOGL
 
@@ -158,7 +159,6 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         likelihood_config = parse_likelihood(
             likelihood_spec,
             baseline_formula=baseline_formula,
-            permissive=(not gated),
             soft_floor_noise_sigma=soft_floor_noise,
             soft_floor_logl=soft_floor_logl,
             noise_seed=seed,

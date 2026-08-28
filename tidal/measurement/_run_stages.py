@@ -33,12 +33,15 @@ Scope: the stages of *running a point*.  Expression evaluation
 is still imported from :mod:`tidal.cli._simulate` directly by the two
 callers that evaluate baseline formulae.
 
-Nothing in this module holds logic of its own beyond the probe stage it
-re-exports from :mod:`tidal.measurement._stability`.
+Beyond the probe stage it re-exports from
+:mod:`tidal.measurement._stability`, this module holds no logic of its
+own --- only :class:`RunStatus`, the shared vocabulary for what can
+happen to a point.
 """
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from tidal.measurement._stability import (
@@ -56,6 +59,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "PROBE_METADATA_KEYS",
+    "RunStatus",
     "measure_from_sim_data",
     "measure_run",
     "parse_bounds",
@@ -67,6 +71,147 @@ __all__ = [
     "set_single_thread_blas",
     "simulate_run",
 ]
+
+
+class RunStatus(StrEnum):
+    """Every outcome a parameter point can have, on either entry point.
+
+    ``run_status`` is the column a reader of a sweep ``results.csv`` or a
+    chain CSV uses to decide whether a row is usable, and what went wrong
+    when it is not.  It had no single definition until GH #480: sweep and
+    inference each grew their own vocabulary, sharing only ``success``,
+    and three documents described three mutually inconsistent
+    taxonomies --- two of them naming tags no code ever emitted.
+
+    A :class:`~enum.StrEnum`, so ``RunStatus.SUCCESS == "success"`` and it
+    serializes as the bare string.  Existing readers
+    (``row.get("run_status") == "success"``) need no change.
+
+    **Names are not unified across the two paths.**  ``SOLVER_ERROR``
+    (sweep) and ``SIMULATION_FAILED`` (inference) mean the same thing
+    under different historical names; renaming either would change values
+    in newly written CSVs and break comparability with the archive, which
+    is a record change and wants its own decision.  This enumeration
+    documents the pairing instead of resolving it.
+    """
+
+    SUCCESS = "success"
+    """The point ran and was measured.  Both paths.
+
+    Note this includes points the stability probe calls tachyonic: since
+    GH #454 the probe is a diagnostic and never blocks a run, so growth
+    is reported in the ``tachyonic_excess`` / ``n_tachyonic_modes``
+    columns rather than by withholding the row."""
+
+    SIMULATION_DIVERGED = "simulation_diverged"
+    """The solver raised :exc:`~tidal.solver.SimulationDivergedError`.
+    Both paths.
+
+    The failure mode the campaign actually watches for, now that the
+    probe does not gate: fields went non-finite or exceeded the norm
+    threshold.  Distinct from :attr:`EXCEPTION` on purpose --- before
+    GH #480 the inference path swallowed divergence into the bare
+    ``except``, so a genuine instability was indistinguishable from a
+    ``KeyError`` in measurement code."""
+
+    SIMULATION_FAILED = "simulation_failed"
+    """The simulation subprocess exited non-zero.  Inference path.
+
+    Same meaning as :attr:`SOLVER_ERROR` on the sweep path."""
+
+    SOLVER_ERROR = "solver_error"
+    """The simulation subprocess exited non-zero.  Sweep path.
+
+    Same meaning as :attr:`SIMULATION_FAILED` on the inference path; the
+    two names are historical."""
+
+    KINETIC_ERROR = "kinetic_error"
+    """A ``kinetic_coefficient_symbolic`` could not be resolved
+    (:exc:`~tidal.solver.KineticEvaluationError`).  Both paths.
+
+    A **configuration** error --- typically a parameter missing from
+    ``--param`` --- not a physics result.  It gets its own tag for the
+    same reason GH #447 made the exception a ``RuntimeError`` rather than
+    a ``ValueError``: so nothing downstream can relabel it as a physics
+    verdict.  Before GH #480 the sweep row path caught it in a broad
+    ``except RuntimeError`` and recorded it as ``diverged``."""
+
+    MEASUREMENT_ERROR = "measurement_error"
+    """The simulation ran but a measurement failed.  Sweep path."""
+
+    METRIC_MISSING = "metric_missing"
+    """The requested metric is absent from the simulation output.
+    Inference path.  A genuine bug rather than parameter-space signal, so
+    it keeps ``-inf`` rather than the soft floor."""
+
+    METRIC_NAN = "metric_nan"
+    """The metric evaluated to NaN or Inf.  Inference path.  Soft-floored
+    with a distinct tag so post-chain analysis can find these
+    specifically."""
+
+    BELOW_NOISE_FLOOR = "below_noise_floor"
+    """The simulation returned a finite logL below ``SOFT_FLOOR_LOGL``.
+    Inference path.  Observational metadata only --- the value is kept
+    verbatim, not clamped (GH #356)."""
+
+    LOGL_MINUS_INF = "logl_minus_inf"
+    """The likelihood evaluated to ``-inf``.  Inference path."""
+
+    EXCEPTION = "exception"
+    """An unexpected exception.  Both paths.
+
+    The residual bucket: everything not covered by a specific tag above.
+    A row landing here is a defect to investigate, not a parameter-space
+    feature."""
+
+    # --- historical values -------------------------------------------
+    # Nothing emits these any more.  They are retained because archived
+    # CSVs contain them and a reader needs to know what they meant.
+
+    DIVERGED = "diverged"
+    """**Historical.**  The sweep path's pre-GH #480 catch-all: every
+    ``ValueError``/``TypeError``/``KeyError``/``OSError``/``RuntimeError``
+    from a run was recorded under this one physics-sounding name,
+    configuration errors included.  Split into
+    :attr:`SIMULATION_DIVERGED`, :attr:`KINETIC_ERROR`,
+    :attr:`MEASUREMENT_ERROR` and :attr:`EXCEPTION`."""
+
+    TACHYONIC_GATED = "tachyonic_gated"
+    """**Historical.**  A point the stability probe called tachyonic,
+    rejected without being simulated under the ``--gated`` flag.  The flag
+    was removed in v0.49.6: rejection on numerical growth is abandoned
+    policy, because growth cannot be classified as physics or artifact
+    without theory-level analysis (PSALTer, GH #360).  Appears in chains
+    and sweeps run with ``--gated`` between 2026-05-10 and v0.49.6."""
+
+    @classmethod
+    def live(cls) -> frozenset[RunStatus]:
+        """Statuses the current code can emit (i.e. excluding historical)."""
+        return frozenset(cls) - {cls.DIVERGED, cls.TACHYONIC_GATED}
+
+    @classmethod
+    def from_exception(cls, exc: BaseException) -> RunStatus:
+        """Classify an exception raised while running a point.
+
+        One classification shared by every caller that catches broadly,
+        so a physics failure, a configuration error and a bug cannot be
+        collapsed into one tag again.  The sweep path did exactly that
+        until GH #480: a single ``except (ValueError, TypeError, KeyError,
+        OSError, RuntimeError, SystemExit)`` recorded all of them as
+        ``diverged``.
+        """
+        from tidal.solver import (
+            KineticEvaluationError,
+            SimulationDivergedError,
+        )
+
+        if isinstance(exc, SimulationDivergedError):
+            return cls.SIMULATION_DIVERGED
+        if isinstance(exc, KineticEvaluationError):
+            return cls.KINETIC_ERROR
+        if isinstance(exc, (ValueError, TypeError, KeyError, OSError)):
+            return cls.MEASUREMENT_ERROR
+        return cls.EXCEPTION
 
 
 def parse_params(

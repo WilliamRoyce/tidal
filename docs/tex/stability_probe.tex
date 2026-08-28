@@ -134,10 +134,14 @@ shorter $t_{\text{end}}$ or a localised-$B$ geometry with a finite
 interaction time, and surfaces honestly as a diverged run rather than
 as an absent row.
 
-\texttt{--gated} restores the pre-v3 hard rejection on both
-\texttt{tidal sample} and \texttt{tidal sweep}.  It exists so archived
-v2 chains and April-2026 sweeps can be reproduced bit-for-bit, and is
-\textbf{not} a physics option.
+\textbf{There is no flag to re-enable rejection.}  A \texttt{--gated}
+escape hatch existed from 2026-05-10, restoring the pre-v3 hard
+rejection so archived v2 chains could be reproduced bit-for-bit; it was
+removed in v0.49.6.  Keeping a switch for an abandoned policy leaves it
+one flag away from being used, and the reproducibility it bought is
+still available from a checkout of the release that produced those
+chains.  Their rows carry \texttt{run\_status=tachyonic\_gated}, which
+is retained in \texttt{RunStatus} as an archive-only value.
 
 \paragraph{How the two entry points diverged (GH~\#454).}  The v3
 permissive change (2026-05-10) rewrote the inference path and left the

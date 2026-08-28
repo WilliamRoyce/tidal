@@ -10,7 +10,52 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
-## [Unreleased]
+- **One `run_status` vocabulary, and divergence is finally distinguishable
+  (#480)**. `run_status` is the column that tells a reader whether a row is
+  usable, and it had no single definition: sweep emitted `success`,
+  `solver_error`, `measurement_error`, `diverged`; inference emitted `success`,
+  `simulation_failed`, `metric_missing`, `metric_nan`, `logl_minus_inf`,
+  `below_noise_floor`, `exception`. They shared exactly one value. Three
+  documents described three mutually inconsistent taxonomies, two naming tags no
+  code ever emitted. `tidal.measurement._run_stages.RunStatus` is now the single
+  definition, a `StrEnum` so every existing consumer
+  (`row["run_status"] == "success"`) keeps working untouched. Two defects fall
+  out of it:
+  - **`SimulationDivergedError` was invisible on the inference path.** It fell
+    into the bare `except Exception` and was tagged `exception` —
+    indistinguishable from a `KeyError` in measurement code — while
+    `docs/V3_ARCHITECTURE.md` had promised `simulation_diverged` since May 2026.
+    That matters now that the probe gates nothing (#454): divergence is the
+    failure mode the campaign watches for. The tag is emitted on both paths, and
+    since the soft floor is applied identically either way, **logL is unchanged
+    and no recorded chain can shift** — asserted by test.
+  - **Sweep recorded configuration errors as a physics verdict.** A single
+    `except (ValueError, TypeError, KeyError, OSError, RuntimeError, SystemExit)`
+    tagged all of them `diverged`, `KineticEvaluationError` included — so a
+    parameter missing from `--param` read as a divergence. That is the
+    mislabeling #447 prevented at the probe (by making the exception a
+    `RuntimeError`, not a `ValueError`), reintroduced one layer up. Now split
+    into `simulation_diverged` / `kinetic_error` / `measurement_error` /
+    `exception` via `RunStatus.from_exception`.
+
+  `KineticEvaluationError` is now exported from `tidal.solver` alongside
+  `SimulationDivergedError` — an exception callers are expected to catch belongs
+  in the public surface.
+
+### Removed
+
+- **`--gated` (BREAKING, CLI)**. The flag restored the pre-v3 hard rejection of
+  tachyonic points on `tidal sample` (since 2026-05-10) and `tidal sweep` (since
+  v0.49.5), as a reproducibility affordance for archived runs. Rejection on
+  tachyonic growth is abandoned policy — growth cannot be classified as physics
+  or artifact without theory-level analysis (PSALTer, #360) — and keeping a
+  switch for an abandoned policy leaves it one flag away from being used. The
+  probe is now unconditionally a diagnostic on both paths. `LikelihoodConfig`
+  loses its `permissive` field and `parse_likelihood` its `permissive` kwarg.
+  **Consequence:** chains and sweeps recorded with `--gated` can no longer be
+  reproduced bit-for-bit from the current codebase, only from a checkout of the
+  release that produced them. Their rows carry `run_status=tachyonic_gated`,
+  retained in `RunStatus` as archive-only.
 
 ### Fixed
 

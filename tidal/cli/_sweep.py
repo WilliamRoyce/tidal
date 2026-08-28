@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from tidal.measurement._run_stages import RunStatus
 from tidal.measurement._stability import probe_for_run
 
 if TYPE_CHECKING:
@@ -966,7 +967,7 @@ def _run_single(  # noqa: PLR0913, PLR0917
     # columns.  The probe now resolves the grid the same way the
     # simulation does (GH #479), so it runs there and describes the
     # system that is about to be evolved.
-    stability, sweep_stability_meta = probe_for_run(
+    _stability, sweep_stability_meta = probe_for_run(
         spec_path,
         base_args,
         param_overrides,
@@ -975,22 +976,6 @@ def _run_single(  # noqa: PLR0913, PLR0917
         measurements=measurements,
         grid_shape_override=grid_shape_override,
     )
-    if (
-        stability is not None
-        and not stability.stable
-        and getattr(base_args, "gated", False)
-    ):
-        # ``--gated``: reproduce the pre-v0.49.5 row for archived sweeps.
-        # A reproducibility affordance, NOT a physics policy — see
-        # docs/tex/stability_probe.tex.
-        return {
-            "run_status": "tachyonic_gated",
-            "error_message": stability.message[:200],
-            "solver_exit_code": 0,
-            "wall_time_s": 0.0,
-            "error": stability.message,
-            **sweep_stability_meta,
-        }
 
     # 1. Simulate
     exit_code, wall_time, spec = _simulate_run(
@@ -1005,7 +990,7 @@ def _run_single(  # noqa: PLR0913, PLR0917
 
     if exit_code != 0:
         return {
-            "run_status": "solver_error",
+            "run_status": RunStatus.SOLVER_ERROR,
             "error_message": f"solver exit code {exit_code}",
             "solver_exit_code": exit_code,
             "wall_time_s": round(wall_time, 2),
@@ -1023,7 +1008,7 @@ def _run_single(  # noqa: PLR0913, PLR0917
         spec=spec,
     )
     metrics["wall_time_s"] = round(wall_time, 2)
-    metrics["run_status"] = "success"
+    metrics["run_status"] = RunStatus.SUCCESS
     metrics["error_message"] = None
     metrics["solver_exit_code"] = 0
     metrics.update(sweep_stability_meta)
@@ -1066,12 +1051,12 @@ def _measure_existing(  # noqa: PLR0913, PLR0917
     except (ValueError, TypeError, KeyError, OSError, RuntimeError, SystemExit) as exc:
         return {
             "error": f"resume_measure_failed: {exc}",
-            "run_status": "measurement_error",
+            "run_status": RunStatus.MEASUREMENT_ERROR,
             "error_message": str(exc)[:200],
             "solver_exit_code": 0,
         }
     else:
-        metrics.setdefault("run_status", "success")
+        metrics.setdefault("run_status", RunStatus.SUCCESS)
         metrics.setdefault("error_message", None)
         metrics.setdefault("solver_exit_code", 0)
         return metrics
@@ -1266,7 +1251,10 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                     sim_settings,
                     {
                         "error": str(exc),
-                        "run_status": "diverged",
+                        # Was a flat "diverged" for every exception type,
+                        # so a missing --param or a KeyError in measurement
+                        # code read as a physics verdict (GH #480).
+                        "run_status": RunStatus.from_exception(exc),
                         "error_message": str(exc)[:200],
                         "solver_exit_code": -1,
                     },
@@ -1548,7 +1536,7 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
             print(f" ERROR: {exc}")
             metrics = {
                 "error": str(exc),
-                "run_status": "diverged",
+                "run_status": RunStatus.from_exception(exc),
                 "error_message": str(exc)[:200],
                 "solver_exit_code": -1,
             }
@@ -2375,7 +2363,7 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
     except (RuntimeError, SystemExit) as exc:
         metrics = {
             "error": str(exc)[:500],
-            "run_status": "diverged",
+            "run_status": RunStatus.from_exception(exc),
             "error_message": str(exc)[:200],
             "solver_exit_code": -1,
         }

@@ -590,13 +590,12 @@ class TestSweepTachyonicPolicy:
         monkeypatch.setattr(sweep_mod, "_measure_run", _measure)
 
     @staticmethod
-    def _args(*, gated: bool) -> Namespace:
+    def _args() -> Namespace:
         return Namespace(
             param=[],
             grid_shape=32,
             bounds="0:50",
             ic_wavevector=None,
-            gated=gated,
         )
 
     def test_default_simulates_and_records_the_verdict(
@@ -610,7 +609,7 @@ class TestSweepTachyonicPolicy:
         self._patch(monkeypatch, simulated)
 
         row = sweep_mod._run_single(
-            self._args(gated=False),
+            self._args(),
             T1_SPEC,
             {},
             tmp_path,
@@ -629,30 +628,25 @@ class TestSweepTachyonicPolicy:
         assert row["n_tachyonic_modes"] == 7
         assert row["k_tachyonic"] == 0.31
 
-    def test_gated_reproduces_the_old_blocking_row(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-        tmp_path: Path,
-    ) -> None:
-        import tidal.cli._sweep as sweep_mod
+    def test_there_is_no_configuration_that_blocks(self) -> None:
+        """The probe verdict is unconditionally a diagnostic (v0.49.6).
 
-        simulated: list[bool] = []
-        self._patch(monkeypatch, simulated)
+        ``--gated`` reproduced the pre-v0.49.5 blocking row for archived
+        sweeps; it was removed once rejection on tachyonic growth was
+        abandoned as policy, so the abandoned behavior is now structurally
+        unreachable rather than merely off by default.
+        """
+        from tidal.cli import _build_parser
 
-        row = sweep_mod._run_single(
-            self._args(gated=True),
-            T1_SPEC,
-            {},
-            tmp_path,
-            {"conversion"},
-            ("a_1",),
-            ("a_2",),
-            0.99,
-        )
-
-        assert simulated == [], "--gated must not simulate the blocked point"
-        # Status string matches the inference path, so one post-hoc filter
-        # catches both.
-        assert row["run_status"] == "tachyonic_gated"
-        assert row["wall_time_s"] == 0.0
-        assert row["tachyonic_excess"] == 0.42
+        with pytest.raises(SystemExit):
+            _build_parser().parse_args(
+                [
+                    "sweep",
+                    "x.json",
+                    "--sweep",
+                    "p=0:1:2",
+                    "--measure",
+                    "conversion",
+                    "--gated",
+                ]
+            )
