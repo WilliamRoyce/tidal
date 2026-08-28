@@ -573,7 +573,7 @@ class TestSweepTachyonicPolicy:
         """Patch the shared stages, not the caller.
 
         ``_run_single`` delegates the sequence to ``run_point`` (GH #480),
-        so the stages are patched where they now live.  The behaviour under
+        so the stages are patched where they now live.  The behavior under
         test is unchanged — that the probe verdict is recorded and the
         point simulated anyway — only the seam moved.
         """
