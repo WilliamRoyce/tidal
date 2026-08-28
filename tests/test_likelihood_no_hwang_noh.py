@@ -94,7 +94,7 @@ class TestHwangNohRemoved:
         This used to compare permissive against ``--gated``: that flag
         controlled the upstream tachyonic gate, never the value-level
         Hwang-Noh check, and neither mode re-enabled the cap.  With the
-        gate removed entirely (v0.49.6) there is only one mode left, and
+        gate removed entirely (v0.50.0) there is only one mode left, and
         the property to pin is simply that a large P_max is scored
         faithfully.
         """

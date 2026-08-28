@@ -4,7 +4,7 @@ Was ``test_likelihood_permissive.py``.  The v3 architecture
 (post-2026-05-08 supervisor pivot, see ``docs/V3_ARCHITECTURE.md``) made
 the pre-flight tachyonic probe a metadata-only measurement, keeping a
 ``permissive=False`` / ``--gated`` escape hatch that restored v2
-hard-rejection.  That escape hatch was removed in v0.49.6: rejection on
+hard-rejection.  That escape hatch was removed in v0.50.0: rejection on
 tachyonic growth is abandoned policy, because growth cannot be
 classified as physics or artifact without theory-level analysis
 (PSALTer, GH #360).  Nothing now acts on the probe verdict, so there is
@@ -38,7 +38,7 @@ class TestLikelihoodConfigDefaults:
     def test_no_gate_to_configure(self) -> None:
         """The probe verdict is not a configurable rejection any more.
 
-        Pins the v0.49.6 removal: a ``permissive`` field reappearing would
+        Pins the v0.50.0 removal: a ``permissive`` field reappearing would
         mean the abandoned policy had been made reachable again.
         """
         lc = LikelihoodConfig(metric="P_max", likelihood_type="maximize")

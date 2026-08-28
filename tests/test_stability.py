@@ -629,7 +629,7 @@ class TestSweepTachyonicPolicy:
         assert row["k_tachyonic"] == 0.31
 
     def test_there_is_no_configuration_that_blocks(self) -> None:
-        """The probe verdict is unconditionally a diagnostic (v0.49.6).
+        """The probe verdict is unconditionally a diagnostic (v0.50.0).
 
         ``--gated`` reproduced the pre-v0.49.5 blocking row for archived
         sweeps; it was removed once rejection on tachyonic growth was

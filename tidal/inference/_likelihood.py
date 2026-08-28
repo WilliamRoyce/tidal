@@ -15,7 +15,7 @@ perturbativity gate (``P_max > 0.5 -> -inf``) is removed entirely; large
 ``P_max`` is faithful linearized-PDE output, not a probability-conservation
 violation.  The pre-flight tachyonic probe is run as a metadata measurement
 only — nothing acts on its verdict (GH #454; the ``--gated`` escape hatch
-was removed in v0.49.6).
+was removed in v0.50.0).
 """
 
 from __future__ import annotations
@@ -556,7 +556,7 @@ def _evaluate_likelihood(
     # support post-hoc filtering.  Nothing acts on the verdict: rejection
     # on tachyonic growth was abandoned as policy (growth cannot be called
     # physics or artifact without theory-level analysis — PSALTer, GH
-    # #360) and the ``--gated`` escape hatch was removed in v0.49.6.
+    # #360) and the ``--gated`` escape hatch was removed in v0.50.0.
     # The probe itself is deliberately conservative:
     # when cond(V) is too high to trust the IC-coupling filter (typical
     # for CDT/PGT), a growing mode counts as tachyonic rather than risk a

@@ -179,10 +179,10 @@ class RunStatus(StrEnum):
     TACHYONIC_GATED = "tachyonic_gated"
     """**Historical.**  A point the stability probe called tachyonic,
     rejected without being simulated under the ``--gated`` flag.  The flag
-    was removed in v0.49.6: rejection on numerical growth is abandoned
+    was removed in v0.50.0: rejection on numerical growth is abandoned
     policy, because growth cannot be classified as physics or artifact
     without theory-level analysis (PSALTer, GH #360).  Appears in chains
-    and sweeps run with ``--gated`` between 2026-05-10 and v0.49.6."""
+    and sweeps run with ``--gated`` between 2026-05-10 and v0.50.0."""
 
     @classmethod
     def live(cls) -> frozenset[RunStatus]:

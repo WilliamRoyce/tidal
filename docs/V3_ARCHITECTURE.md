@@ -59,15 +59,15 @@ Default `σ_explore = 1.0` nat; tunable via `--soft-floor-noise SIGMA`.
 
 > **Amendment (2026-08-27, additive — the table above is preserved as written):**
 > two corrections. (1) The `simulation_diverged` tag was aspirational until
-> v0.49.6: `SimulationDivergedError` actually fell into the bare `except` and was
+> v0.50.0: `SimulationDivergedError` actually fell into the bare `except` and was
 > recorded as `exception`, indistinguishable from a bug in measurement code. It is
 > now emitted as documented, and `kinetic_error` joins it so a missing `--param`
 > is not recorded as a physics verdict (GH #480). (2) The `--gated` flag described
-> here was **removed in v0.49.6**: rejection on tachyonic growth is abandoned
+> here was **removed in v0.50.0**: rejection on tachyonic growth is abandoned
 > policy — growth cannot be classified as physics or artifact without theory-level
 > analysis (PSALTer, GH #360) — so the probe is unconditionally a diagnostic and
 > there is no gate to re-enable. Chains recorded with `--gated` between 2026-05-10
-> and v0.49.6 may contain `tachyonic_gated` rows; that value is retained in the
+> and v0.50.0 may contain `tachyonic_gated` rows; that value is retained in the
 > `RunStatus` enumeration as archive-only.
 > The vocabulary's source of truth is `tidal.measurement._run_stages.RunStatus`.
 
