@@ -17,30 +17,44 @@ left behind at the copy site, ``# Pre-flight tachyonic guard -- mirrors
 _run_row_inner in _sweep.py``.
 
 Implementations of the simulate/measure stages currently live in
-:mod:`tidal.cli._sweep` for historical reasons, and were reached by
+:mod:`tidal.cli._sweep`, and were reached by
 :mod:`tidal.inference._likelihood` and
 :mod:`tidal.measurement._posthoc_audit` importing private names out of a
 CLI module.  This module is the seam that hides that: callers outside
-:mod:`tidal.cli` import from here, so the implementations can move into
-the library layer without touching them.  Relocating them, and
-collapsing ``_run_single`` / ``_evaluate_likelihood`` onto a single
-policy-free ``run_point(ctx) -> PointOutcome``, is tracked separately --
-those are the two hottest paths in the package and want their own
-regression campaign.
+:mod:`tidal.cli` import from here.
+
+**Why they have not simply been moved.**  The obvious next step --- relocate
+the ~450 lines of wrappers into this package (GH #480 step 4) --- does not
+buy what it looks like it buys.  The wrappers are not the dependency:
+
+* ``simulate_run`` and ``run_inference_step`` call
+  ``tidal.cli._simulate._simulate``, the ~3000-line simulation driver.
+* ``measure_from_sim_data`` calls eleven private ``_run_*`` measurement
+  dispatchers in the ~1000-line :mod:`tidal.cli._measure`.
+
+Moving the wrappers would relocate a large diff across the two hottest
+paths in the package and leave both couplings exactly where they are ---
+the lazy import would simply be issued from a different file.  The real
+work is relocating the *driver* and the *dispatchers* out of
+:mod:`tidal.cli`, which is a different and much larger project than
+GH #480 step 4 assumed.  Recorded on that issue so it is not re-attempted
+on the wrong premise.
 
 Scope: the stages of *running a point*.  Expression evaluation
 (``FORMULA_NAMESPACE``, ``safe_formula_eval``) is a separate concern and
 is still imported from :mod:`tidal.cli._simulate` directly by the two
 callers that evaluate baseline formulae.
 
-Beyond the probe stage it re-exports from
-:mod:`tidal.measurement._stability`, this module holds no logic of its
-own --- only :class:`RunStatus`, the shared vocabulary for what can
-happen to a point.
+:func:`run_point` is that sequence, written once.  Beyond it and the
+probe stage re-exported from :mod:`tidal.measurement._stability`, this
+module holds no logic of its own --- only :class:`RunStatus`, the shared
+vocabulary for what can happen to a point.
 """
 
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
@@ -52,6 +66,7 @@ from tidal.measurement._stability import (
 
 if TYPE_CHECKING:
     from argparse import Namespace
+    from collections.abc import Callable
     from pathlib import Path
 
     from tidal.measurement._io import SimulationData
@@ -59,6 +74,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "PROBE_METADATA_KEYS",
+    "PointContext",
+    "PointOutcome",
     "RunStatus",
     "measure_from_sim_data",
     "measure_run",
@@ -68,6 +85,7 @@ __all__ = [
     "probe_for_run",
     "probe_metadata",
     "run_inference_step",
+    "run_point",
     "set_single_thread_blas",
     "simulate_run",
 ]
@@ -209,8 +227,13 @@ class RunStatus(StrEnum):
             return cls.SIMULATION_DIVERGED
         if isinstance(exc, KineticEvaluationError):
             return cls.KINETIC_ERROR
-        if isinstance(exc, (ValueError, TypeError, KeyError, OSError)):
-            return cls.MEASUREMENT_ERROR
+        # Deliberately nothing else.  An exception TYPE identifies the stage
+        # only when the type is specific to it: a bare OSError is a missing
+        # spec file as readily as an unreadable output, and a ValueError is
+        # a bad parameter as readily as a failed measurement.  Guessing the
+        # stage from the type was an over-claim in the first cut of this
+        # helper; :attr:`MEASUREMENT_ERROR` is now set by ``run_point``
+        # where it actually knows it is measuring.
         return cls.EXCEPTION
 
 
@@ -270,12 +293,10 @@ def simulate_run(  # noqa: PLR0913
     ic_perturbation: float | None = None,
     spec: EquationSystem | None = None,
 ) -> tuple[int, float, EquationSystem]:
-    """Run one simulation to disk. See ``tidal.cli._sweep._simulate_run``."""
-    from tidal.cli._sweep import (
-        _simulate_run,  # pyright: ignore[reportPrivateUsage]
-    )
+    """Run one simulation to disk. See ``tidal.cli._sweep.simulate_run``."""
+    from tidal.cli._sweep import simulate_run as _impl
 
-    return _simulate_run(
+    return _impl(
         base_args,
         spec_path,
         param_overrides,
@@ -346,3 +367,248 @@ def set_single_thread_blas() -> None:
     )
 
     _set_single_thread_blas()
+
+
+# ---------------------------------------------------------------------------
+# Running one point
+# ---------------------------------------------------------------------------
+
+
+class _MeasurementStageError(Exception):
+    """Internal marker: the failure happened in the MEASURE stage.
+
+    Carries the original exception so the outcome can report it.  Exists
+    so the stage is identified by where it was raised rather than guessed
+    from the exception's type — a ``ValueError`` is a bad parameter as
+    readily as a failed measurement.
+    """
+
+    def __init__(self, cause: BaseException) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+
+
+@dataclass(frozen=True)
+class PointContext:
+    """Everything needed to run one point in parameter space. No policy.
+
+    Carries the differences between the two entry points explicitly, so
+    they are visible as data rather than as two divergent code paths:
+    ``run_dir`` is a durable artifact for a sweep and a temp directory for
+    the inference disk backend; ``replicate_seed`` / ``ic_perturbation``
+    are sweep-only; ``sampled_params`` is inference-only.
+    """
+
+    spec_path: Path
+    base_args: Namespace
+    param_overrides: dict[str, float]
+    measurements: set[str]
+    source: tuple[str, ...] | None
+    target: tuple[str, ...] | None
+    threshold: float
+    run_dir: Path | None = None
+    grid_shape_override: int | None = None
+    replicate_seed: int | None = None
+    ic_perturbation: float | None = None
+    #: Sampled (BSM) parameter names, stashed on the spec's metadata so the
+    #: modal convolution-block cache can tell which symbols vary per call
+    #: from which are geometry-fixed (GH #384 Phase A').  Memory backend only.
+    sampled_params: tuple[str, ...] | None = None
+    #: Hook for the GH #421 "probe unavailable" marker.  The inference path
+    #: passes its warn-once builder so a position-dependent-kinetic spec
+    #: records WHY the diagnostic columns are absent; sweep passes nothing.
+    unavailable_meta: Callable[[BaseException], dict[str, Any]] | None = None
+
+
+@dataclass(frozen=True)
+class PointOutcome:
+    """What happened to a point.  Still no policy — nothing here is a verdict.
+
+    ``status`` says what occurred; it does not say what to do about it.
+    Mapping an outcome to a results row or to a log-likelihood is the
+    caller's business, and the two callers answer differently: a sweep
+    records the row, inference applies a soft floor whose noise is seeded
+    on ``theta`` (GH #408) and so cannot be computed here.
+    """
+
+    status: RunStatus
+    metrics: dict[str, Any] = field(default_factory=dict)
+    stability: dict[str, Any] = field(default_factory=dict)
+    wall_time_s: float = 0.0
+    spec: EquationSystem | None = None
+    exit_code: int | None = None
+    #: The exception, when one was caught.  Retained rather than
+    #: stringified so a caller that wants the original propagation (the
+    #: sweep loop builds its error rows from the exception, with the swept
+    #: values it holds and ``run_point`` does not) can re-raise it intact.
+    exception: BaseException | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status is RunStatus.SUCCESS
+
+
+def run_point(ctx: PointContext, *, backend: str = "disk") -> PointOutcome:
+    """Run one parameter point: probe -> simulate -> measure -> classify.
+
+    The single definition of the sequence both ``tidal sweep`` and
+    ``tidal sample`` execute.  They used to hand-roll it separately, which
+    is why a policy change to the probe stage reached only one of them for
+    four months (GH #454) and why they emitted different metadata schemas
+    and different status vocabularies (GH #480).
+
+    **Total**: every path returns an outcome, including the failure ones.
+    That is what lets both callers be straight-line mappings instead of
+    re-implementing exception handling, and it is why
+    :meth:`RunStatus.from_exception` exists.
+
+    **Policy-free**: it never rejects a point, never soft-floors, never
+    writes a row.  In particular the stability probe is run for its
+    diagnostics and its verdict is *recorded*, never acted on — rejection
+    on tachyonic growth is abandoned policy (GH #454).
+
+    Parameters
+    ----------
+    backend
+        ``"disk"`` runs the simulation to ``ctx.run_dir`` and measures from
+        it.  ``"memory"`` runs in-process and measures the arrays directly,
+        skipping the disk round-trip; it is the inference default, with
+        the disk path kept for bisectability (GH #269).
+    """
+    stability: dict[str, Any] = {}
+    try:
+        _result, stability = probe_for_run(
+            ctx.spec_path,
+            ctx.base_args,
+            ctx.param_overrides,
+            source=ctx.source,
+            target=ctx.target,
+            measurements=ctx.measurements,
+            grid_shape_override=ctx.grid_shape_override,
+            unavailable_meta=ctx.unavailable_meta,
+        )
+
+        if backend == "memory":
+            spec, metrics, wall_time_s = _run_in_memory(ctx)
+            exit_code = 0
+        else:
+            spec, metrics, wall_time_s, exit_code = _run_on_disk(ctx)
+            if exit_code != 0:
+                return PointOutcome(
+                    status=RunStatus.SIMULATION_FAILED,
+                    stability=stability,
+                    wall_time_s=wall_time_s,
+                    spec=spec,
+                    exit_code=exit_code,
+                )
+    except _MeasurementStageError as wrapper:
+        return PointOutcome(
+            status=RunStatus.MEASUREMENT_ERROR,
+            stability=stability,
+            exception=wrapper.cause,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return PointOutcome(
+            status=RunStatus.from_exception(exc),
+            stability=stability,
+            exception=exc,
+        )
+
+    return PointOutcome(
+        status=RunStatus.SUCCESS,
+        metrics=metrics,
+        stability=stability,
+        wall_time_s=wall_time_s,
+        spec=spec,
+        exit_code=exit_code,
+    )
+
+
+def _run_in_memory(
+    ctx: PointContext,
+) -> tuple[EquationSystem | None, dict[str, Any], float]:
+    """Simulate in-process and measure the arrays directly.
+
+    Raises
+    ------
+    _MeasurementStageError
+        If the measure stage raises, so the outcome can attribute the
+        failure to that stage rather than guessing from the type.
+    """
+    import dataclasses as _dc
+
+    from tidal.symbolic._spec_cache import load_spec_cached
+
+    spec_arg: EquationSystem | None = None
+    if ctx.sampled_params is not None:
+        raw_spec = load_spec_cached(ctx.spec_path)
+        spec_arg = _dc.replace(
+            raw_spec,
+            metadata={
+                **raw_spec.metadata,
+                "_inference_sampled_params": tuple(ctx.sampled_params),
+            },
+        )
+
+    started = time.perf_counter()
+    sim_data = run_inference_step(
+        ctx.base_args,
+        ctx.spec_path,
+        ctx.param_overrides,
+        spec_arg,
+    )
+    try:
+        metrics = measure_from_sim_data(
+            sim_data,
+            ctx.measurements,
+            ctx.source,
+            ctx.target,
+            ctx.threshold,
+        )
+    except Exception as exc:
+        raise _MeasurementStageError(exc) from exc
+    return sim_data.spec, metrics, time.perf_counter() - started
+
+
+def _run_on_disk(
+    ctx: PointContext,
+) -> tuple[EquationSystem | None, dict[str, Any], float, int]:
+    """Simulate to ``ctx.run_dir`` and measure from it.
+
+    Raises
+    ------
+    ValueError
+        If ``ctx.run_dir`` is unset; the disk backend has nowhere to write.
+    _MeasurementStageError
+        If the measure stage raises, so the outcome can attribute the
+        failure to that stage rather than guessing from the type.
+    """
+    if ctx.run_dir is None:
+        msg = "run_point(backend='disk') requires PointContext.run_dir"
+        raise ValueError(msg)
+
+    exit_code, wall_time_s, spec = simulate_run(
+        ctx.base_args,
+        ctx.spec_path,
+        ctx.param_overrides,
+        ctx.run_dir,
+        ctx.grid_shape_override,
+        replicate_seed=ctx.replicate_seed,
+        ic_perturbation=ctx.ic_perturbation,
+    )
+    if exit_code != 0:
+        return spec, {}, wall_time_s, exit_code
+
+    try:
+        metrics = measure_run(
+            ctx.run_dir,
+            ctx.spec_path,
+            ctx.measurements,
+            ctx.source,
+            ctx.target,
+            ctx.threshold,
+            spec,
+        )
+    except Exception as exc:
+        raise _MeasurementStageError(exc) from exc
+    return spec, metrics, wall_time_s, exit_code

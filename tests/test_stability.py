@@ -570,7 +570,14 @@ class TestSweepTachyonicPolicy:
         monkeypatch: pytest.MonkeyPatch,
         simulated: list[bool],
     ) -> None:
-        import tidal.cli._sweep as sweep_mod
+        """Patch the shared stages, not the caller.
+
+        ``_run_single`` delegates the sequence to ``run_point`` (GH #480),
+        so the stages are patched where they now live.  The behavior under
+        test is unchanged — that the probe verdict is recorded and the
+        point simulated anyway — only the seam moved.
+        """
+        import tidal.measurement._run_stages as stages
         from tidal.measurement._stability import probe_metadata
 
         unstable = self._unstable()
@@ -585,9 +592,9 @@ class TestSweepTachyonicPolicy:
         def _measure(*_a: object, **_k: object) -> dict[str, object]:
             return {"P_max": 0.017}
 
-        monkeypatch.setattr(sweep_mod, "probe_for_run", _probe)
-        monkeypatch.setattr(sweep_mod, "_simulate_run", _simulate)
-        monkeypatch.setattr(sweep_mod, "_measure_run", _measure)
+        monkeypatch.setattr(stages, "probe_for_run", _probe)
+        monkeypatch.setattr(stages, "simulate_run", _simulate)
+        monkeypatch.setattr(stages, "measure_run", _measure)
 
     @staticmethod
     def _args() -> Namespace:

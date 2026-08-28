@@ -247,10 +247,158 @@ class TestExceptionClassification:
 
     @pytest.mark.parametrize(
         "exc",
-        [ValueError("bad"), TypeError("bad"), KeyError("bad"), OSError("bad")],
+        [
+            ValueError("bad"),
+            TypeError("bad"),
+            KeyError("bad"),
+            OSError("bad"),
+            RuntimeError("?"),
+        ],
     )
-    def test_measurement_failures_are_measurement_errors(self, exc: Exception) -> None:
-        assert RunStatus.from_exception(exc) is RunStatus.MEASUREMENT_ERROR
+    def test_generic_types_are_not_attributed_to_a_stage(self, exc: Exception) -> None:
+        """An exception TYPE does not identify the stage that raised it.
 
-    def test_unexpected_exceptions_fall_through_to_exception(self) -> None:
-        assert RunStatus.from_exception(RuntimeError("?")) is RunStatus.EXCEPTION
+        The first cut of this helper mapped ValueError/TypeError/KeyError/
+        OSError to MEASUREMENT_ERROR. That over-claims: a bare OSError is a
+        missing spec file as readily as an unreadable output, and a
+        ValueError is a bad parameter as readily as a failed measurement.
+        Concretely it mislabelled a missing spec path on the inference
+        path, which the GH #480 equal-output proof caught.
+
+        MEASUREMENT_ERROR is now set by ``run_point`` at the point where it
+        is actually measuring — attribution by position, not by type.
+        """
+        assert RunStatus.from_exception(exc) is RunStatus.EXCEPTION
+
+    def test_measurement_stage_failures_are_attributed_by_position(self) -> None:
+        """``run_point`` tags a failure in the measure stage, wherever it came from."""
+        from tidal.measurement._run_stages import (
+            _MeasurementStageError,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        cause = KeyError("P_max")
+        wrapper = _MeasurementStageError(cause)
+        assert wrapper.cause is cause
+        # The type alone would have said EXCEPTION; position says otherwise.
+        assert RunStatus.from_exception(cause) is RunStatus.EXCEPTION
+
+
+class TestRunPointTotality:
+    """``run_point`` returns an outcome for every path, and never raises.
+
+    That totality is what lets both callers be straight-line mappings
+    instead of each re-implementing exception handling — which is how they
+    drifted apart in the first place (GH #454).
+    """
+
+    @staticmethod
+    def _ctx(tmp_path: Path) -> object:
+        from argparse import Namespace
+
+        from tidal.measurement._run_stages import PointContext
+
+        return PointContext(
+            spec_path=Path("/nonexistent/spec.json"),
+            base_args=Namespace(param=[], grid_shape=None, bounds=None),
+            param_overrides={},
+            measurements={"summary"},
+            source=None,
+            target=None,
+            threshold=0.99,
+            run_dir=tmp_path,
+        )
+
+    @pytest.mark.parametrize(
+        ("exc_factory", "expected"),
+        [
+            ("SimulationDivergedError", RunStatus.SIMULATION_DIVERGED),
+            ("KineticEvaluationError", RunStatus.KINETIC_ERROR),
+            ("ValueError", RunStatus.EXCEPTION),
+            ("RuntimeError", RunStatus.EXCEPTION),
+        ],
+    )
+    def test_stage_failures_become_outcomes(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        exc_factory: str,
+        expected: RunStatus,
+    ) -> None:
+        import tidal.measurement._run_stages as stages
+        from tidal.solver import KineticEvaluationError, SimulationDivergedError
+
+        kinds: dict[str, type[BaseException]] = {
+            "SimulationDivergedError": SimulationDivergedError,
+            "KineticEvaluationError": KineticEvaluationError,
+            "ValueError": ValueError,
+            "RuntimeError": RuntimeError,
+        }
+        exc_type = kinds[exc_factory]
+
+        def _boom(*_a: object, **_k: object) -> object:
+            msg = "stage failed"
+            raise exc_type(msg)
+
+        def _no_probe(*_a: object, **_k: object) -> tuple[None, dict[str, object]]:
+            return None, {}
+
+        monkeypatch.setattr(stages, "probe_for_run", _no_probe)
+        monkeypatch.setattr(stages, "simulate_run", _boom)
+
+        outcome = stages.run_point(self._ctx(tmp_path), backend="disk")
+
+        assert outcome.status is expected
+        assert not outcome.ok
+        assert isinstance(outcome.exception, exc_type)
+
+    def test_measurement_failure_is_attributed_to_the_measure_stage(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """A ValueError from measure is MEASUREMENT_ERROR; from simulate it is not.
+
+        Position, not type — the distinction the GH #480 equal-output proof
+        forced, after type-sniffing mislabelled a missing spec path.
+        """
+        import tidal.measurement._run_stages as stages
+
+        def _no_probe(*_a: object, **_k: object) -> tuple[None, dict[str, object]]:
+            return None, {}
+
+        def _ok_sim(*_a: object, **_k: object) -> tuple[int, float, None]:
+            return 0, 1.0, None
+
+        monkeypatch.setattr(stages, "probe_for_run", _no_probe)
+        monkeypatch.setattr(stages, "simulate_run", _ok_sim)
+
+        def _boom(*_a: object, **_k: object) -> object:
+            msg = "same exception type as the simulate case"
+            raise ValueError(msg)
+
+        monkeypatch.setattr(stages, "measure_run", _boom)
+
+        outcome = stages.run_point(self._ctx(tmp_path), backend="disk")
+        assert outcome.status is RunStatus.MEASUREMENT_ERROR
+        assert isinstance(outcome.exception, ValueError)
+
+    def test_nonzero_exit_is_not_an_exception(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        import tidal.measurement._run_stages as stages
+
+        def _no_probe(*_a: object, **_k: object) -> tuple[None, dict[str, object]]:
+            return None, {}
+
+        def _failing_sim(*_a: object, **_k: object) -> tuple[int, float, None]:
+            return 3, 0.5, None
+
+        monkeypatch.setattr(stages, "probe_for_run", _no_probe)
+        monkeypatch.setattr(stages, "simulate_run", _failing_sim)
+
+        outcome = stages.run_point(self._ctx(tmp_path), backend="disk")
+        assert outcome.status is RunStatus.SIMULATION_FAILED
+        assert outcome.exit_code == 3
+        assert outcome.exception is None

@@ -37,8 +37,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from tidal.measurement._run_stages import RunStatus
-from tidal.measurement._stability import probe_for_run
+from tidal.measurement._run_stages import PointContext, RunStatus, run_point
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -575,7 +574,7 @@ def _build_sim_args(  # noqa: PLR0913
     return sim_args
 
 
-def _simulate_run(  # noqa: PLR0913
+def simulate_run(  # noqa: PLR0913
     base_args: Namespace,
     spec_path: Path,
     param_overrides: dict[str, float],
@@ -627,7 +626,7 @@ def run_inference_step(
 ) -> SimulationData:
     """Run one simulation in-memory for the inference likelihood path.
 
-    Same setup as :func:`_simulate_run` but wires an
+    Same setup as :func:`simulate_run` but wires an
     :class:`InMemoryAccumulator` (via ``_simulate(..., in_memory_out=...)``)
     in place of the :class:`SnapshotWriter`, returning the resulting
     ``SimulationData`` directly without any disk round-trip.  This skips
@@ -967,51 +966,49 @@ def _run_single(  # noqa: PLR0913, PLR0917
     # columns.  The probe now resolves the grid the same way the
     # simulation does (GH #479), so it runs there and describes the
     # system that is about to be evolved.
-    _stability, sweep_stability_meta = probe_for_run(
-        spec_path,
-        base_args,
-        param_overrides,
-        source=source,
-        target=target,
-        measurements=measurements,
-        grid_shape_override=grid_shape_override,
+    outcome = run_point(
+        PointContext(
+            spec_path=spec_path,
+            base_args=base_args,
+            param_overrides=param_overrides,
+            measurements=measurements,
+            source=source,
+            target=target,
+            threshold=threshold,
+            run_dir=output_dir,
+            grid_shape_override=grid_shape_override,
+            replicate_seed=replicate_seed,
+            ic_perturbation=ic_perturbation,
+        ),
+        backend="disk",
     )
 
-    # 1. Simulate
-    exit_code, wall_time, spec = _simulate_run(
-        base_args,
-        spec_path,
-        param_overrides,
-        output_dir,
-        grid_shape_override,
-        replicate_seed=replicate_seed,
-        ic_perturbation=ic_perturbation,
-    )
+    # --- policy: outcome -> results row --------------------------------------
+    # ``run_point`` is total and never raises, but the sweep's error rows are
+    # assembled by the LOOP, which holds the swept values and the fixed
+    # parameters this function is not given.  So a caught exception is
+    # re-raised intact, preserving both the traceback and the existing
+    # contract that ``_run_single`` propagates.
+    if outcome.exception is not None:
+        raise outcome.exception
 
-    if exit_code != 0:
+    if outcome.status is RunStatus.SIMULATION_FAILED:
+        # Sweep records a non-zero exit under its own historical name; see
+        # RunStatus.SOLVER_ERROR on why the two are not unified.
         return {
             "run_status": RunStatus.SOLVER_ERROR,
-            "error_message": f"solver exit code {exit_code}",
-            "solver_exit_code": exit_code,
-            "wall_time_s": round(wall_time, 2),
+            "error_message": f"solver exit code {outcome.exit_code}",
+            "solver_exit_code": outcome.exit_code,
+            "wall_time_s": round(outcome.wall_time_s, 2),
             "error": "simulation_failed",
         }
 
-    # 2. Measure (reuse spec from simulate — avoids redundant JSON parse)
-    metrics = _measure_run(
-        output_dir,
-        spec_path,
-        measurements,
-        source,
-        target,
-        threshold,
-        spec=spec,
-    )
-    metrics["wall_time_s"] = round(wall_time, 2)
+    metrics = outcome.metrics
+    metrics["wall_time_s"] = round(outcome.wall_time_s, 2)
     metrics["run_status"] = RunStatus.SUCCESS
     metrics["error_message"] = None
     metrics["solver_exit_code"] = 0
-    metrics.update(sweep_stability_meta)
+    metrics.update(outcome.stability)
     return metrics
 
 

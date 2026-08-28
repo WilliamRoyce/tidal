@@ -524,12 +524,10 @@ def _evaluate_likelihood(
         ``metadata`` may also include the measured metric value.
     """
     from tidal.measurement._run_stages import (
+        PointContext,
         RunStatus,
-        measure_run,
-        probe_for_run,
-        simulate_run,
+        run_point,
     )
-    from tidal.solver import KineticEvaluationError, SimulationDivergedError
 
     # Build parameter overrides
     param_overrides = {name: float(theta[i]) for i, name in enumerate(param_names)}
@@ -565,92 +563,58 @@ def _evaluate_likelihood(
     # The stage lives in tidal.measurement._stability because tidal sweep
     # runs the identical preamble; it used to be copy-pasted here, and the
     # copies drifted into two different policies (GH #454).
-    _stability, stability_meta = probe_for_run(
-        spec_path,
-        base_args,
-        param_overrides,
-        source=source,
-        target=target,
-        measurements=measurements,
-        unavailable_meta=_posdep_probe_unavailable_meta,
+    outcome = run_point(
+        PointContext(
+            spec_path=spec_path,
+            base_args=base_args,
+            param_overrides=param_overrides,
+            measurements=measurements,
+            source=source,
+            target=target,
+            threshold=threshold,
+            run_dir=run_dir,
+            sampled_params=tuple(param_names) if backend == "memory" else None,
+            unavailable_meta=_posdep_probe_unavailable_meta,
+        ),
+        backend=backend,
     )
+    stability_meta = outcome.stability
+
+    # --- policy: outcome -> (logL, metadata) ---------------------------------
+    # The soft floor stays HERE, not in run_point: its noise is seeded on
+    # theta (GH #408), which makes the likelihood a deterministic function
+    # of the parameter point — a correctness property for nested sampling,
+    # not a convenience — and run_point has no theta.
+    if outcome.status is RunStatus.SIMULATION_FAILED:
+        return _soft_floor_logl(
+            likelihood_config.soft_floor_noise_sigma,
+            likelihood_config.soft_floor_logl,
+            _floor_rng(likelihood_config.noise_seed, theta),
+        ), {
+            "run_status": RunStatus.SIMULATION_FAILED,
+            "exit_code": int(outcome.exit_code or 0),
+            **stability_meta,
+        }
+
+    if outcome.status is RunStatus.METRIC_MISSING:  # pragma: no cover - defensive
+        return -math.inf, {
+            "run_status": RunStatus.METRIC_MISSING,
+            "missing_metric": likelihood_config.metric,
+        }
+
+    if not outcome.ok:
+        # Divergence, kinetic-evaluation and everything else: all soft-floored
+        # identically, so the finer tag cannot move a chain (GH #480).
+        return _soft_floor_logl(
+            likelihood_config.soft_floor_noise_sigma,
+            likelihood_config.soft_floor_logl,
+            _floor_rng(likelihood_config.noise_seed, theta),
+        ), {"run_status": outcome.status, **stability_meta}
+
+    metrics = outcome.metrics
+    spec = outcome.spec
+
     try:
-        if backend == "memory":
-            # GH #384 Phase B: pass the already-cached spec through so
-            # run_inference_step doesn't reload+parse it on every call.
-            # load_spec_cached is keyed on (path, mtime) → per-rank singleton.
-            # GH #384 Phase A′: stash the sampled (BSM) parameter names on
-            # the spec's metadata so the modal convolution-block cache can
-            # identify which symbols vary per call (BSM) vs which are
-            # geometry-fixed. EquationSystem is frozen, so we
-            # dataclasses.replace to a new wrapper carrying the augmented
-            # metadata (~µs allocation, irrelevant vs the ~2 s simulate).
-            import dataclasses as _dc
-
-            from tidal.measurement._run_stages import (
-                measure_from_sim_data,
-                run_inference_step,
-            )
-            from tidal.symbolic._spec_cache import (
-                load_spec_cached,
-            )
-
-            raw_spec = load_spec_cached(spec_path)
-            spec_with_bsm = _dc.replace(
-                raw_spec,
-                metadata={
-                    **raw_spec.metadata,
-                    "_inference_sampled_params": tuple(param_names),
-                },
-            )
-            sim_data = run_inference_step(
-                base_args,
-                spec_path,
-                param_overrides,
-                spec=spec_with_bsm,
-            )
-            spec = sim_data.spec
-            metrics = measure_from_sim_data(
-                sim_data,
-                measurements,
-                source,
-                target,
-                threshold,
-            )
-        else:
-            # Run simulation (disk path — preserved for rollback)
-            assert run_dir is not None  # set when backend == "disk"
-            exit_code, _wall_time, spec = simulate_run(
-                base_args,
-                spec_path,
-                param_overrides,
-                run_dir,
-            )
-
-            if exit_code != 0:
-                # v3 soft floor: Normal(SOFT_FLOOR_LOGL, sigma_explore) so the
-                # chain learns "this region fails" without a flat plateau.
-                return _soft_floor_logl(
-                    likelihood_config.soft_floor_noise_sigma,
-                    likelihood_config.soft_floor_logl,
-                    _floor_rng(likelihood_config.noise_seed, theta),
-                ), {
-                    "run_status": RunStatus.SIMULATION_FAILED,
-                    "exit_code": int(exit_code),
-                    **stability_meta,
-                }
-
-            # Extract metrics
-            metrics = measure_run(
-                run_dir,
-                spec_path,
-                measurements,
-                source,
-                target,
-                threshold,
-                spec=spec,
-            )
-
         # Get the target metric
         metric_value = metrics.get(likelihood_config.metric)
         if metric_value is None:
@@ -742,34 +706,13 @@ def _evaluate_likelihood(
             return logl, {**success_meta, "run_status": RunStatus.BELOW_NOISE_FLOOR}
         return logl, success_meta  # noqa: TRY300
 
-    except SimulationDivergedError:
-        # The failure mode the campaign actually watches for, now that the
-        # probe is a diagnostic and gates nothing (GH #454).  It used to
-        # fall into the bare except below and be tagged "exception",
-        # indistinguishable from a KeyError in measurement code — and
-        # docs/V3_ARCHITECTURE.md has promised this tag since May 2026
-        # without any code emitting it (GH #480).
-        #
-        # Identical soft floor to the generic branch: the logL is
-        # unchanged, only the tag is finer, so no chain can move.
-        return _soft_floor_logl(
-            likelihood_config.soft_floor_noise_sigma,
-            likelihood_config.soft_floor_logl,
-            _floor_rng(likelihood_config.noise_seed, theta),
-        ), {"run_status": RunStatus.SIMULATION_DIVERGED, **stability_meta}
-
-    except KineticEvaluationError:
-        # A CONFIGURATION error (typically a parameter missing from
-        # --param), not a physics result. Distinct tag for the same reason
-        # GH #447 made this a RuntimeError rather than a ValueError: so
-        # nothing downstream can relabel it as a physics verdict.
-        return _soft_floor_logl(
-            likelihood_config.soft_floor_noise_sigma,
-            likelihood_config.soft_floor_logl,
-            _floor_rng(likelihood_config.noise_seed, theta),
-        ), {"run_status": RunStatus.KINETIC_ERROR, **stability_meta}
-
     except Exception:  # noqa: BLE001
+        # Failures in the POLICY stage only — metric extraction, the
+        # likelihood formula.  Everything that can go wrong while probing,
+        # simulating or measuring is caught and classified by run_point,
+        # which is why the SimulationDivergedError / KineticEvaluationError
+        # handlers that used to sit here are gone: those exceptions can no
+        # longer reach this frame.
         import logging
 
         logging.getLogger("tidal.inference").debug(

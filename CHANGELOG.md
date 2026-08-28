@@ -10,6 +10,50 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
+## [Unreleased]
+
+### Changed
+
+- **One `run_point`, and the two orchestrators become the policy they always
+  were (#480 step 2)**. `tidal sweep` and `tidal sample` each hand-rolled
+  **probe -> simulate -> measure -> classify** and interleaved policy with
+  mechanism, so a change to the sequence had to be made twice — which is how a
+  probe-policy change reached only one of them for four months (#454).
+  `tidal.measurement._run_stages.run_point(ctx) -> PointOutcome` is that
+  sequence, written once. It is **total**: every path returns an outcome,
+  including failures, which is what lets `_run_single` map outcome->row and
+  `_evaluate_likelihood` map outcome->`(logL, metadata)` without either
+  re-implementing exception handling. The soft floor stays at the inference
+  call site: its noise is seeded on `theta` (#408), a correctness property for
+  nested sampling, and `run_point` has no `theta`.
+
+  Verified by capturing sweep rows and `(logL, metadata)` for fixed parameter
+  points before and after — success on both the memory and disk backends plus
+  the failure branches — and asserting exact equality. The soft-floor values
+  compare exactly because they are deterministic in `theta`.
+
+  That proof earned its keep: it caught a missing spec path being re-tagged
+  `measurement_error`, because `RunStatus.from_exception` mapped
+  `OSError -> MEASUREMENT_ERROR`. Inferring the *stage* from the exception
+  *type* over-claims — a bare `OSError` is a missing spec as readily as an
+  unreadable output. `from_exception` now classifies only what a type genuinely
+  identifies (`SimulationDivergedError`, `KineticEvaluationError`), and
+  `MEASUREMENT_ERROR` is set by `run_point` where it knows it is measuring:
+  attribution by position, not by type.
+
+- **`tidal.cli._sweep.simulate_run` is public** — it is consumed through the
+  `_run_stages` seam rather than privately, and the underscore said otherwise.
+
+- **GH #480 step 4 is not viable as scoped, and the seam records why.** Moving
+  the ~450 lines of execution wrappers into the library layer would leave both
+  couplings exactly where they are: `simulate_run` / `run_inference_step` call
+  the ~3000-line driver `tidal.cli._simulate._simulate`, and
+  `measure_from_sim_data` calls eleven private dispatchers in the ~1000-line
+  `tidal.cli._measure`. The wrappers are not the dependency. Relocating the
+  driver and the dispatchers is a different and much larger project.
+
+### Fixed
+
 - **One `run_status` vocabulary, and divergence is finally distinguishable
   (#480)**. `run_status` is the column that tells a reader whether a row is
   usable, and it had no single definition: sweep emitted `success`,
@@ -42,22 +86,6 @@ retroactively covered; see `git log` for the full history.
   `SimulationDivergedError` — an exception callers are expected to catch belongs
   in the public surface.
 
-### Removed
-
-- **`--gated` (BREAKING, CLI)**. The flag restored the pre-v3 hard rejection of
-  tachyonic points on `tidal sample` (since 2026-05-10) and `tidal sweep` (since
-  v0.49.5), as a reproducibility affordance for archived runs. Rejection on
-  tachyonic growth is abandoned policy — growth cannot be classified as physics
-  or artifact without theory-level analysis (PSALTer, #360) — and keeping a
-  switch for an abandoned policy leaves it one flag away from being used. The
-  probe is now unconditionally a diagnostic on both paths. `LikelihoodConfig`
-  loses its `permissive` field and `parse_likelihood` its `permissive` kwarg.
-  **Consequence:** chains and sweeps recorded with `--gated` can no longer be
-  reproduced bit-for-bit from the current codebase, only from a checkout of the
-  release that produced them. Their rows carry `run_status=tachyonic_gated`,
-  retained in `RunStatus` as archive-only.
-
-### Fixed
 
 - **The stability probe now runs on the grid the simulation will actually use
   (#479)**. The probe built its grid from private fallbacks when `--grid-shape`
@@ -233,19 +261,21 @@ retroactively covered; see `git log` for the full history.
   corner-collapsed O(ε) correction coefficients. Localized sweep/sampling
   gating now refuses loudly pending the #441 gate design.
 
-### Added
+### Removed
 
-- **Position-dependent kinetic coefficients in modal (#427)**. The
-  convolution paths fold the per-grid-point `M⁻¹(x)`
-  (grid-aware `build_inverse_kinetic_diag`, #382) into each velocity-row
-  coefficient in real space before the FFT — mathematically identical to
-  the mass-side `M̂⁻¹(k−k′)` convolution. Routing is kinetics-aware,
-  `can_use_modal` requirement 6 is retired, and auto-selection accepts
-  such specs; the strictly per-mode engines (genEig/stability-probe/
-  modal-jax entry, Pass-1 Duhamel) keep an updated refusal. Validated:
-  stripped-EH modal-vs-CVODE RMS < 1%, spectral-rate convergence,
-  cross-path kinetic-contract pins on both convolution paths, and the
-  intact EH spec runs end-to-end via `--perturbative-order 0`.
+- **`--gated` (BREAKING, CLI)**. The flag restored the pre-v3 hard rejection of
+  tachyonic points on `tidal sample` (since 2026-05-10) and `tidal sweep` (since
+  v0.49.5), as a reproducibility affordance for archived runs. Rejection on
+  tachyonic growth is abandoned policy — growth cannot be classified as physics
+  or artifact without theory-level analysis (PSALTer, #360) — and keeping a
+  switch for an abandoned policy leaves it one flag away from being used. The
+  probe is now unconditionally a diagnostic on both paths. `LikelihoodConfig`
+  loses its `permissive` field and `parse_likelihood` its `permissive` kwarg.
+  **Consequence:** chains and sweeps recorded with `--gated` can no longer be
+  reproduced bit-for-bit from the current codebase, only from a checkout of the
+  release that produced them. Their rows carry `run_status=tachyonic_gated`,
+  retained in `RunStatus` as archive-only.
+
 
 ## [v0.34.0 – v0.47.9] — not individually recorded
 
