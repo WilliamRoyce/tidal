@@ -89,7 +89,7 @@ class TestHwangNohRemoved:
         assert compute_log_likelihood(float("inf"), lc) == -math.inf
 
     def test_no_gate_can_reintroduce_the_value_cap(self) -> None:
-        """There is no configuration under which P_max > 0.5 is penalised.
+        """There is no configuration under which P_max > 0.5 is penalized.
 
         This used to compare permissive against ``--gated``: that flag
         controlled the upstream tachyonic gate, never the value-level
