@@ -192,3 +192,96 @@ class TestEvaluateLikelihoodDeterminism:
     def test_floor_value_is_near_the_configured_floor(self) -> None:
         logl, _ = self._evaluate([1.0, 2.0])
         assert abs(logl - SOFT_FLOOR_LOGL) < 10.0
+
+
+class TestFinerTagsDoNotMoveTheChain:
+    """GH #480: the new status tags must be diagnostics, nothing more.
+
+    ``SimulationDivergedError`` and ``KineticEvaluationError`` used to fall
+    into the bare ``except Exception`` and be tagged ``exception``.  They
+    now get their own tags — but they take the SAME soft floor, with the
+    same ``theta``-derived generator, so the logL is unchanged and no
+    recorded chain could shift because of the finer labelling.
+
+    This is the claim the change rests on, so it is asserted rather than
+    argued: same ``theta``, three different failure causes, one logL.
+    """
+
+    @staticmethod
+    def _evaluate_raising(
+        exc: BaseException,
+        theta: list[float],
+        *,
+        noise_seed: int = 42,
+    ) -> tuple[float, str]:
+        from argparse import Namespace
+        from pathlib import Path
+
+        import tidal.symbolic._spec_cache as spec_cache
+        from tidal.inference._likelihood import (
+            LikelihoodConfig,
+            _evaluate_likelihood,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        def _boom(*_a: object, **_k: object) -> object:
+            raise exc
+
+        original = spec_cache.load_spec_cached
+        spec_cache.load_spec_cached = _boom  # type: ignore[assignment]
+        try:
+            logl, meta = _evaluate_likelihood(
+                theta=theta,
+                base_args=Namespace(),
+                spec_path=Path("/nonexistent/spec.json"),
+                param_names=["a", "b"],
+                measurements={"peak_conversion"},
+                source=None,
+                target=None,
+                threshold=0.0,
+                likelihood_config=LikelihoodConfig(
+                    metric="P_max",
+                    likelihood_type="maximize",
+                    soft_floor_noise_sigma=1.0,
+                    noise_seed=noise_seed,
+                ),
+                temp_dir=None,
+                keep_sims=False,
+                call_index=0,
+            )
+        finally:
+            spec_cache.load_spec_cached = original  # type: ignore[assignment]
+        return logl, str(meta["run_status"])
+
+    def test_divergence_is_tagged_but_scored_identically(self) -> None:
+        from tidal.solver import SimulationDivergedError
+
+        theta = [1.0, 2.0]
+        diverged_logl, diverged_status = self._evaluate_raising(
+            SimulationDivergedError("fields blew up"), theta
+        )
+        generic_logl, generic_status = self._evaluate_raising(
+            RuntimeError("something else"), theta
+        )
+
+        assert diverged_status == "simulation_diverged"
+        assert generic_status == "exception"
+        # The tag is finer; the number is not different.
+        assert diverged_logl == generic_logl
+
+    def test_kinetic_error_is_tagged_but_scored_identically(self) -> None:
+        from tidal.solver import KineticEvaluationError
+
+        theta = [1.0, 2.0]
+        kinetic_logl, kinetic_status = self._evaluate_raising(
+            KineticEvaluationError("xi unbound"), theta
+        )
+        generic_logl, _ = self._evaluate_raising(RuntimeError("other"), theta)
+
+        assert kinetic_status == "kinetic_error"
+        assert kinetic_logl == generic_logl
+
+    def test_the_new_branches_still_land_on_the_floor(self) -> None:
+        from tidal.solver import SimulationDivergedError
+
+        logl, _ = self._evaluate_raising(SimulationDivergedError("boom"), [1.0, 2.0])
+        assert abs(logl - SOFT_FLOOR_LOGL) < 10.0
