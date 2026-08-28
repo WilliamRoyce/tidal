@@ -3,7 +3,7 @@
 **Created:** February 2026
 **Last Updated:** April 2026
 **Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); **Perturbative Reduction v6 complete (v0.33.9, Stage 7 closed 2026-04-20, issue #271 resolved — Euler–Heisenberg + matter-only theories now supported)**; Phases G–I planned
-**Version:** 0.49.5 | **Tests:** 2,651 collected | **Examples:** 19 working (1+1D to 3+1D)
+**Version:** 0.50.0 | **Tests:** 2,651 collected | **Examples:** 19 working (1+1D to 3+1D)
 
 ## Completed — April 2026
 
