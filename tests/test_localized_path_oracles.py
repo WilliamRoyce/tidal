@@ -389,7 +389,8 @@ class TestPath4ECalAdjudication:
         Re-scoped from two former strict xfails that awaited a float64
         operator for the FULL localized pencil. The Lane 1c experiment
         showed no such operator exists without the Kronecker-like
-        staircase reduction (GH #474 root cause; #473 checkpoint-closed, GH #477 the general fix);
+        staircase reduction (GH #474 root cause; #473 and #477 both closed --
+        no float64 route is known, decision record GH #470);
         what every reduction tried did reproduce was this decoupled
         block, at 1e-11..1e-15 — the closure contract is the meaningful
         gate for the observable that the Phase E campaign measures.

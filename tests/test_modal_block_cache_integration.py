@@ -33,10 +33,11 @@ pytestmark = [
     # honestly at float64 (implicit-dynamical sector + far-field gauge
     # restoration; GH #474 root cause). Cache-mechanics coverage remains in
     # test_conv_block_cache.py. Re-enable once the Kronecker-like staircase
-    # reduction was checkpoint-closed; the general fix is GH #477.
+    # reduction and GH #477 symbolic discovery are both closed; no float64
+    # route is known (decision record GH #470).
     pytest.mark.skip(
         reason="GH #455/#474: the full localized implicit-dynamical pencil "
-        "refuses at float64; re-enable with GH #477"
+        "refuses at float64; re-enable only if a route reopens; see GH #470"
     ),
     pytest.mark.skipif(
         not BROKEN_THEORY_PATH.exists(),
