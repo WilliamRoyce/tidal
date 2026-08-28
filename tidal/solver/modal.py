@@ -154,6 +154,40 @@ if TYPE_CHECKING:
     )
 
 # ---------------------------------------------------------------------------
+# Numerical-validity guards
+# ---------------------------------------------------------------------------
+# A run is refused when its amplitude grows by more than this factor over the
+# initial condition.  This is a statement about the ARITHMETIC, not about the
+# physics: past this ratio the IEEE 754 round-off floor that ``numpy.fft``
+# seeds into every k-bin (~1e-14, see docs/tex/stability_probe.tex
+# §sec:ieee-floor) has been amplified until it dominates the bins the IC
+# actually excited, so the numbers coming back are round-off rather than a
+# solution.  It is NOT the abandoned tachyonic gate: a genuinely unstable
+# theory is simulated and reported like any other, right up to the point
+# where float64 stops being able to represent the answer.
+#
+# One constant for every path.  The per-mode and convolution evolvers used
+# 100.0 and 1e6 respectively, undocumented, until GH #441.
+DIVERGENCE_AMPLITUDE_RATIO: float = 100.0
+
+
+def _amplitude_diverged(max_amp: float, initial_max_amp: float) -> bool:
+    """Report whether the state has stopped being a usable float64 answer.
+
+    One definition, shared by every evolver.  The ``isfinite`` half is not
+    decoration: ``np.max(np.abs(...))`` over an array containing NaN returns
+    NaN, and ``nan > threshold`` is ``False`` — so a ratio test on its own
+    lets an overflowed run (which reaches NaN via ``inf - inf`` in the next
+    matrix product) pass as a success and return NaN snapshots to the
+    caller.  The convolution path had exactly that hole until GH #441.
+    """
+    return (
+        not np.isfinite(max_amp)
+        or max_amp / initial_max_amp > DIVERGENCE_AMPLITUDE_RATIO
+    )
+
+
+# ---------------------------------------------------------------------------
 # Exact Fourier multipliers (angular wavenumber convention: k = 2π·rfftfreq)
 # ---------------------------------------------------------------------------
 # These use the EXACT wavenumber k, consistent with operators.py spectral
@@ -3288,7 +3322,7 @@ def _evolve_per_mode_pade(
     # When the kill-switch is set, fall back to the legacy per-mode
     # expm pre-check.  Same physics, same numbers — slower.
     initial_max_amp: float = 0.0
-    divergence_threshold: float = 100.0
+    divergence_threshold: float = DIVERGENCE_AMPLITUDE_RATIO
     if t_end_rel > 0:
         initial_physical = _ifft_slots(y0_hat, layout, grid)
         initial_max_amp = max(float(np.max(np.abs(initial_physical))), 1e-15)
@@ -3438,9 +3472,7 @@ def _evolve_per_mode_pade(
         max_amp = float(np.max(np.abs(y_physical)))
         if ti == 0:
             initial_max_amp = max(max_amp, 1e-15)
-        elif (
-            not np.isfinite(max_amp) or max_amp / initial_max_amp > divergence_threshold
-        ):
+        elif _amplitude_diverged(max_amp, initial_max_amp):
             msg = (
                 f"Simulation diverged at t={t:.4g}: amplitude ratio "
                 f"{max_amp / initial_max_amp:.2e} exceeds threshold "
@@ -3685,42 +3717,71 @@ def _evolve_full_matrix(
             if progress is not None:
                 progress.update(t)
 
-    # --- Post-evolution divergence check (GH #367, GH #379) -------------------
-    # Defensive net: with both #367 (M⁻¹ in convolution path) and #379 (Schur
-    # elimination for pos-dep + constraints) now fixed, reaching this branch
-    # indicates either (a) a new builder regression in path 3/4, or (b) genuine
-    # tachyonic instability in the physics (run with α=0 to disambiguate;
-    # see docs/CLAUDE.md "t_end independence test").
+    # --- Numerical-validity check (GH #367, GH #379, GH #441) ----------------
+    # Scans EVERY snapshot, not just the last, and uses the shared
+    # _amplitude_diverged predicate.  Both of those are GH #441 fixes:
+    #
+    #   * The old check read ``y_final_max > y0_max * 1e6``.  Because
+    #     ``np.max`` over an array containing NaN returns NaN and
+    #     ``nan > x`` is False, an overflowed run — which reaches NaN via
+    #     ``inf - inf`` in the next matrix product — passed this check and
+    #     was returned to the caller as a SUCCESS, NaN snapshots and all.
+    #     Its metrics then flowed into a sweep row or a chain sample.
+    #   * The threshold was 1e6 here and 100.0 on the per-mode path, with
+    #     no recorded reason.  Both now use DIVERGENCE_AMPLITUDE_RATIO.
+    #
+    # Unlike the per-mode evolver this cannot abort early: ``expm_multiply``
+    # produces the whole trajectory in one call, so by the time we look the
+    # arithmetic has already happened.  What the scan buys is a correct
+    # verdict and the time at which the state first went bad, instead of a
+    # silent NaN.
+    #
+    # This refuses because the ARITHMETIC failed, not because the theory is
+    # unphysical: a genuinely unstable theory is simulated and reported like
+    # any other until float64 can no longer represent the answer.  See
+    # docs/tex/stability_probe.tex §sec:probe-is-diagnostic.
     y0_max = float(np.max(np.abs(y0_flat))) or 1.0
-    y_final_max = float(np.max(np.abs(snapshots[-1])))
-    if y_final_max > y0_max * 1e6 and t_end > t0:
-        # Classify the theory by slot composition to make the message actionable.
-        has_constraints = any(s.kind == "constraint" for s in layout.slots)
-        if has_constraints:
-            hint = (
-                "Theory has algebraic constraints; reaching this guard with "
-                "constraints present indicates a regression in path 4 "
-                "(_build_convolution_matrix_with_constraints) — file a bug "
-                "with the theory's JSON and parameter values. CVODE and IDA "
-                "typically cannot run constraint-bearing theories with d2_t "
-                "RHS operators; rerun with α=0 to check for tachyonic "
-                "instability vs. matrix-builder bug."
+    if t_end > t0:
+        for ti in range(n_snapshots):
+            snap_max = float(np.max(np.abs(snapshots[ti])))
+            if not _amplitude_diverged(snap_max, y0_max):
+                continue
+            # Classify the theory by slot composition to make the message
+            # actionable.
+            has_constraints = any(s.kind == "constraint" for s in layout.slots)
+            if has_constraints:
+                hint = (
+                    "Theory has algebraic constraints; reaching this guard "
+                    "with constraints present indicates a regression in path 4 "
+                    "(_build_convolution_matrix_with_constraints) — file a bug "
+                    "with the theory's JSON and parameter values. CVODE and IDA "
+                    "typically cannot run constraint-bearing theories with d2_t "
+                    "RHS operators; rerun with α=0 to check for tachyonic "
+                    "instability vs. matrix-builder bug."
+                )
+            else:
+                hint = (
+                    "If physics is expected to be smooth at these parameters, "
+                    "this indicates a builder regression in path 3 "
+                    "(_build_convolution_matrix) — file a bug. For genuine "
+                    "tachyonic instability, reduce coupling or shorten t_end. "
+                    "Fallback: --scheme cvode (works for theories without "
+                    "constraint or d2_t-RHS structure)."
+                )
+            detail = (
+                "state is not finite (overflow reached inf/NaN)"
+                if not np.isfinite(snap_max)
+                else (
+                    f"amplitude {snap_max:.2e} is "
+                    f"{snap_max / y0_max:.1e}x the initial {y0_max:.2e} "
+                    f"(threshold {DIVERGENCE_AMPLITUDE_RATIO:.0e})"
+                )
             )
-        else:
-            hint = (
-                "If physics is expected to be smooth at these parameters, "
-                "this indicates a builder regression in path 3 "
-                "(_build_convolution_matrix) — file a bug. For genuine "
-                "tachyonic instability, reduce coupling or shorten t_end. "
-                "Fallback: --scheme cvode (works for theories without "
-                "constraint or d2_t-RHS structure)."
+            msg = (
+                f"Simulation diverged in _evolve_full_matrix at "
+                f"t={times[ti]:.4g}: {detail}.\n{hint}"
             )
-        msg = (
-            f"Simulation diverged in _evolve_full_matrix: final amplitude "
-            f"{y_final_max:.2e} is >{y_final_max / y0_max:.1e}× the initial "
-            f"amplitude {y0_max:.2e}.\n{hint}"
-        )
-        raise SimulationDivergedError(msg)
+            raise SimulationDivergedError(msg)
 
     return times, snapshots
 
