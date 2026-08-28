@@ -1,7 +1,8 @@
 # Gauge-orbit chains for the localized class (GH #477 stage F1 — PARKED)
 
-**Status: ACTIVE — stage F1 in progress.** Gate F1-a has **passed at
-machine precision** (below); F1-b onward is being built. No production
+**Status: ACTIVE — stage F1 in progress.** Gates F1-a, F1-b, F1-c and
+F1-f have **passed**; F1-d (the consumer end-to-end, which carries the
+arc's stop-checkpoint) is next. No production
 code exists yet, by design: the arc's checkpoint discipline forbids
 shipping any solver change before the full F1 battery closes.
 
@@ -69,15 +70,79 @@ checkpoint), and it is a property of the formulation, not of TIDAL.
   Conventions verified against `tidal/solver/modal.py`: full-fftn basis,
   slot-major indexing (`slot*N + mode`), `k = 2π·fftfreq(N, dx)`, and the
   E.cal spec coordinate `"x"` being physical `z`.
-- `f1a_exactness.py` — the gate above. `uv run python
-  scripts/research/gauge_orbit/f1a_exactness.py [N ...]`.
+- `f1a_exactness.py`, `f1b_breaking.py`, `f1c_span.py` — the gates
+  above; each runs standalone, e.g. `uv run python
+  scripts/research/gauge_orbit/f1c_span.py 24`.
+- `orbit.joint_operator` / `orbit.grade` — the joint chain map and the
+  relative grading sigma(u) = ||D(u)||/||C(u)|| that the production
+  consumer would use (null(C) dropped first to avoid phantom profiles).
+
+## F1-b (PASS) — the defect IS the background-EOM violation
+
+The identity predicts different powers of the background amplitude for
+the two violations, which is a sharp falsifiable statement no other
+origin of the defect would reproduce. Measured (N=24, log-log fit over
+Bpeak = 0.0025 … 0.02):
+
+| generator | a-row slope (predict 1) | h-row slope (predict 2) |
+| --- | --- | --- |
+| `xi_t` | 1.000 | 1.998 |
+| `xi_x` | identically 0 | 2.000 |
+| `xi_y` | 0.988 | 1.988 |
+| `xi_z` | 1.000 | 1.999 |
+| `chi_u1` | 0 (background-independent) | identically 0 |
+
+`xi_x` reaches no photon row at all — the a-rows read h_2, h_5 and
+h_0/h_4/h_7/h_9 while the `xi_x` orbit is h_1, h_6, v_h_6 — so its
+Maxwell-violation defect is *exactly* zero rather than O(Bpeak). The
+defect is also spatially localized where the background lives (far-field
+share 4.0e-3 for `xi_t`, 1.7e-3 for `xi_x`).
+
+## F1-f (PASS) — the generator representative matters, by 123x
+
+`delta a = L_xi Abar` and `delta a = xi^nu Fbar` differ by a U(1) with
+chi = xi·Abar, which this spec's Lorenz gauge-fixing term breaks. Measured
+on `xi_y`:
+
+| representative | a-row defect | far-field share |
+| --- | --- | --- |
+| full Lie `L_xi Abar` | 8.28e-2 | 1.87e-1 |
+| covariant `xi^nu Fbar` | 6.71e-4 | 1.33e-4 |
+
+`xi_z` is the control: `Abar_z = 0`, so both representatives coincide and
+the numbers match to the digit. This is why the consumer grades the
+**joint** span of all candidates rather than each generator separately —
+a per-generator reading would over-report `xi_y`'s breaking by 123x and
+fail to pin it.
+
+## F1-c (PASS) — the symbolic orbit IS the numerically weak sector
+
+The experiment this issue was opened on. Two independent findings:
+
+1. **The grading rediscovers the physics unprompted.** Told nothing about
+   B0(z), the least-determined gauge profiles come out with a
+   near-Gaussian energy share of **0.000** (purely far-field) while the
+   most-determined sit at 0.998 — i.e. "the symmetry returns where the
+   background vanishes" falls out of the operator alone.
+2. **The pencil's weak directions lie in the orbit span.** The 4–8
+   weakest right singular vectors of `A - lambda B` sit within 6.4e-3 rad
+   of the symbolic orbit span (median 1.3e-3 over the 32 weakest), with
+   an unexplained component of 0.002–0.006. The weakest direction of all
+   lives on h_0=0.63, h_3=0.51, v_h_3=0.50, h_9=0.21, v_h_9=0.21 — a
+   `xi_t`+`xi_z` orbit vector.
+
+This also settles the open `xi_z` question: `xi_z` is *not* better
+determined than the others (sigma median 2.4e-4 vs 1.3e-3 for `xi_t`), so
+hypothesis H1 is refuted; it was missing from the 2026-08-27 weak-triplet
+list because of its depth-3 (L_2) chain shape, which an L_1-shaped probe
+does not resolve (H2). It is plainly present in the weakest direction
+above.
 
 ## Not yet measured (the rest of stage F1)
 
-F1-b onward: breaking-vs-closed-form and the background-EOM-violation
-cross-check; the orbit-span/weak-direction principal angles; the consumer
+F1-d: the consumer
 construction (symbolic-orbit quotient with residual-graded pinning) and
-its end-to-end physics gate. The full design, gates and honest-scope
+its end-to-end physics gate; F1-e (Noether-row map); F1-g (cost). The full design, gates and honest-scope
 statement are on GH #477.
 
 If F1-d cannot meet its gates after honest effort, the arc stops there

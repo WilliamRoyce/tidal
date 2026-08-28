@@ -234,3 +234,66 @@ def sigma(A: np.ndarray, B: np.ndarray, R: list[np.ndarray]) -> float:
     """Relative determination measure ||D(u)|| / ||C(u)|| (plan step 2d)."""
     c = np.linalg.norm(np.concatenate(R))
     return float(np.linalg.norm(defect(A, B, R)) / max(c, 1e-300))
+
+
+# --------------------------------------------------------------------------
+# Joint determination operator (arc-F consumer, plan step 2).
+#
+# Grading must be JOINT over all candidates and RELATIVE:
+#   * joint, because the least-broken representative is a cross-generator
+#     combination (diffeo + compensating U(1)); per-generator grading
+#     over-reports breaking -- measured 123x for xi_y on this spec;
+#   * relative, sigma(u) = ||D(u)|| / ||C(u)||, because plain ||D(u)||
+#     mislabels small-norm chains as undetermined and would spend pin
+#     slots (and dropped rows) on no-ops.
+# --------------------------------------------------------------------------
+
+
+def padded_chain(
+    ctx: Ctx, gen: str, mode: int, depth: int, *, covariant: bool = True
+) -> list[np.ndarray]:
+    """Chain padded with zero levels to a common depth (identities survive)."""
+    R = chain(ctx, gen, mode, covariant=covariant)
+    R += [np.zeros(ctx.dim, dtype=np.complex128)] * (depth + 1 - len(R))
+    return R
+
+
+def joint_operator(
+    ctx: Ctx,
+    A: np.ndarray,
+    B: np.ndarray,
+    gens: tuple[str, ...] = GENERATORS,
+    *,
+    covariant: bool = True,
+    depth: int = 2,
+) -> tuple[np.ndarray, np.ndarray, list[tuple[str, int]]]:
+    """Chain map C, defect map D, and the profile labels, over all candidates."""
+    labels: list[tuple[str, int]] = []
+    c_cols: list[np.ndarray] = []
+    d_cols: list[np.ndarray] = []
+    for gen in gens:
+        for m in range(ctx.N):
+            R = padded_chain(ctx, gen, m, depth, covariant=covariant)
+            labels.append((gen, m))
+            c_cols.append(np.concatenate(R))
+            d_cols.append(defect(A, B, R))
+    return np.array(c_cols).T, np.array(d_cols).T, labels
+
+
+def grade(C: np.ndarray, D: np.ndarray, *, rank_tol: float = 1e-10):
+    """Generalized grading: sigma spectrum of ||D u|| / ||C u||.
+
+    Returns ``(sigma, U_profiles, chain_vectors)`` sorted ascending in
+    sigma.  ``null(C)`` is dropped FIRST: phantom profiles (cross-generator
+    combinations with no state-space content) would otherwise score as
+    perfectly undetermined and consume pin slots for no-ops.
+    """
+    _Uc, Sc, Vch = np.linalg.svd(C, full_matrices=False)
+    keep = Sc > rank_tol * max(Sc[0], 1.0)
+    Vk, Sk = Vch.conj().T[:, keep], Sc[keep]
+    M = D @ Vk / Sk[None, :]  # ||D u|| with ||C u|| = 1
+    _, sig, Wh = np.linalg.svd(M)
+    order = np.argsort(sig)
+    prof = Vk @ (Wh.conj().T / Sk[:, None])  # profile coordinates
+    prof = prof[:, order] / np.linalg.norm(prof[:, order], axis=0, keepdims=True)
+    return sig[order], prof, (C @ prof)
