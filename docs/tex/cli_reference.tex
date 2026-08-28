@@ -344,20 +344,45 @@ Flag & Default & Description \\
 \texttt{--adaptive-threshold T}   & 0.01 & Stop when max interval score $< T$ \\
 \texttt{--dry-run}                & ---  & Print sweep plan without executing \\
 \texttt{--force-large-sweep}      & ---  & Allow sweeps with $> 10{,}000$ runs \\
-\texttt{--gated}                  & ---  & Reproduce the pre-v0.49.5 hard rejection: points the stability probe calls tachyonic are recorded as \texttt{run\_status=tachyonic\_gated} and never simulated \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\texttt{--gated} is a \textbf{reproducibility affordance for archived
-sweeps, not a physics option}.  By default every point is simulated and
-the probe's verdict is recorded as metadata
-(\texttt{stability\_profile}, \texttt{borderline\_stability},
-\texttt{tachyonic\_excess}, \texttt{k\_tachyonic},
-\texttt{n\_tachyonic\_modes}) --- the same columns and the same flag
-name as \texttt{tidal sample}.  See
-\S\ref{sec:probe-is-diagnostic} for why rejection on numerical growth
-was abandoned.
+Every point is simulated, unconditionally, and the stability probe's
+verdict is recorded as metadata (\texttt{stability\_profile},
+\texttt{borderline\_stability}, \texttt{tachyonic\_excess},
+\texttt{k\_tachyonic}, \texttt{n\_tachyonic\_modes}) --- the same
+columns as \texttt{tidal sample}.  There is no flag to re-enable
+rejection: see \S\ref{sec:probe-is-diagnostic} for why it was
+abandoned.
+
+\paragraph{The \texttt{run\_status} column}
+Every row carries a \texttt{run\_status}.  The vocabulary is shared
+with \texttt{tidal sample} and defined once, in
+\texttt{tidal.measurement.\_run\_stages.RunStatus} --- consult that
+enumeration rather than any list in prose, which is how three documents
+came to describe three different taxonomies (GH~\#480).
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+Value & Meaning \\
+\midrule
+\texttt{success}             & Ran and was measured.  Includes points the probe calls tachyonic --- growth is reported in the metadata columns, not by withholding the row \\
+\texttt{simulation\_diverged} & \texttt{SimulationDivergedError}: fields went non-finite or exceeded the norm threshold \\
+\texttt{solver\_error}       & The simulation subprocess exited non-zero (\texttt{simulation\_failed} on the inference path) \\
+\texttt{kinetic\_error}      & A kinetic coefficient could not be resolved --- a \emph{configuration} error, typically a parameter missing from \texttt{--param} \\
+\texttt{measurement\_error}  & The simulation ran but a measurement failed \\
+\texttt{exception}           & Anything else; a defect to investigate rather than a parameter-space feature \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Archived sweeps may also contain \texttt{diverged} (the pre-v0.49.6
+catch-all, which recorded configuration errors under a physics-sounding
+name) and \texttt{tachyonic\_gated} (points blocked under the removed
+\texttt{--gated} flag).
 
 All \texttt{tidal simulate} flags (\texttt{--param}, \texttt{--grid-shape}, \texttt{--bounds}, \texttt{--ic}, etc.)\ are passed through unchanged.
 

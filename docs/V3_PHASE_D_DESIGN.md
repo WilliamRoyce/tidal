@@ -25,7 +25,7 @@ Add §"Tachyon-permissive inference architecture" describing:
 
 - The three principles (probe-as-measurement-not-gate, soft penalties, compactified priors)
 - The soft-floor logL = −100 + Normal(0, σ_explore) mechanism with rationale (sampler-gradient information in failure regions)
-- The `run_status` taxonomy (success, simulation_diverged, simulation_failed, metric_nan, metric_missing, logl_minus_inf, below_noise_floor, exception, tachyonic_gated under `--gated`)
+- The `run_status` taxonomy (success, simulation_diverged, simulation_failed, kinetic_error, metric_nan, metric_missing, logl_minus_inf, below_noise_floor, exception) — defined in `tidal.measurement._run_stages.RunStatus`. `tachyonic_gated` was dropped with the `--gated` flag in v0.49.6 and survives only in chains recorded before then; `simulation_diverged` was only aspirational until v0.49.6 (GH #480).
 - Compactified priors: `arctan_uniform:-89:89` for sign-symmetric dimensionless couplings; `log_uniform:1e-3:1e3` for positive-definite kinetic coefficients
 - The cubed-sphere joint-prior chart for higher-dimensional coupling spaces (per parallel session's psalter-aligned implementation in `tidal/inference/_sphere.py`)
 - Cite `docs/V3_ARCHITECTURE.md` (commit reference) and `docs/meetings/2026-05-08_supervisor.md` (supervisor pivot)
