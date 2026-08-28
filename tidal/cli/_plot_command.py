@@ -520,9 +520,45 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         requested = {s.strip() for s in raw_metric.split(",")}
         if requested & derived_metrics:
             baseline = getattr(args, "baseline_formula", None)
-            results.add_derived_columns(
-                baseline_formula=baseline or "sin(kappa * B0 * t_end / 2)**2",
+            formula = baseline or "sin(kappa * B0 * t_end / 2)**2"
+            # Refuse an unsatisfiable formula rather than filling the derived
+            # columns with NaN (#407).  add_derived_columns swallows the
+            # failure per row, so without this the plot is simply empty and
+            # the reason is nowhere.  The available set mirrors the namespace
+            # it builds: fixed params, floatable sim settings, swept columns.
+            from tidal.cli._simulate import (
+                FORMULA_NAMESPACE,
+                unresolved_formula_names,
             )
+
+            available = (
+                set(FORMULA_NAMESPACE)
+                | set(results.fixed_params)
+                | set(results.sim_settings)
+                | set(results.swept_params)
+            )
+            missing = unresolved_formula_names(formula, available)
+            if missing:
+                names = ", ".join(sorted(missing))
+                error_with_hint(
+                    f"Baseline formula references {names}, which this sweep "
+                    f"does not record.",
+                    [
+                        f"Formula: {formula}",
+                        "Supply a formula over the recorded columns with "
+                        "--baseline-formula",
+                        "Recorded names: "
+                        + ", ".join(
+                            sorted(
+                                set(results.fixed_params)
+                                | set(results.sim_settings)
+                                | set(results.swept_params)
+                            )
+                        ),
+                    ],
+                )
+                return 1
+            results.add_derived_columns(baseline_formula=formula)
         if (requested & paired_metrics) and baseline_sweep_dir is None:
             error_with_hint(
                 f"Metric '{raw_metric}' requires --baseline-sweep",
