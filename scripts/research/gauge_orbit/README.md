@@ -1,8 +1,8 @@
 # Gauge-orbit chains for the localized class (GH #477 stage F1 — PARKED)
 
-**Status: ACTIVE — stage F1 in progress.** Gates F1-a, F1-b, F1-c and
-F1-f have **passed**; F1-d (the consumer end-to-end, which carries the
-arc's stop-checkpoint) is next. No production
+**Status: F1 CHECKPOINT REACHED.** Gates F1-a, F1-b, F1-c and F1-f
+**passed**; F1-d reached a decision point that belongs to the user
+(below). No production code exists, by design. No production
 code exists yet, by design: the arc's checkpoint discipline forbids
 shipping any solver change before the full F1 battery closes.
 
@@ -138,11 +138,63 @@ list because of its depth-3 (L_2) chain shape, which an L_1-shaped probe
 does not resolve (H2). It is plainly present in the weakest direction
 above.
 
-## Not yet measured (the rest of stage F1)
+## F1-d — the consumer works, but pinning is not free on this class
 
-F1-d: the consumer
-construction (symbolic-orbit quotient with residual-graded pinning) and
-its end-to-end physics gate; F1-e (Noether-row map); F1-g (cost). The full design, gates and honest-scope
+Two construction errors were found and corrected by measurement, each
+caught by a control rather than by reasoning:
+
+1. **Row-dropping is refuted.** The pencil has *no* redundant rows (min
+   row singular value 0.62), and after pinning, column excess outruns row
+   redundancy ~5:1 (at tau=1e-4: 106 columns pinned, only 21 rows
+   droppable below 1e-6). Both the symbolic Noether-row map (F1-e) and
+   its recorded SVD fallback therefore discard real equations — measured
+   directly: dropped-row content 1.0, contract 2e9. The pencil's rows
+   include velocity-definition rows that no Noether identity touches,
+   which is why the E-L-level identity does not transfer.
+2. **The quotient must allow gauge drift.** Demanding that `ydot` itself
+   lie in the gauge slice over-constrains the system: it costs 0.21 *even
+   when the symmetry is exact* (Bpeak=0). The correct statement solves
+   `B(Cb xdot + W w) = A y` for both the reduced rate and the drift, then
+   projects the drift out. It is well-posed at machine precision
+   (augmented least-squares residual 2.1e-15) and, because no equation is
+   ever dropped, the GH #474 information-discarding defect is
+   structurally impossible.
+
+With the corrected construction the **physical channel is exact**: the
+{h_5,a_1} block reproduces the original operator to 1.0e-15 and its
+cross-coupling to the rest is 1e-14 … 1e-11, across N=16/24 and
+tau=1e-6…1e-4. Consistent with the theorem that no diffeo generator has
+any component on h_5 or a_1 under the plane-wave reduction.
+
+**But the pinned directions carry real motion.** Measured with the
+Bpeak=0 case as control:
+
+| | gauge drift ‖W w‖/‖ydot‖ | drift-free contract |
+| --- | --- | --- |
+| exact symmetry (Bpeak=0) | 1.6e-15 | 2.3e-15 |
+| broken (Bpeak=0.01) | **2.03e-01** | 2.24e-01 |
+
+For an exact symmetry the drift is zero and the full-system contract
+passes at machine precision — the construction is right. On the localized
+class the true dynamics moves along the pinned span at ~20% of the total
+rate, tau-independent (0.18/0.22/0.30 at tau=1e-6/1e-5/1e-4) and
+N-independent (0.14/0.18/0.23 at N=24). Weakly *determined* does not mean
+weakly *excited*: the far-field modes are nearly free, so they are easy to
+excite and carry large amplitude — which is exactly why discarding them
+removes a fifth of the motion.
+
+**Consequence.** No pinning-based construction can satisfy a full-system
+contract on this class; what it can do — exactly — is evolve the
+decoupled physical sector. That is the shipped closure route, and this
+measurement reclassifies it: not a rescue for a refusal, but the correct
+treatment for a class whose remaining directions carry genuine dynamics
+that pinning would fabricate. Deciding whether the arc continues on that
+basis is a user call (GH #477).
+
+## Not yet measured
+
+F1-g (cost at N=128), and the end-to-end conversion run — both only
+meaningful once the checkpoint decision above is made. The full design, gates and honest-scope
 statement are on GH #477.
 
 If F1-d cannot meet its gates after honest effort, the arc stops there
