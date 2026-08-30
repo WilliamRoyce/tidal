@@ -274,11 +274,16 @@ Then H3 ∥ H4. H6 anytime.
   appear only at `ϖ_r > 1` — so the same table pushed through stock CAMB's
   `set_w_a_table` must agree with our patched path. Disagreement then localizes a
   re-apply bug rather than a physics one.
-  **Posterior reproduction is NOT a gate** and is not achievable: no Cobaya run
-  configuration is archived anywhere (`num_repeats`, precision criterion, seed are
-  unrecoverable) and no marginal-parameter table was ever published. The four recovered
-  evidences (H1 §5.3) are the only numeric targets on record, held for a possible later
-  O1b.
+  **Posterior reproduction is NOT a gate**, but be precise about why (H1 correction).
+  *Exact* reproduction is impossible: no Cobaya run configuration is archived, so
+  `num_repeats`, the precision criterion and the seed are unrecoverable. *Statistical*
+  comparison, however, **is** available — `_equal_weights.txt` is archived for all seven
+  runs and `.paramnames` carries `H0`, `omegam`, `sigma8` and the `S_8` variants as
+  derived parameters, so marginal posteriors are obtainable via `anesthetic`; the paper
+  simply never printed a table. So a later O1b could compare contours and check `log Z`
+  against the stated ±0.22 — but **not** lean on Δ`log Z`, which would carry an unknown
+  systematic from the unknown `num_repeats`. The four evidences (H1 §5.3) are the only
+  numbers the paper itself states.
 - **WS6:** Lin–Hobson–Lasenby inequalities reproduced exactly; agreement with the
   supplementary-materials implementation on pole masses/residues.
 

@@ -755,7 +755,11 @@ cross-check must be re-verified for sign changes and bounded `|w|` first.
 **Unresolved:**
 
 - PolyChord `num_repeats`, precision criterion and seed are not recorded anywhere (§5.4).
-- No marginal-parameter table exists to compare against (§1.6, §5.4).
+- No marginal-parameter *table* was published (§1.6, §5.4) — but the posteriors themselves
+  are recoverable: `_equal_weights.txt` is archived for all seven runs and `.paramnames`
+  carries the derived parameters, so marginals are obtainable via `anesthetic`. What the
+  missing run configuration rules out is *exact* reproduction, not *statistical*
+  comparison.
 
 ## Sources
 
