@@ -34,6 +34,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from argparse import Namespace
+    from collections.abc import Callable
 
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._io import SimulationData
@@ -59,6 +60,266 @@ _VALID_MEASUREMENTS = frozenset(
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
+
+def _restriction_guard(
+    spec_path: Path, measurements: set[str], args: Namespace
+) -> int | None:
+    """Honest-data guard for closure-restricted runs (GH #468 route 3).
+
+    A restricted run's spec carries ``metadata.restriction``. Fields
+    outside the evolved closure are ABSENT (never zero), so measurements
+    that read them cannot be computed: conversion on an omitted source or
+    target, and total energy when Hamiltonian terms were dropped, error
+    here with the sector alternative named instead of returning a wrong
+    number. Returns an exit code when the guard fires, else ``None``.
+    """
+    import json as _json
+
+    from tidal.cli._console import error_with_hint
+
+    try:
+        restriction = (
+            _json.loads(spec_path.read_text(encoding="utf-8"))
+            .get("metadata", {})
+            .get("restriction")
+        )
+    except (OSError, ValueError):
+        return None
+    if not restriction:
+        return None
+    evolved = set(restriction.get("evolved", []))
+    omitted = list(restriction.get("omitted", []))
+    dropped = int(restriction.get("dropped_hamiltonian_terms", 0))
+    if dropped and (measurements & {"energy", "conservation", "summary"}):
+        error_with_hint(
+            f"total energy is not available on a closure-restricted run: "
+            f"{dropped} Hamiltonian term(s) touch omitted fields {omitted}",
+            [
+                f"The evolved sector is {sorted(evolved)}; its conversion "
+                f"measurement is exact (`--what conversion`)",
+                "Re-run `tidal simulate` with --no-closure-restriction to attempt "
+                "the full system (it refuses at double precision, GH #468)",
+            ],
+        )
+        return 1
+    requested: set[str] = set()
+    for attr in ("source", "target"):
+        raw = getattr(args, attr, None)
+        if raw:
+            requested.update(s.strip() for s in str(raw).split(",") if s.strip())
+    missing = sorted(requested - evolved)
+    if missing:
+        error_with_hint(
+            f"field(s) {missing} were not evolved on this closure-restricted run "
+            f"(omitted: {omitted})",
+            [
+                f"Evolved sector: {sorted(evolved)} — measure within it",
+                "Re-run `tidal simulate` exciting the field you need "
+                "(--ic-component / --ic-field) so it joins the evolved closure",
+                "Or --no-closure-restriction to attempt the full system (GH #468)",
+            ],
+        )
+        return 1
+    return None
+
+
+_PIN_TOL = 1e-10  # overlap below this is round-off: the observable never reads a pin
+
+
+def _gauge_certificate(
+    data_path: Path,
+    measurements: set[str],
+    args: Namespace,
+    data: SimulationData | None = None,
+) -> dict[str, Any] | None:
+    """Per-observable gauge certificate from the run's pinned directions.
+
+    GH #468 "pin + certify": the modal solver records, per state slot,
+    how much of the gauge-quotiented (pinned, min-norm-zero) subspace
+    lives on that slot (``solver_diagnostics.pin_overlap_max`` in
+    ``metadata.json``). A measurement whose field support carries no
+    pinned content is provably independent of the pin — ``certified``;
+    otherwise it is ``flagged`` with the overlap magnitude and the slots
+    involved, so the number is never presented as gauge-invariant when
+    it is not. Returns ``None`` when the run carries no diagnostics
+    (non-modal backends, older runs).
+    """
+    import json as _json
+
+    meta_path = data_path / "metadata.json" if data_path.is_dir() else None
+    if meta_path is None or not meta_path.exists():
+        return None
+    try:
+        diag = _json.loads(meta_path.read_text(encoding="utf-8")).get(
+            "solver_diagnostics"
+        )
+    except (OSError, ValueError):
+        return None
+    if not diag or not diag.get("slot_names"):
+        return None
+    slot_names: list[str] = list(diag["slot_names"])
+    overlap_max: list[float] = [float(v) for v in diag.get("pin_overlap_max", [])]
+    overlap = dict(zip(slot_names, overlap_max, strict=False))
+
+    field_scoped = measurements & {"conversion", "mixing", "peak_conversion"}
+    whole_state = measurements & {"energy", "conservation", "summary", "spectrum"}
+    support: set[str]
+    if field_scoped and not whole_state:
+        bases: set[str] = set()
+        for attr in ("source", "target"):
+            raw = getattr(args, attr, None)
+            if raw:
+                bases.update(s.strip() for s in str(raw).split(",") if s.strip())
+        support = {s for s in slot_names if s in bases or s[2:] in bases}
+        scope = f"fields {sorted(bases)}"
+    else:
+        support = set(slot_names)
+        scope = "whole state"
+    worst = max(((overlap.get(s, 0.0), s) for s in support), default=(0.0, ""))
+    touched = sorted(s for s in support if overlap.get(s, 0.0) > _PIN_TOL)
+    cert: dict[str, Any] = {
+        "verdict": "certified" if worst[0] <= _PIN_TOL else "flagged",
+        "method": "slot-overlap",
+        "scope": scope,
+        "max_pin_overlap": worst[0],
+        "worst_slot": worst[1],
+        "pinned_slots_in_support": touched,
+        "pinned_dims": int(diag.get("pinned_dims", 0)),
+        "determination_floor": float(diag.get("determination_floor", 0.0)),
+    }
+    # Direct test when the run stored probes of its pinned subspace: perturb
+    # the state along them and re-run the measurement (arc C2). This is the
+    # observable's ACTUAL dependence on the gauge choice — a measurement may
+    # read a pinned field yet be invariant (its operator annihilates the
+    # pinned combination), and a pinned combination may mix a value with a
+    # derivative; slot overlap cannot tell, sensitivity can.
+    probes_path = data_path / "pin_probes.npy"
+    scalar = _primary_scalar(measurements, args)
+    if (
+        data is not None
+        and scalar is not None
+        and cert["pinned_dims"] > 0
+        and probes_path.exists()
+    ):
+        label, fn = scalar
+        sens = _gauge_sensitivity(data, slot_names, probes_path, fn, label)
+        if sens is not None:
+            cert.update(sens)
+            cert["method"] = "perturb-and-remeasure"
+            cert["verdict"] = (
+                "certified" if sens["max_sensitivity"] <= _SENS_TOL else "flagged"
+            )
+    return cert
+
+
+_SENS_TOL = (
+    1e-6  # relative change per relative perturbation; invariants sit at round-off
+)
+_PERTURB_REL = 1e-3
+
+
+def _primary_scalar(measurements: set[str], args: Namespace) -> tuple[str, Any] | None:
+    """Return the scalar a measurement reduces to (for the sensitivity test)."""
+    if measurements & {"conversion", "mixing", "peak_conversion"} and not (
+        measurements & {"energy", "conservation", "summary", "spectrum"}
+    ):
+        src = _parse_field_list(getattr(args, "source", None))
+        tgt = _parse_field_list(getattr(args, "target", None))
+        if not src or not tgt:
+            return None
+        from tidal.measurement import compute_conversion_probability
+
+        def _peak(d: SimulationData) -> float:
+            return float(
+                np.max(compute_conversion_probability(d, src[0], tgt[0]).probability)
+            )
+
+        return f"peak conversion {src[0]}→{tgt[0]}", _peak
+    if measurements & {"energy", "conservation", "summary"}:
+        from tidal.measurement import compute_energy_timeseries
+
+        def _e0(d: SimulationData) -> float:
+            return float(compute_energy_timeseries(d)[3][0])
+
+        return "total energy at t=0", _e0
+    return None
+
+
+def _gauge_sensitivity(
+    data: SimulationData,
+    slot_names: list[str],
+    probes_path: Path,
+    fn: Callable[[SimulationData], float],
+    label: str,
+) -> dict[str, Any] | None:
+    """Measure how much scalar ``fn(data)`` moves along the pinned subspace.
+
+    Relative change per relative perturbation, maximized over the stored
+    probes; ``None`` if the probe file does not match the run's slots.
+    """
+    import dataclasses
+
+    probes = np.load(probes_path)  # (K, n_slots, *grid)
+    min_probe_axes = 3
+    if probes.ndim < min_probe_axes or probes.shape[1] != len(slot_names):
+        return None
+    base = fn(data)
+    state_scale = max(
+        [float(np.max(np.abs(a))) for a in data.fields.values()]
+        + [float(np.max(np.abs(a))) for a in data.velocities.values()]
+        + [1e-300]
+    )
+    sensitivities: list[float] = []
+    for probe in probes:
+        p_scale = float(np.max(np.abs(probe))) or 1.0
+        eps = _PERTURB_REL * state_scale / p_scale
+        fields = dict(data.fields)
+        vels = dict(data.velocities)
+        for si, name in enumerate(slot_names):
+            if name.startswith("v_") and name[2:] in vels:
+                vels[name[2:]] = np.asarray(vels[name[2:]]) + eps * probe[si][None, ...]
+            elif name in fields:
+                fields[name] = np.asarray(fields[name]) + eps * probe[si][None, ...]
+        perturbed = dataclasses.replace(data, fields=fields, velocities=vels)
+        val = fn(perturbed)
+        sensitivities.append(abs(val - base) / (abs(base) + 1e-300) / _PERTURB_REL)
+    return {
+        "observable": label,
+        "max_sensitivity": max(sensitivities),
+        "sensitivities": sensitivities,
+        "perturbation_rel": _PERTURB_REL,
+    }
+
+
+def _format_text_section_gauge_certificate(
+    lines: list[str], cert: dict[str, Any]
+) -> None:
+    """Append the gauge-certificate section to *lines*."""
+    lines.append("Gauge certificate (GH #468 pin + certify):")
+    if cert.get("method") == "perturb-and-remeasure":
+        tag = "certified" if cert["verdict"] == "certified" else "FLAGGED"
+        lines.append(
+            f"  {tag} — {cert['observable']} changes by "
+            f"{cert['max_sensitivity']:.2e} (relative, per relative perturbation) "
+            f"along the {cert['pinned_dims']} pinned direction(s); "
+            f"{'independent of' if tag == 'certified' else 'DEPENDS on'} "
+            f"the min-norm-zero gauge choice (floor {cert['determination_floor']:.1e})."
+        )
+    elif cert["verdict"] == "certified":
+        lines.append(
+            f"  certified — {cert['scope']} read no pinned direction "
+            f"(max pin overlap {cert['max_pin_overlap']:.1e}; "
+            f"{cert['pinned_dims']} pinned dim(s) in the run)"
+        )
+    else:
+        lines.append(
+            f"  FLAGGED — {cert['scope']} read pinned (gauge-quotiented) content: "
+            f"max overlap {cert['max_pin_overlap']:.2e} on {cert['worst_slot']}; "
+            f"slots {cert['pinned_slots_in_support']}. The value depends on the "
+            f"min-norm-zero gauge choice (floor {cert['determination_floor']:.1e})."
+        )
+    lines.append("")
 
 
 def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
@@ -789,6 +1050,8 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
         _format_text_section_asymptotic(lines, results["asymptotic"])
     if "peak_conversion" in results:
         _format_text_section_peak_conversion(lines, results["peak_conversion"])
+    if "gauge_certificate" in results:
+        _format_text_section_gauge_certificate(lines, results["gauge_certificate"])
 
     lines.append("=" * 64)
     return "\n".join(lines)
@@ -1013,6 +1276,10 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PL
         return 1
     quiet: bool = getattr(args, "quiet", False)
 
+    guard = _restriction_guard(spec_path, measurements, args)
+    if guard is not None:
+        return guard
+
     if not quiet:
         print(f"Loading: {data_path.name}")
         print(f"Spec:    {spec_path.name}")
@@ -1036,6 +1303,11 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PL
         if isinstance(outcome, int):
             return outcome
         results = outcome
+
+    # GH #468 pin + certify: stamp every result with its gauge certificate.
+    certificate = _gauge_certificate(data_path, measurements, args, data)
+    if certificate is not None:
+        results["gauge_certificate"] = certificate
 
     # Output
     output_path: str | None = getattr(args, "output", None)

@@ -249,6 +249,8 @@ def test_eigenvalue_pre_check_catches_noise_amplified_divergence() -> None:
     this is the load-bearing safety property the new pre-check
     inherits from the all-modes expm pre-check.
     """
+    from tidal.solver.modal import SingularPencilError
+
     fixed = (
         "kappa=1.0",
         "B0=0.01",
@@ -257,7 +259,13 @@ def test_eigenvalue_pre_check_catches_noise_amplified_divergence() -> None:
         "alpha3=0.0794345149654468",
     )
     overrides = {"delta1": 0.077796221228164}
-    with pytest.raises(SimulationDivergedError):
+    # GH #457/#467 (2026-08-25): the corrected pencil engine refuses this
+    # sample point even EARLIER than the eigenvalue pre-check — the
+    # deflation contract detects near constraint-index breakdown at
+    # build time (this sample's γ_v1 = 17.11 growth was itself computed
+    # on the pre-#457 oracle-refuted operator). Either refusal upholds
+    # the load-bearing safety property: no garbage run starts.
+    with pytest.raises((SimulationDivergedError, SingularPencilError)):
         _run_sim_snapshots(
             sparse_ic=True,
             overrides=overrides,
@@ -307,7 +315,15 @@ def test_inference_eval_perf() -> None:
             times.append((time.perf_counter() - t0) * 1000)
 
     median_ms = float(np.median(times))
-    assert median_ms <= 200.0, (
-        f"likelihood-eval median wall {median_ms:.2f} ms exceeds 200 ms budget; "
-        "investigate matrix-construction or coefficient-resolution paths"
+    # Budget re-derived 2026-08-25 (GH #457 pencil engine): this fixture
+    # (general_nonminimal) has a promoted second-order sector, so every
+    # eval runs the ordered-QZ deflation per mode (~117 ms/build measured;
+    # median 556 ms vs the old 75 ms — the old operator was WRONG on this
+    # spec class, so the old budget pinned the wrong computation). 900 ms
+    # keeps ~1.6× headroom for slow CI workers; GH #466 tracks bringing
+    # the engine cost back down (probe/QZ reuse across modes).
+    assert median_ms <= 900.0, (
+        f"likelihood-eval median wall {median_ms:.2f} ms exceeds the "
+        "900 ms budget (re-derived for the QZ pencil engine, GH #457); "
+        "see GH #466 before touching the budget again"
     )

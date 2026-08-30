@@ -86,6 +86,14 @@ class StateLayout:
     field_slot_map: dict[str, int]
     velocity_slot_map: dict[str, int]
     dynamical_fields: tuple[str, ...]
+    implicit_dynamical_fields: frozenset[str] = frozenset()
+    """Order-0 fields in the implicit-dynamical sector (GH #457).
+
+    These have field + velocity slots like ``order >= 2`` fields (their
+    inter-constraint time-derivative couplings make them dynamical), but
+    ``SlotInfo.time_order`` keeps the true LHS fact (0). Consumers that
+    key "frozen constraint" on ``time_order == 0`` must exclude these.
+    """
 
     @property
     def momentum_slot_map(self) -> dict[str, int]:
@@ -97,9 +105,14 @@ class StateLayout:
         """Build layout from an equation system specification.
 
         Follows the same ordering as py-pde FieldCollection:
-        for each equation, emit a field slot; if second-order, also emit
-        a velocity slot immediately after.
+        for each equation, emit a field slot; if second-order — or
+        in the implicit-dynamical sector (GH #457) — also emit a
+        velocity slot immediately after. There is ONE layout rule for
+        all backends; backends that cannot represent the
+        implicit-dynamical sector refuse at their entry
+        (RHSEvaluator / modal_jax).
         """
+        promoted = spec.implicit_dynamical_sector.fields
         slots: list[SlotInfo] = []
         field_slot_map: dict[str, int] = {}
         velocity_slot_map: dict[str, int] = {}
@@ -109,11 +122,12 @@ class StateLayout:
         for eq in spec.equations:
             name = eq.field_name
             order = eq.time_derivative_order
+            is_second_order = order >= SECOND_ORDER or name in promoted
 
-            kind = "constraint" if order == 0 else "field"
+            kind = "constraint" if (order == 0 and name not in promoted) else "field"
 
             d_idx = None
-            if order >= SECOND_ORDER:
+            if is_second_order:
                 d_idx = dyn_idx
                 dynamical_fields.append(name)
                 dyn_idx += 1
@@ -129,7 +143,7 @@ class StateLayout:
                 ),
             )
 
-            if order >= SECOND_ORDER:
+            if is_second_order:
                 vel_name = f"v_{name}"
                 velocity_slot_map[name] = len(slots)
                 slots.append(
@@ -148,6 +162,7 @@ class StateLayout:
             field_slot_map=field_slot_map,
             velocity_slot_map=velocity_slot_map,
             dynamical_fields=tuple(dynamical_fields),
+            implicit_dynamical_fields=promoted,
         )
 
     @cached_property

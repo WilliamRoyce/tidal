@@ -812,6 +812,7 @@ def _build_evolution_matrices(
     coeff_eval: object,  # CoefficientEvaluator
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
+    diagnostics: PencilDiagnostics | None = None,
 ) -> tuple[
     NDArray[np.complex128],  # A_rhs (n_modes, n_dyn_slots, n_dyn_slots)
     NDArray[np.complex128] | None,  # B_lhs (n_modes, n_dyn, n_dyn) or None
@@ -821,58 +822,51 @@ def _build_evolution_matrices(
     dict[int, int],  # orig_to_reduced slot mapping
     NDArray[np.complex128] | None,  # S_cc_inv (n_modes, n_c, n_c) or None
     NDArray[np.bool_] | None,  # singular_mask (n_modes,) or None
+    NDArray[np.complex128] | None,  # manifold projector (n_modes, n, n) or None
 ]:
-    """Build per-mode matrices for systems with mass-matrix coupling.
+    """Build the per-mode evolution generator for constraint-coupled systems.
 
-    Returns A_rhs and optionally B_lhs for the generalized eigenvalue
-    problem B·d' = A·d, where B = I - vel_coupling may be singular
-    (gauge freedom from circular constraint velocity dependencies).
-
-    When B_lhs is not None, the caller should use scipy.linalg.eig(A, B)
-    (QZ decomposition) instead of np.linalg.eig(A) for eigendecomposition.
-    Infinite eigenvalues correspond to gauge-constrained directions.
-
-    Handles the generalized second-order system:
+    Handles the generalized second-order system
 
         M(k)·ẍ = K(k)·x + D(k)·ẋ + J(k)·x⃛
 
-    where M may be singular (creating hidden algebraic constraints) and J
-    encodes jerk coupling from d3_t/mixed_T3_S* operators.
+    plus residual algebraic rows, uniformly (GH #457 rework):
 
-    The algorithm:
-    1. Separates constraint (time_order=0) and dynamical fields
-    2. Builds M, D, K matrices for dynamical fields from operator decomposition
-    3. SVD of M to detect singular directions (rank-deficient mass matrix)
-    4. Schur-eliminates mass-null directions: solves K_cc · z_c = -K_cd · z_d
-       for determinable constraint modes.  When K_cc is itself rank-deficient
-       (e.g. CDT dark photon at critical kinetic-mixing point), uses
-       ``np.linalg.pinv(K_cc)`` to give the minimum-norm solution — determinable
-       modes are solved exactly, undetermined modes are frozen at zero.
-    5. Back-projects to original field basis via V_eff = V_d + V_c · recovery,
-       where V_d, V_c are right singular vectors of M and recovery is the Schur
-       constraint-recovery matrix.  The effective operators are
-       K_orig = V_eff · E · V_eff⁺ (pseudoinverse), not V_d · E · V_dᴴ (#260).
-    6. Substitutes jerk terms using the (now-invertible) dynamical equations
-    7. Combines both constraint levels and builds the first-order evolution matrix
-    8. Pre-solves ``B_lhs · A_final = A_rhs`` via ``np.linalg.solve`` + ``lstsq``
-       fallback, returning a single first-order evolution matrix (``B_lhs=None``).
-       This replaces the old generalized-eigenvalue output after #256.
+    1. The implicit-dynamical sector (``spec.implicit_dynamical_sector``) —
+       order-0 rows carrying inter-constraint time derivatives — joins the
+       dynamical field set with pure off-diagonal mass rows; only RESIDUAL
+       rows are Schur-eliminated (``recovery = −S_cc⁻¹·S_cd``).
+    2. The dynamical sector is assembled as a first-order PENCIL
+       ``B·ẏ = A·y`` with all mass content on the B side and raw K/D on
+       the A side; residual couplings fold in as
+       ``A += A_dc_field·recovery``, ``B −= A_dc_vel·recovery`` — scale-
+       correct by construction (GH #458).
+    3. Composition: batched ``B⁻¹A`` when B is invertible on every mode;
+       otherwise the ordered-QZ deflating-subspace engine
+       (:func:`_pencil_deflate`), which handles singular mass matrices,
+       k-dependent rank deficiency, and constraint chains of any index,
+       and raises :class:`SingularPencilError` on true gauge freedom.
 
     Returns
     -------
-    A_final : ndarray, shape (n_modes, n_dyn, n_dyn)
-        First-order evolution matrix (pre-solved, no separate ``B_lhs``).
+    A_rhs : ndarray, shape (n_modes, n_dyn_slots, n_dyn_slots)
+        Fully composed first-order evolution generator.
     B_lhs : None
-        Always ``None`` after #256; retained in the tuple for API compat
-        with callers that destructure all six return values.
-    recovery : ndarray
-        Schur-recovery matrix for algebraic constraint fields.
+        Composition is complete; kept for tuple-shape compatibility.
+    recovery : ndarray, shape (n_modes, n_c, n_dyn_slots)
+        Residual-constraint recovery.
     v_recovery : ndarray or None
-        Exact constraint-velocity recovery (``recovery @ A_final``).
+        Exact constraint-velocity recovery (``recovery @ A_rhs``).
     constraint_field_names : list[str]
-        Names of the algebraic constraint fields.
+        Names of the RESIDUAL algebraic constraint fields.
     orig_to_reduced : dict[int, int]
         Original → reduced slot index mapping.
+    S_cc_inv, singular_mask :
+        Residual Schur internals for the Pass-1 augmented recovery (#290).
+    manifold_proj : ndarray or None
+        Per-mode orthogonal projector onto the constraint manifold when
+        the QZ engine ran (project the IC with it); None on the batched
+        fast path.
     """
     import logging  # noqa: PLC0415
 
@@ -896,8 +890,16 @@ def _build_evolution_matrices(
     n_modes = int(np.prod(rfft_shape))
 
     # ---- Identify constraint and dynamical fields ----
+    # GH #457: order-0 rows carrying inter-constraint time derivatives
+    # (the implicit-dynamical sector, per the ONE classification in
+    # EquationSystem.implicit_dynamical_sector) are NOT algebraic — they join
+    # the dynamical sector below. Only the residual rows are Schur-
+    # eliminated here.
+    promoted_fields = spec.implicit_dynamical_sector.fields
     constraint_field_names: list[str] = [
-        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order == 0 and eq.field_name not in promoted_fields
     ]
     c_idx_map: dict[str, int] = {
         name: i for i, name in enumerate(constraint_field_names)
@@ -936,11 +938,14 @@ def _build_evolution_matrices(
                 multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
 
     # ---- Identify dynamical fields and their indices ----
-    # Map: dynamical field name → index in the n_f dynamical field array
+    # Map: dynamical field name → index in the n_f dynamical field array.
+    # Promoted order-0 fields (GH #457) are dynamical-sector members: they
+    # have field + velocity slots from the layout and mass-matrix ROWS
+    # (pure off-diagonal, from their d2_t cross terms) below.
     dyn_field_names: list[str] = []
     dyn_field_idx: dict[str, int] = {}
     for eq in spec.equations:
-        if eq.time_derivative_order > 0:
+        if eq.time_derivative_order > 0 or eq.field_name in promoted_fields:
             dyn_field_idx[eq.field_name] = len(dyn_field_names)
             dyn_field_names.append(eq.field_name)
     n_f = len(dyn_field_names)  # number of dynamical FIELDS (not slots)
@@ -967,10 +972,19 @@ def _build_evolution_matrices(
     )
 
     eq_for_field: dict[str, object] = {
-        eq.field_name: eq for eq in spec.equations if eq.time_derivative_order > 0
+        eq.field_name: eq
+        for eq in spec.equations
+        if eq.time_derivative_order > 0 or eq.field_name in promoted_fields
     }
     for fi, fname in enumerate(dyn_field_names):
         eq_f = eq_for_field[fname]
+        if fname in promoted_fields:
+            # GH #457: a implicit-dynamical row has an ALGEBRAIC LHS — there is no
+            # ẍ_self term, so its mass-matrix diagonal is exactly 0 (its
+            # mass content is the off-diagonal d2_t cross terms collected
+            # in the term loop below). The M = 1 JSON convention applies
+            # only to true order > 0 equations.
+            continue
         kin_sym = getattr(eq_f, "kinetic_coefficient_symbolic", None)
         if kin_sym is None:
             # No kinetic declared — M = 1 by JSON convention (not a fallback).
@@ -1031,7 +1045,9 @@ def _build_evolution_matrices(
 
     # ---- Populate matrices from equations ----
     for eq_idx, eq in enumerate(spec.equations):
-        is_constraint = eq.time_derivative_order == 0
+        is_constraint = (
+            eq.time_derivative_order == 0 and eq.field_name not in promoted_fields
+        )
 
         if is_constraint:
             ci = c_idx_map[eq.field_name]
@@ -1045,6 +1061,25 @@ def _build_evolution_matrices(
                 mult = multiplier_cache[term.operator]
                 decomp = _OPERATOR_DECOMP[term.operator]
                 t_order = decomp.time_order
+
+                # Classification invariant (GH #457): a residual row can
+                # carry NO time derivative of another residual field —
+                # such an edge would have promoted both endpoints. The
+                # old code folded d2_t(C) into S_cc as identity and
+                # silently dropped v_C refs here; both are now impossible
+                # by construction, and this assert keeps them so.
+                res_base = term.field.removeprefix("v_")
+                if res_base in c_idx_map and (
+                    t_order >= 1 or term.field.startswith("v_")
+                ):
+                    msg = (
+                        f"classification invariant violated: residual row "
+                        f"{eq.field_name!r} carries a time reference "
+                        f"{term.operator}({term.field}) to residual field "
+                        f"{res_base!r} — implicit_dynamical_sector should have "
+                        f"promoted both (GH #457)"
+                    )
+                    raise AssertionError(msg)
 
                 if term.field in c_idx_map:
                     cj = c_idx_map[term.field]
@@ -1074,7 +1109,7 @@ def _build_evolution_matrices(
 
         # Dynamical equation
         fi = dyn_field_idx[eq.field_name]
-        field_slot = orig_to_reduced[layout.field_slot_map[eq.field_name]]
+        orig_to_reduced[layout.field_slot_map[eq.field_name]]
         vel_slot = orig_to_reduced[layout.velocity_slot_map[eq.field_name]]
 
         for term_idx, term in enumerate(eq.rhs_terms):
@@ -1094,14 +1129,35 @@ def _build_evolution_matrices(
             is_vel_ref = target_field.startswith("v_")
             base_field = target_field[2:] if is_vel_ref else target_field
 
-            if target_field in c_idx_map:
-                # Direct reference to constraint field
-                cj = c_idx_map[target_field]
-                A_dc_field[:, vel_slot, cj] += coeff * mult
-            elif is_vel_ref and base_field in c_idx_map:
-                # Velocity of constraint field
+            if base_field in c_idx_map:
+                # Reference to a RESIDUAL algebraic field: dispatch by the
+                # TOTAL time order (operator time order + 1 for a v_ ref).
+                # The old dispatch matched `target_field in c_idx_map`
+                # first, so first_derivative_t(C) folded ḣ_c into
+                # A_dc_field as h_c — GH #458 mechanism 2 (measured 0.98
+                # on a_3, which has M = 1 and no other coupling).
                 cj = c_idx_map[base_field]
-                A_dc_vel[:, vel_slot, cj] += coeff * mult
+                total_t = t_order + (1 if is_vel_ref else 0)
+                if total_t == 0:
+                    A_dc_field[:, vel_slot, cj] += coeff * mult
+                elif total_t == 1:
+                    A_dc_vel[:, vel_slot, cj] += coeff * mult
+                else:
+                    # Classification invariant (GH #457): an order-0
+                    # field whose acceleration any row references is
+                    # promoted by implicit_dynamical_sector (algebraic recovery
+                    # cannot supply q̈), so it cannot be in c_idx_map
+                    # here. The OLD dispatch folded q̈_c as q_c
+                    # (t_order-blind — GH #458).
+                    msg = (
+                        f"classification invariant violated: dynamical row "
+                        f"{eq.field_name!r} carries {term.operator}"
+                        f"({term.field}) (total time order {total_t}) of "
+                        f"residual field {base_field!r} — "
+                        f"implicit_dynamical_sector should have promoted it "
+                        f"(GH #457)"
+                    )
+                    raise AssertionError(msg)
             elif base_field in dyn_field_idx:
                 fj = dyn_field_idx[base_field]
                 if t_order == 0:
@@ -1134,394 +1190,149 @@ def _build_evolution_matrices(
                 # Just put it in the A matrix directly later
                 # For now, track separately if needed
 
-    # ---- Mass-matrix constraint elimination ----
-    # Eigendecompose M per mode to find singular directions.
-    # Zero eigenvalues → hidden constraints; nonzero → dynamical.
+    # ---- Second-order-sector composition: the per-mode pencil (GH #457) ----
+    # The dynamical-sector rows form a first-order pencil  B·ẏ = A·y  over
+    # the reduced slots, with ALL mass content on the B side: the LHS
+    # kinetic on the velocity-row diagonal, RHS d2_t/accel cross terms
+    # off-diagonal (moved to the LHS), and implicit-dynamical rows (GH #457)
+    # carrying no kinetic at all. K/D content sits RAW on the A side — the
+    # row scale lives in B, which makes the residual-constraint couplings
+    # (A_dc, folded in below) scale-correct by construction: the old
+    # post-hoc field_correction/vel_coupling path added them onto
+    # M⁻¹-scaled rows without the mass factor (GH #458, measured at
+    # exactly (M−1)/M on the synthetic and a sign flip on κ⁻² rows).
     #
-    # For each mode k:
-    #   M(k) = Q(k) · Λ(k) · Q(k)ᵀ
-    #   Rotate: K̃ = QᵀKQ, D̃ = QᵀDQ
-    #   Singular rows (λ=0) → constraint: 0 = K̃_c·z + D̃_c·ż
-    #   Dynamical rows (λ≠0) → ODE: Λ_d·z̈ = K̃_d·z + D̃_d·ż
-
-    # Check if any mode has singular M
+    # Composition: batched B⁻¹A when B is invertible on every mode (the
+    # common case — mathematically identical to the old m_inv path);
+    # otherwise the ordered-QZ deflating-subspace engine
+    # (_pencil_deflate), which subsumes the old SVD mass-Schur branch,
+    # its k-dependent bare-pinv gap (GH #460), and the velocity-aware
+    # null-row cases uniformly, for ANY constraint index. Genuinely
+    # singular pencils (true gauge) raise SingularPencilError.
     dets = np.linalg.det(M_mat)
-    has_singular_M = np.any(np.abs(dets) < 1e-12)
-    m_k_independent = False
-    con_mask = np.zeros(n_f, dtype=bool)  # will be updated if singular
-
-    if has_singular_M:
+    has_singular_M = bool(np.any(np.abs(dets) < 1e-12))
+    use_engine = has_singular_M or bool(promoted_fields)
+    if use_engine:
         logger.info(
-            "Generalized mass matrix: singular M detected — "
-            "applying mass-matrix Schur elimination",
+            "Pencil composition: QZ deflating-subspace engine "
+            "(singular mass: %s; implicit-dynamical sector: %s)",
+            has_singular_M,
+            sorted(promoted_fields) if promoted_fields else "none",
         )
 
-    # Build the first-order evolution matrix A in the FULL dynamical slot space.
-    # A has shape (n_modes, n_dyn_slots, n_dyn_slots).
-    # For 2nd-order fields: rows for field_slot get dq/dt = v (kinematic),
-    # rows for vel_slot get dv/dt = M⁻¹(K·x + D·v).
-    A_dd = np.zeros((n_modes, n_dyn_slots, n_dyn_slots), dtype=np.complex128)
-
-    # Kinematic equations: dq/dt = v
-    for fname in dyn_field_names:
-        field_slot = orig_to_reduced[layout.field_slot_map[fname]]
-        vel_slot = orig_to_reduced[layout.velocity_slot_map[fname]]
-        A_dd[:, field_slot, vel_slot] = 1.0
-
-    if has_singular_M:
-        # Use eigendecomposition to handle singular M
-        # We work with each mode separately for modes where M is singular,
-        # and batch-process modes where M is invertible.
-
-        # For simplicity and correctness, process per-mode where needed.
-        # M is typically k-independent for d2_t coupling (spatial_mult=1),
-        # so use the k=0 mode's eigenstructure as representative.
-        # For k-dependent M (from mixed_T2_S*), process per mode.
-
-        # Check if M is k-independent
-        M_spread = np.max(np.abs(M_mat - M_mat[0:1, :, :]))
-        m_k_independent = M_spread < 1e-14
-
-        if m_k_independent:
-            # M is the same for all modes — single SVD-based Schur.
-            #
-            # The system is M·ẍ = K·x + D·ẋ + J·x⃛.  When M is singular
-            # (rank-deficient), the naive Moore-Penrose pseudoinverse
-            # M⁺ · (K·x + D·ẋ) gives the minimum-norm ẍ but misses the
-            # **algebraic constraints** encoded in the left null space
-            # of M.  For the torsion dark-photon model, the rank-3
-            # tensor produces a rank-deficient M where multiple equations
-            # share the same mass-matrix row up to sign; these rows
-            # impose algebraic constraints on x (and ẋ) via their
-            # non-proportional K and D rows.
-            #
-            # Full Schur elimination via SVD:
-            #   M = U·Σ·Vᵀ  (asymmetric-safe, unlike eigh)
-            #   Left null space = columns of U with s=0 -- row constraints
-            #   Right null space = columns of V with s=0 -- gauge modes
-            #   Rotate K, D, J as K~ = Ut*K*V, etc.
-            #   Partition by dyn/con masks: dynamical rows (s>0)
-            #     evolve, constraint rows (s=0) give algebraic
-            #     constraints on the gauge column variables.
-            #   Solve K̃_cc·z_c = -K̃_cd·z_d for the gauge modes.
-            #   Substitute back into the dynamical block to get
-            #     K_eff, D_eff, then diagonal inversion by Σ_d.
-            #   Back-project via V_d to the original basis.
-            #
-            # This replaces the previous np.linalg.eigh-based approach,
-            # which assumed M was real-symmetric.  The derived-JSON M
-            # is NOT symmetric in general (each equation has its own
-            # LHS kinetic coefficient, and the off-diagonal d2_t
-            # cross-couplings between distinct fields don't
-            # antisymmetrize), so eigh silently symmetrized via
-            # (M + Mᵀ)/2 and gave a wrong eigenbasis for rank-deficient
-            # cases (leading to the torsion dark-photon null result).
-            #
-            # Ref: Golub & Van Loan (2013), Matrix Computations §5.5
-            # (generalized Schur decomposition for DAE systems).
-            M0 = M_mat[0]
-            U_svd, S_svd, Vh_svd = cast(
-                "tuple[NDArray[np.complex128], NDArray[np.float64], NDArray[np.complex128]]",
-                np.linalg.svd(M0),
+    # Jerk (d3_t) substitution requires an invertible mass matrix; apply
+    # it at the field level so the pencil below stays first-order.
+    if float(np.max(np.abs(J_mat))) > 1e-15:
+        if use_engine:
+            msg = (
+                "Jerk (d3_t) terms combined with a singular mass matrix or "
+                "a implicit-dynamical sector are not supported — the "
+                "jerk substitution needs M⁻¹. GH #457."
             )
-            tol = 1e-10 * max(1.0, float(np.max(S_svd)) if S_svd.size else 1.0)
-            dyn_mask = S_svd > tol
-            con_mask = ~dyn_mask
-            n_mass_con = int(np.sum(con_mask))
-            n_mass_dyn = int(np.sum(dyn_mask))
-
-            logger.info(
-                "Mass matrix singular values: %s (dynamical: %d, constrained: %d)",
-                S_svd,
-                n_mass_dyn,
-                n_mass_con,
-            )
-
-            if n_mass_con > 0:
-                # U = left singular vectors (rows of M -> row basis)
-                # V = right singular vectors (columns of M -> col basis)
-                # Σ_d = diag of positive singular values
-                V_full: NDArray[np.complex128] = np.asarray(
-                    Vh_svd.conj().T,
-                    dtype=np.complex128,
-                )  # (n_f, n_f)
-                U_full: NDArray[np.complex128] = np.asarray(
-                    U_svd,
-                    dtype=np.complex128,
-                )  # (n_f, n_f)
-                V_d: NDArray[np.complex128] = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
-                V_c: NDArray[np.complex128] = V_full[:, con_mask]  # (n_f, n_mass_con)
-                Sigma_d_inv: NDArray[np.float64] = np.diag(
-                    1.0 / S_svd[dyn_mask],
-                )  # (n_mass_dyn, n_mass_dyn)
-
-                # Rotate K, D, J: K̃ = Uᵀ · K · V.  Express as two
-                # 2-D × 3-D matmuls (BLAS gemm) — without
-                # ``optimize=True`` the 3-way einsum is ~70× slower
-                # than this two-step form (#327).
-                Uc_T = U_full.conj().T  # (n_f, n_f)
-                K_rot = (Uc_T @ K_mat) @ V_full
-                D_rot = (Uc_T @ D_mat) @ V_full
-                J_rot = (Uc_T @ J_mat) @ V_full
-
-                # Partition into dyn/con blocks
-                d_idx = np.where(dyn_mask)[0]
-                c_idx = np.where(con_mask)[0]
-                K_dd = K_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
-                K_dc = K_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
-                K_cd = K_rot[:, np.ix_(c_idx, d_idx)[0], np.ix_(c_idx, d_idx)[1]]
-                K_cc = K_rot[:, np.ix_(c_idx, c_idx)[0], np.ix_(c_idx, c_idx)[1]]
-                D_dd = D_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
-                D_dc = D_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
-                J_dd = J_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
-                J_dc = J_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
-
-                # Constraint rows (s=0): 0 = K_cd*z_d + K_cc*z_c + D_cd*dz_d/dt + ...
-                # Solve K_cc · z_c = -K_cd · z_d (position-only constraints).
-                #
-                # K_cc may itself be rank-deficient (e.g. CDT dark photon at
-                # dm = √ξ/2 where extra mass-matrix null directions open).
-                # Use pseudoinverse instead of regularized inverse: pinv gives
-                # the minimum-norm solution for determinable constraint modes
-                # and zeroes undetermined ones.  For full-rank K_cc, pinv ≡ inv.
-                K_cc_norms = np.linalg.norm(K_cc, axis=(1, 2))
-                has_k_con = np.any(K_cc_norms > 1e-14)
-                mass_recovery: NDArray[np.complex128] | None = None
-
-                if has_k_con:
-                    K_cc_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]",
-                        np.linalg.pinv(K_cc),
-                    )
-                    # NOTE (#327 perf): batched 3D einsum 'mij,mjk->mik' is
-                    # ~9× slower than np.matmul (`@`) for our shapes; the
-                    # latter dispatches to BLAS gemm.  Bit-equivalent.
-                    mass_recovery = -(K_cc_pinv @ K_cd)
-                    K_eff = K_dd + K_dc @ mass_recovery
-                    D_eff = D_dd + D_dc @ mass_recovery
-                    J_eff = J_dd + J_dc @ mass_recovery
-                else:
-                    # Null-space decouples trivially from the rest —
-                    # keep only the dyn/dyn block.
-                    K_eff = K_dd
-                    D_eff = D_dd
-                    J_eff = J_dd
-
-                # Invert Σ_d (diagonal): E = Σ_d⁻¹·K_eff, F = Σ_d⁻¹·D_eff.
-                # Sigma_d_inv is (n_mass_dyn, n_mass_dyn) — broadcasts via
-                # matmul against the (n_modes, n_mass_dyn, n_mass_dyn) RHS.
-                E = Sigma_d_inv @ K_eff
-                F = Sigma_d_inv @ D_eff
-
-                # Jerk substitution: when J ≠ 0, the d3_t(x_j) term on
-                # the RHS couples third-order time derivatives. Reduce
-                # to second-order by iterating the ẍ expression once.
-                J_eff_inv = Sigma_d_inv @ J_eff
-                has_jerk = float(np.max(np.abs(J_eff_inv))) > 1e-15
-                if has_jerk:
-                    logger.info("Jerk substitution: applying d3_t elimination")
-                    FE = F @ E
-                    K_jerk = J_eff_inv @ FE
-                    FF = F @ F
-                    D_jerk = J_eff_inv @ (E + FF)
-                    E_final = E + K_jerk
-                    F_final = F + D_jerk
-                else:
-                    E_final = E
-                    F_final = F
-
-                # Back-project to original basis.  After Schur
-                # elimination, z_c = recovery · z_d, so the original
-                # coordinates are:
-                #   x = V_d · z_d + V_c · z_c
-                #     = (V_d + V_c · recovery) · z_d  =  V_eff · z_d
-                # The effective operators in original field space are:
-                #   K_orig = V_eff · E_final · V_eff⁺
-                #   D_orig = V_eff · F_final · V_eff⁺
-                # where V_eff⁺ = (V_effᴴ V_eff)⁻¹ V_effᴴ is the
-                # left pseudoinverse.  When recovery = 0 (trivially
-                # decoupled constraints), V_eff = V_d and V_eff⁺ = V_dᴴ,
-                # recovering the previous formula.
-                if has_k_con:
-                    assert mass_recovery is not None  # set above when has_k_con is True
-                    # mass_recovery: (n_modes, n_mass_con, n_mass_dyn)
-                    # 'ic,mcj->mij' = V_c @ mass_recovery (broadcast).
-                    V_eff: NDArray[np.complex128] = np.asarray(
-                        V_d[np.newaxis, :, :] + V_c @ mass_recovery,
-                        dtype=np.complex128,
-                    )  # (n_modes, n_f, n_mass_dyn)
-                    # V_eff^+ = pinv(V_eff) handles rank-deficient cases
-                    # (e.g. mA2 near zero where mass modes become degenerate).
-                    # Using pinv(V_eff) directly is more numerically stable than
-                    # the two-step (V_eff^H V_eff)^{-1} V_eff^H formula, which
-                    # requires inv(V_eff^H V_eff) and fails when V_eff has
-                    # linearly-dependent columns.
-                    V_eff_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]",
-                        np.linalg.pinv(V_eff),
-                    )  # (n_modes, n_mass_dyn, n_f)
-                    # 3-way 'mia,mab,mbj->mij' = (V_eff @ E_final) @ V_eff_pinv.
-                    K_orig = (V_eff @ E_final) @ V_eff_pinv
-                    D_orig = (V_eff @ F_final) @ V_eff_pinv
-                else:
-                    # Trivially decoupled: V_eff = V_d, V_eff⁺ = V_dᴴ.
-                    # 'ia,mab,jb->mij' = (V_d @ E_final) @ V_d.conj().T.
-                    V_d_H = V_d.conj().T  # (n_mass_dyn, n_f)
-                    K_orig = (V_d @ E_final) @ V_d_H
-                    D_orig = (V_d @ F_final) @ V_d_H
-
-                # Fill A_dd velocity rows
-                for i, fname_i in enumerate(dyn_field_names):
-                    vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
-                    for j, fname_j in enumerate(dyn_field_names):
-                        field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
-                        vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                        A_dd[:, vel_i, field_j] += K_orig[:, i, j]
-                        A_dd[:, vel_i, vel_j] += D_orig[:, i, j]
-            else:
-                # No singular directions — M is invertible.
-                # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
-                m_inv = np.linalg.inv(M_mat)
-                eff_k = m_inv @ K_mat
-                eff_d = m_inv @ D_mat
-
-                # Jerk substitution
-                j_inv = m_inv @ J_mat
-                has_jerk = np.max(np.abs(j_inv)) > 1e-15
-                if has_jerk:
-                    fd_k = eff_d @ eff_k
-                    k_jerk = j_inv @ fd_k
-                    fd_d = eff_d @ eff_d
-                    d_jerk = j_inv @ (eff_k + fd_d)
-                    eff_k += k_jerk
-                    eff_d += d_jerk
-
-                for i, fname_i in enumerate(dyn_field_names):
-                    vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
-                    for j, fname_j in enumerate(dyn_field_names):
-                        field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
-                        vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                        A_dd[:, vel_i, field_j] += eff_k[:, i, j]
-                        A_dd[:, vel_i, vel_j] += eff_d[:, i, j]
-        else:
-            # M is k-dependent — process per mode
-            # For now, treat each mode independently
-            for m in range(n_modes):
-                M_m = M_mat[m]
-                # Use SVD (not eigh) for rank detection since M may be
-                # asymmetric per the non-uniform kinetic-coefficient
-                # convention; eigh would silently symmetrize it.
-                sv_m = np.linalg.svd(M_m, compute_uv=False)
-                tol = 1e-10 * max(1.0, float(np.max(sv_m)) if sv_m.size else 1.0)
-                dyn_m = sv_m > tol
-                if np.all(dyn_m):
-                    # Invertible for this mode
-                    m_inv_m = np.linalg.inv(M_m)  # pyright: ignore[reportUnknownVariableType]
-                    ek_m = m_inv_m @ K_mat[m]  # pyright: ignore[reportUnknownVariableType]
-                    ed_m = m_inv_m @ D_mat[m]  # pyright: ignore[reportUnknownVariableType]
-                    j_inv_m = m_inv_m @ J_mat[m]  # pyright: ignore[reportUnknownVariableType]
-                    if np.max(np.abs(j_inv_m)) > 1e-15:  # pyright: ignore[reportUnknownArgumentType]
-                        fd_k_m = ed_m @ ek_m  # pyright: ignore[reportUnknownVariableType]
-                        ek_m += j_inv_m @ fd_k_m  # pyright: ignore[reportUnknownVariableType]
-                        ed_m += j_inv_m @ (ek_m + ed_m @ ed_m)  # pyright: ignore[reportUnknownVariableType]
-                    for i, fname_i in enumerate(dyn_field_names):
-                        vi = orig_to_reduced[layout.velocity_slot_map[fname_i]]
-                        for j, fname_j in enumerate(dyn_field_names):
-                            fj = orig_to_reduced[layout.field_slot_map[fname_j]]
-                            vj = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                            A_dd[m, vi, fj] += ek_m[i, j]
-                            A_dd[m, vi, vj] += ed_m[i, j]
-                else:
-                    # Singular mode — would need per-mode Schur elimination
-                    # This is rare for k-dependent M; log and use pseudoinverse
-                    m_pinv = np.linalg.pinv(M_m)  # pyright: ignore[reportUnknownVariableType]
-                    ek_m2 = m_pinv @ K_mat[m]  # pyright: ignore[reportUnknownVariableType]
-                    ed_m2 = m_pinv @ D_mat[m]  # pyright: ignore[reportUnknownVariableType]
-                    for i, fname_i in enumerate(dyn_field_names):
-                        vi = orig_to_reduced[layout.velocity_slot_map[fname_i]]
-                        for j, fname_j in enumerate(dyn_field_names):
-                            fj = orig_to_reduced[layout.field_slot_map[fname_j]]
-                            vj = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                            A_dd[m, vi, fj] += ek_m2[i, j]
-                            A_dd[m, vi, vj] += ed_m2[i, j]
-    else:
-        # M is invertible for all modes — standard path.
-        # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
+            raise NotImplementedError(msg)
+        logger.info("Jerk substitution: applying d3_t elimination")
         m_inv = np.linalg.inv(M_mat)
         eff_k = m_inv @ K_mat
         eff_d = m_inv @ D_mat
-
-        # Jerk substitution
         j_inv = m_inv @ J_mat
-        has_jerk = np.max(np.abs(j_inv)) > 1e-15
-        if has_jerk:
-            logger.info("Jerk substitution: applying d3_t elimination")
-            fd_k = eff_d @ eff_k
-            k_jerk = j_inv @ fd_k
-            fd_d = eff_d @ eff_d
-            d_jerk = j_inv @ (eff_k + fd_d)
-            eff_k += k_jerk
-            eff_d += d_jerk
+        fd_k = eff_d @ eff_k
+        k_jerk = j_inv @ fd_k
+        fd_d = eff_d @ eff_d
+        d_jerk = j_inv @ (eff_k + fd_d)
+        K_mat = M_mat @ (eff_k + k_jerk)
+        D_mat = M_mat @ (eff_d + d_jerk)
 
-        for i, fname_i in enumerate(dyn_field_names):
-            vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
-            for j, fname_j in enumerate(dyn_field_names):
-                field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
-                vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                A_dd[:, vel_i, field_j] += eff_k[:, i, j]
-                A_dd[:, vel_i, vel_j] += eff_d[:, i, j]
+    # ---- Assemble the pencil over reduced slots ----
+    A0 = np.zeros((n_modes, n_dyn_slots, n_dyn_slots), dtype=np.complex128)
+    B0 = np.zeros((n_modes, n_dyn_slots, n_dyn_slots), dtype=np.complex128)
+    for fname in dyn_field_names:
+        f_slot = orig_to_reduced[layout.field_slot_map[fname]]
+        v_slot = orig_to_reduced[layout.velocity_slot_map[fname]]
+        # Kinematic rows: dq/dt = v.
+        B0[:, f_slot, f_slot] = 1.0
+        A0[:, f_slot, v_slot] = 1.0
+    for i, fname_i in enumerate(dyn_field_names):
+        vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
+        for j, fname_j in enumerate(dyn_field_names):
+            field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
+            vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
+            B0[:, vel_i, vel_j] += M_mat[:, i, j]
+            A0[:, vel_i, field_j] += K_mat[:, i, j]
+            A0[:, vel_i, vel_j] += D_mat[:, i, j]
 
-    # ---- Substitute deferred constraint acceleration/velocity terms ----
-    # Constraints may contain time_order>=2 operators on dynamical fields
-    # (e.g., mixed_T2_S1x(t_3) = ik_x x ẍ_{t_3}).  After mass-matrix
-    # inversion, ẍ_j = Σ_k E[j,k]·field_k + F[j,k]·vel_k.  Substitute
-    # this into the constraint's S_cd matrix.
+    def _compose(
+        A_p: NDArray[np.complex128],
+        B_p: NDArray[np.complex128],
+        what: str,
+    ) -> tuple[NDArray[np.complex128], NDArray[np.complex128] | None]:
+        """Per-mode generator (and manifold projector when reduced)."""
+        if not use_engine:
+            try:
+                return (
+                    np.asarray(np.linalg.solve(B_p, A_p), dtype=np.complex128),
+                    None,
+                )
+            except np.linalg.LinAlgError:
+                logger.info(
+                    "Pencil composition (%s): batched solve hit a singular "
+                    "mode — switching to the QZ engine",
+                    what,
+                )
+        A_out = np.zeros_like(A_p)
+        proj_out = np.zeros_like(A_p)
+        for m in range(n_modes):
+            A_out[m], proj_out[m] = _pencil_deflate(
+                A_p[m],
+                B_p[m],
+                context=f"{what}, mode {m}",
+                diagnostics=diagnostics,
+                tag=(what, m),
+            )
+        return A_out, proj_out
+
+    # ---- Deferred residual-row acceleration substitution ----
+    # Residual algebraic rows may reference q̈ of dynamical-sector fields
+    # (time_order>=2 operators). Substitute using the PRE-FOLD generator's
+    # velocity rows: q̈_j = G0[vel_j, :]·y. Documented approximation (the
+    # A_dc corrections folded below are not yet included — same semantics
+    # as the old A_dd-based extraction; measured 8e-10 on E.cal).
     if deferred_constraint_terms:
-        # Extract effective acceleration matrices from A_dd.
-        # A_dd[m, vel_i, field_j] = K_eff[i,j] (position → acceleration)
-        # A_dd[m, vel_i, vel_j] = D_eff[i,j] (velocity → acceleration)
-        K_eff = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
-        D_eff = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
-        for i, fname_i in enumerate(dyn_field_names):
-            vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
-            for j, fname_j in enumerate(dyn_field_names):
-                field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
-                vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                K_eff[:, i, j] = A_dd[:, vel_i, field_j]
-                D_eff[:, i, j] = A_dd[:, vel_i, vel_j]
-
+        G0, _proj0 = _compose(A0, B0, "deferred-substitution")
         for ci, coeff_val, spatial_mult, t_order, fj in deferred_constraint_terms:
             if t_order == 2:
-                # ẍ_fj = Σ_k K_eff[fj,k]·field_k + D_eff[fj,k]·vel_k
-                for k, fname_k in enumerate(dyn_field_names):
-                    fk_slot = orig_to_reduced[layout.field_slot_map[fname_k]]
-                    vk_slot = orig_to_reduced[layout.velocity_slot_map[fname_k]]
-                    # Position contribution: coeff x spatial x K_eff[fj, k]
-                    S_cd[:, ci, fk_slot] += coeff_val * spatial_mult * K_eff[:, fj, k]
-                    # Velocity contribution: coeff x spatial x D_eff[fj, k]
-                    S_cd[:, ci, vk_slot] += coeff_val * spatial_mult * D_eff[:, fj, k]
-            # time_order=3 in constraints is very rare; log and skip
+                vel_j = orig_to_reduced[layout.velocity_slot_map[dyn_field_names[fj]]]
+                # S_cd[:, ci, :] += coeff·mult·(q̈_j row over all slots)
+                S_cd[:, ci, :] += (
+                    coeff_val * spatial_mult[:, np.newaxis] * G0[:, vel_j, :]
+                )
             elif t_order >= 3:
                 logger.warning(
                     "Constraint has time_order=%d operator — not yet handled",
                     t_order,
                 )
 
-    # ---- Constraint field Schur elimination ----
+    # ---- Residual-constraint Schur elimination ----
     if n_c > 0:
-        # Batch-invert S_cc
-        cc_dets = np.linalg.det(S_cc) if n_c > 0 else np.ones(n_modes)
-        singular_mask = np.abs(cc_dets) < 1e-14
-        S_cc_reg = S_cc.copy()
-        if np.any(singular_mask):
-            S_cc_reg[singular_mask] += 1e-14 * np.eye(n_c, dtype=np.complex128)
-        S_cc_inv = np.linalg.inv(S_cc_reg)
+        # GH #459 (fixed here): the old |det| < 1e-14 gate was
+        # scale-sensitive and its 1e-14 Tikhonov shift amplified
+        # off-range roundoff by 1/ε into the recovery — measured as
+        # 1e-4..1e-2 closure noise on dark_photon_plasma's rank-1
+        # repeated constraint rows, and as a spurious ~2e5 abscissa once
+        # the recovery fed the pencil fold. Rank-revealing pseudoinverse
+        # instead: consistent (possibly redundant) systems are solved
+        # exactly with the minimum-norm convention — the same
+        # "undetermined modes frozen at zero" choice the mass machinery
+        # has always documented — and no ε enters anywhere.
+        sv_cc = np.linalg.svd(S_cc, compute_uv=False)
+        sv_scale = np.maximum(sv_cc[:, 0], 1e-300)
+        singular_mask = (sv_cc[:, -1] / sv_scale) < 1e-10
+        S_cc_inv = np.asarray(
+            np.linalg.pinv(S_cc, rcond=1e-10),
+            dtype=np.complex128,
+        )
 
         # See #290: expose S_cc_inv + singular_mask so the augmented
-        # Pass 1 constraint recovery can use them. Without these the
-        # driver only has ``recovery = -S_cc_inv · S_cd`` and cannot
-        # reconstruct h_c¹ = recovery·y_dyn¹ + S_cc_inv·[LHS-feedback +
-        # order-1 RHS corr].
+        # Pass 1 constraint recovery can use them.
         Scc_inv_out: NDArray[np.complex128] | None = np.asarray(
             S_cc_inv,
             dtype=np.complex128,
@@ -1529,92 +1340,59 @@ def _build_evolution_matrices(
         Scc_singular_mask_out: NDArray[np.bool_] | None = singular_mask
 
         # Recovery: c = -S_cc⁻¹ · S_cd · d.
-        # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
         recovery = -(S_cc_inv @ S_cd)
 
-        # Field correction: A_dc_field · recovery
-        field_correction = A_dc_field @ recovery
-
-        # Velocity coupling: A_dc_vel · recovery
-        vel_coupling = A_dc_vel @ recovery
-        has_vel = np.max(np.abs(vel_coupling)) > 1e-15
-
-        A_rhs = A_dd + field_correction
-
-        if has_vel:
-            eye = np.broadcast_to(
-                np.eye(n_dyn_slots, dtype=np.complex128),
-                (n_modes, n_dyn_slots, n_dyn_slots),
-            ).copy()
-            B_lhs: NDArray[np.complex128] | None = eye - vel_coupling
-        else:
-            B_lhs = None
+        # ---- Fold residual couplings into the pencil (GH #458 fix) ----
+        # identity/spatial(C) content enters the A side; v_C /
+        # first_derivative_t(C) content is d/dt(recovery·y) = recovery·ẏ,
+        # i.e. B-side content: B1 = B0 − A_dc_vel·recovery. Because B
+        # carries the row mass, no separate M⁻¹ scaling exists to forget.
+        a_fold = A0 + A_dc_field @ recovery
+        b_fold = B0 - A_dc_vel @ recovery
     else:
         recovery = np.zeros((n_modes, 0, n_dyn_slots), dtype=np.complex128)
-        A_rhs = A_dd
-        B_lhs = None
+        a_fold = A0
+        b_fold = B0
         Scc_inv_out = None
         Scc_singular_mask_out = None
 
-    n_mass_con_total = int(np.sum(con_mask))
+    # ---- Final composition ----
+    A_rhs, manifold_proj = _compose(a_fold, b_fold, "evolution")
+    if diagnostics is not None:
+        _record_pin_overlap(
+            diagnostics,
+            layout,
+            orig_to_reduced,
+            n_modes,
+            n_dyn_slots,
+            "evolution",
+            per_mode=True,
+            grid_shape=tuple(grid.shape),
+            mode_shape=tuple(rfft_shape),
+        )
+
     logger.info(
-        "Generalized evolution: %d constraint fields, %d mass-matrix constraints, "
-        "%d dynamical slots, jerk=%s, vel_coupling=%s",
+        "Generalized evolution: %d residual constraint fields, %d dynamical "
+        "slots (%d promoted), composition=%s",
         n_c,
-        n_mass_con_total,
         n_dyn_slots,
-        "yes" if np.max(np.abs(J_mat)) > 1e-15 else "no",
-        "generalized_eig" if B_lhs is not None else "none",
+        len(promoted_fields),
+        "qz-engine" if use_engine else "batched-solve",
     )
 
-    # Velocity recovery for constraint fields: v_c = recovery · d' where
-    # d' = B_lhs⁻¹ · A_rhs · d (computed per mode with lstsq fallback for
-    # near-singular B).  This is needed only for the constraint-velocity
-    # measurement; the main evolution uses generalized eig(A, B) in
-    # _evolve_per_mode when B_lhs is not None, which handles rank-deficient
-    # or near-singular B correctly via QZ decomposition.
-    #
-    # Why NOT pre-solve A_final = B⁻¹·A here and return a single first-order
-    # matrix: for systems with rank-deficient mass matrix (d2_t cross-
-    # couplings), the pre-solved A_final has nearly-degenerate eigenvalues
-    # which make the eigendecomposition V ill-conditioned (cond(V) > 1e9).
-    # Passing (A, B) to scipy.linalg.eig uses QZ decomposition, which
-    # handles rank-deficiency cleanly via the Schur form without requiring
-    # V to be well-conditioned.  See #256 for the empirical test case.
-    if B_lhs is not None and recovery.size > 0:
-        A_eff = np.zeros_like(A_rhs)
-        fallback_count = 0
-        for m in range(n_modes):
-            try:
-                A_eff[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
-            except np.linalg.LinAlgError:
-                A_eff[m] = np.asarray(
-                    np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)[0],  # type: ignore[reportUnknownMemberType]
-                    dtype=np.complex128,
-                )
-                fallback_count += 1
-        if fallback_count > 0:
-            logger.info(
-                "Constraint-velocity recovery: %d/%d modes used lstsq fallback",
-                fallback_count,
-                n_modes,
-            )
-        # Batched matmul (`@`) instead of 'mci,mij->mcj' einsum (#327).
-        v_recovery = recovery @ A_eff
-    elif recovery.size > 0:
-        v_recovery = recovery @ A_rhs
-    else:
-        v_recovery = None
+    # Constraint-velocity recovery: v_c = recovery · ẏ = recovery · A_rhs·y.
+    v_recovery = recovery @ A_rhs if recovery.size > 0 else None
 
     return (
         A_rhs,
-        B_lhs,
+        None,  # B_lhs: composition is complete — no pencil is returned
         recovery,
         v_recovery,
         constraint_field_names,
         orig_to_reduced,
         Scc_inv_out,
         Scc_singular_mask_out,
+        manifold_proj,
     )
 
 
@@ -2235,13 +2013,21 @@ def _build_convolution_matrix_with_constraints(
     coeff_eval: CoefficientEvaluator,
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
+    diagnostics: PencilDiagnostics | None = None,
 ) -> tuple[
     NDArray[np.complex128],  # A_reduced (n_dyn_tot x n_dyn_tot)
     NDArray[np.complex128],  # recovery (n_c_tot x n_dyn_tot)
-    list[str],  # constraint field names
+    list[str],  # RESIDUAL constraint field names
     dict[int, int],  # orig_to_reduced slot mapping
+    NDArray[np.complex128] | None,  # manifold projector (n_dyn_tot²) or None
 ]:
     """Build reduced evolution matrix for pos-dep theories with constraints.
+
+    GH #457: implicit-dynamical order-0 rows (``spec.implicit_dynamical_sector``) join
+    the dynamical sector as pencil rows with mass content on the B side;
+    the composition runs the deflating-subspace engine when B is
+    singular, returning the manifold projector for on-manifold ICs.
+    Only RESIDUAL rows are Schur-eliminated.
 
     This is the position-dependent analog of :func:`_build_evolution_matrices`
     (the constant-coefficient generalized-eigenvalue path). It builds
@@ -2302,20 +2088,41 @@ def _build_convolution_matrix_with_constraints(
     n_modes = int(np.prod(rfft_shape))
 
     # ---- Classify equations ----
+    # GH #457: implicit-dynamical order-0 rows (implicit_dynamical_sector) join the
+    # dynamical sector; only RESIDUAL rows are Schur-eliminated.
+    promoted_fields = spec.implicit_dynamical_sector.fields
     dyn_field_names: list[str] = [
-        eq.field_name for eq in spec.equations if eq.time_derivative_order >= 2
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order >= 2 or eq.field_name in promoted_fields
     ]
     dyn_field_idx: dict[str, int] = {n: i for i, n in enumerate(dyn_field_names)}
     constraint_field_names: list[str] = [
-        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order == 0 and eq.field_name not in promoted_fields
     ]
     c_idx_map: dict[str, int] = {n: i for i, n in enumerate(constraint_field_names)}
     n_c = len(constraint_field_names)
 
-    # ---- Reduced slot mapping (dynamical slots only) ----
+    # GH #468 (constraints-as-slots): when a implicit-dynamical sector
+    # is present, the residual constraints are NOT pre-eliminated —
+    # Schur recovery on the localized residual K_cc injects ‖·‖ ~ 1/B₀⁴
+    # entries into the pencil, collapsing the deflation's tolerance
+    # headroom (measured: genuine smin ~6e-12 on E.cal's 528-dim
+    # pencil). Instead the residual constraint fields become pencil
+    # SLOTS and their algebraic rows pure-A pencil rows: every entry
+    # stays at natural equation scale, the deferred d2_t(dyn)
+    # substitution becomes EXACT B-side content, and the deflation
+    # handles elimination + promotion + IC projection in one object.
+    # Specs without an implicit-dynamical sector keep the classic Schur
+    # route bit-for-bit.
+    constraints_as_slots = bool(promoted_fields)
+
+    # ---- Reduced slot mapping ----
     orig_to_reduced: dict[int, int] = {}
     for si, slot in enumerate(layout.slots):
-        if slot.kind == "constraint":
+        if slot.kind == "constraint" and not constraints_as_slots:
             continue
         orig_to_reduced[si] = len(orig_to_reduced)
     n_dyn_slots = len(orig_to_reduced)
@@ -2440,8 +2247,18 @@ def _build_convolution_matrix_with_constraints(
 
     # ---- Allocate matrices ----------------------------------------------
     n_dyn_tot = n_dyn_slots * n_modes
-    n_c_tot = n_c * n_modes
+    # GH #468: in constraints-as-slots mode the residual Schur machinery
+    # (K_cc/K_cd/A_dc/recovery) is bypassed — allocate it empty so every
+    # downstream matmul no-ops naturally.
+    n_c_tot = (0 if constraints_as_slots else n_c) * n_modes
     A_dd = np.zeros((n_dyn_tot, n_dyn_tot), dtype=np.complex128)
+    # GH #457: B-side mass content of the pencil B·ẏ = A·y. Collected as
+    # POSITIVE contributions of RHS q̈-target terms (and implicit-dynamical-row
+    # mass); composed below as B = I_adj − B_mass − vel_coupling, where
+    # I_adj has 0 on implicit-dynamical velocity-row diagonals (their LHS is
+    # algebraic — no v̇_self term).
+    B_mass = np.zeros((n_dyn_tot, n_dyn_tot), dtype=np.complex128)
+    has_b_mass = bool(promoted_fields)
     A_dc_field = np.zeros((n_dyn_tot, n_c_tot), dtype=np.complex128)
     A_dc_vel = np.zeros((n_dyn_tot, n_c_tot), dtype=np.complex128)
     K_cd = np.zeros((n_c_tot, n_dyn_tot), dtype=np.complex128)
@@ -2472,18 +2289,6 @@ def _build_convolution_matrix_with_constraints(
             complex | NDArray[np.float64],
         ]
     ] = []
-    # deferred_terms_dyn_ddc: dyn RHS references d2_t(constraint) — requires ẍ_c
-    deferred_terms_dyn_ddc: list[
-        tuple[
-            int,
-            int,
-            int,
-            OperatorTerm,
-            NDArray[np.complex128],
-            int,
-            complex | NDArray[np.float64],
-        ]
-    ] = []
 
     # ---- A_dd kinematic rows: dq/dt = v ---------------------------------
     for fname in dyn_field_names:
@@ -2496,9 +2301,14 @@ def _build_convolution_matrix_with_constraints(
     warned_unhandled: set[tuple[str, str, str]] = set()
 
     for eq_idx, eq in enumerate(spec.equations):
-        if eq.time_derivative_order >= 2:
-            # ---------------- Dynamical equation ----------------
-            scale = velocity_row_scale(eq.field_name, m_inv)
+        is_promoted_row = eq.field_name in promoted_fields
+        if eq.time_derivative_order >= 2 or is_promoted_row:
+            # ---------------- Dynamical-sector equation ----------------
+            # Promoted rows (GH #457) have an algebraic LHS: no kinetic
+            # to divide by (scale = 1) and no v̇_self — their mass
+            # content is the off-diagonal q̈ cross terms collected into
+            # B_mass below.
+            scale = 1.0 if is_promoted_row else velocity_row_scale(eq.field_name, m_inv)
             vel_red = orig_to_reduced[layout.velocity_slot_map[eq.field_name]]
             for term_idx, term in enumerate(eq.rhs_terms):
                 target_field = term.field
@@ -2509,20 +2319,64 @@ def _build_convolution_matrix_with_constraints(
                 t_order = decomp.time_order
 
                 if base_field in c_idx_map:
-                    # ----- target is a CONSTRAINT field -----
-                    cj = c_idx_map[base_field]
-                    if is_vel_ref:
-                        if t_order == 0:
-                            # coeff · op · v_c — needs v_c = d/dt(recovery·y_d).
-                            # Defer until recovery is built.
-                            deferred_terms_dyn_velc.append(
-                                (vel_red, eq_idx, term_idx, term, mult, cj, scale),
+                    # ----- target is a RESIDUAL algebraic field -----
+                    total_t = t_order + (1 if is_vel_ref else 0)
+                    if constraints_as_slots:
+                        # GH #468: the residual field is a pencil SLOT.
+                        c_col = orig_to_reduced[layout.field_slot_map[base_field]]
+                        if total_t == 0:
+                            _emit_term(
+                                A_dd,
+                                vel_red,
+                                c_col,
+                                term,
+                                mult,
+                                scale=scale,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
                             )
+                        elif total_t == 1:
+                            # c·Ċ — exact B-side content (replaces the
+                            # velc deferral for this mode).
+                            _emit_term(
+                                B_mass,
+                                vel_red,
+                                c_col,
+                                term,
+                                mult,
+                                scale=scale,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                            has_b_mass = True
                         else:
-                            warned_unhandled.add(
-                                (eq.field_name, term.operator, target_field),
+                            msg = (
+                                f"classification invariant violated: row "
+                                f"{eq.field_name!r} carries {term.operator}"
+                                f"({term.field}) of residual field "
+                                f"{base_field!r} (GH #457)"
                             )
-                    elif t_order == 0:
+                            raise AssertionError(msg)
+                        continue
+                    cj = c_idx_map[base_field]
+                    if total_t >= 2:
+                        # Classification invariant (GH #457): an order-0
+                        # field whose acceleration any row references is
+                        # PROMOTED — it cannot be residual here.
+                        msg = (
+                            f"classification invariant violated: row "
+                            f"{eq.field_name!r} carries {term.operator}"
+                            f"({term.field}) of residual field "
+                            f"{base_field!r} (GH #457)"
+                        )
+                        raise AssertionError(msg)
+                    if total_t == 1:
+                        # coeff · v_c (or first_dt(q_c)) — needs
+                        # v_c = d/dt(recovery·y_d); defer until recovery.
+                        deferred_terms_dyn_velc.append(
+                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
+                        )
+                    else:
                         # coeff · op · q_c → A_dc_field
                         _emit_term(
                             A_dc_field,
@@ -2533,20 +2387,6 @@ def _build_convolution_matrix_with_constraints(
                             scale=scale,
                             eq_idx=eq_idx,
                             term_idx=term_idx,
-                        )
-                    elif t_order == 1:
-                        # coeff · first_dt(q_c) = coeff · v_c → defer
-                        deferred_terms_dyn_velc.append(
-                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
-                        )
-                    elif t_order == 2:
-                        # coeff · d2_t(q_c) = coeff · ẍ_c → defer
-                        deferred_terms_dyn_ddc.append(
-                            (vel_red, eq_idx, term_idx, term, mult, cj, scale),
-                        )
-                    else:
-                        warned_unhandled.add(
-                            (eq.field_name, term.operator, target_field),
                         )
                 elif base_field in dyn_field_idx:
                     # ----- target is a DYNAMICAL field -----
@@ -2566,10 +2406,22 @@ def _build_convolution_matrix_with_constraints(
                                 term_idx=term_idx,
                             )
                         else:
-                            # first_dt(v_X) = ẍ_X = M-cross coupling (rare; not handled)
-                            warned_unhandled.add(
-                                (eq.field_name, term.operator, target_field),
+                            # first_dt(v_X) = ẍ_X: mass-side content of
+                            # the pencil (GH #457) — collect into B_mass.
+                            target_red = orig_to_reduced[
+                                layout.velocity_slot_map[base_field]
+                            ]
+                            _emit_term(
+                                B_mass,
+                                vel_red,
+                                target_red,
+                                term,
+                                mult,
+                                scale=scale,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
                             )
+                            has_b_mass = True
                     elif t_order == 0:
                         target_red = orig_to_reduced[layout.field_slot_map[base_field]]
                         _emit_term(
@@ -2598,15 +2450,111 @@ def _build_convolution_matrix_with_constraints(
                             term_idx=term_idx,
                         )
                     else:
-                        # d2_t(dyn_field) in dyn RHS = M-cross coupling
-                        # genEig handles this; convolution analog is non-trivial
-                        warned_unhandled.add(
-                            (eq.field_name, term.operator, target_field),
+                        # d2_t(dyn_field): q̈ cross coupling = mass-side
+                        # content of the pencil B·ẏ = A·y (GH #457) —
+                        # this includes the implicit-dynamical rows' M_cc terms.
+                        target_red = orig_to_reduced[
+                            layout.velocity_slot_map[base_field]
+                        ]
+                        _emit_term(
+                            B_mass,
+                            vel_red,
+                            target_red,
+                            term,
+                            mult,
+                            scale=scale,
+                            eq_idx=eq_idx,
+                            term_idx=term_idx,
                         )
+                        has_b_mass = True
             continue
 
         if eq.time_derivative_order == 0:
             # ---------------- Algebraic constraint equation ----------------
+            if constraints_as_slots:
+                # GH #468: the residual row is a pure-A pencil row at the
+                # constraint's own slot (zero B-row — algebraic LHS).
+                # d2_t(dyn)/first_dt(v_dyn) content is EXACT B-side mass
+                # (q̈ = v̇), replacing the old A_dd-based deferred
+                # substitution approximation.
+                c_row = orig_to_reduced[layout.field_slot_map[eq.field_name]]
+                for term_idx, term in enumerate(eq.rhs_terms):
+                    target_field = term.field
+                    is_vel_ref = target_field.startswith("v_")
+                    base_field = target_field[2:] if is_vel_ref else target_field
+                    decomp = _OPERATOR_DECOMP[term.operator]
+                    mult = multiplier_cache[term.operator]
+                    t_order = decomp.time_order
+                    total_t = t_order + (1 if is_vel_ref else 0)
+
+                    if base_field in c_idx_map:
+                        if total_t > 0:
+                            msg = (
+                                f"classification invariant violated: "
+                                f"residual row {eq.field_name!r} carries "
+                                f"{term.operator}({term.field}) of residual "
+                                f"field {base_field!r} (GH #457)"
+                            )
+                            raise AssertionError(msg)
+                        tgt = orig_to_reduced[layout.field_slot_map[base_field]]
+                        _emit_term(
+                            A_dd,
+                            c_row,
+                            tgt,
+                            term,
+                            mult,
+                            eq_idx=eq_idx,
+                            term_idx=term_idx,
+                        )
+                    elif base_field in dyn_field_idx:
+                        if total_t == 0:
+                            tgt = orig_to_reduced[layout.field_slot_map[base_field]]
+                            _emit_term(
+                                A_dd,
+                                c_row,
+                                tgt,
+                                term,
+                                mult,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                        elif total_t == 1:
+                            tgt = orig_to_reduced[layout.velocity_slot_map[base_field]]
+                            _emit_term(
+                                A_dd,
+                                c_row,
+                                tgt,
+                                term,
+                                mult,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                        elif total_t == 2:
+                            tgt = orig_to_reduced[layout.velocity_slot_map[base_field]]
+                            _emit_term(
+                                B_mass,
+                                c_row,
+                                tgt,
+                                term,
+                                mult,
+                                eq_idx=eq_idx,
+                                term_idx=term_idx,
+                            )
+                            has_b_mass = True
+                        else:
+                            msg = (
+                                f"residual row {eq.field_name!r}: "
+                                f"{term.operator}({term.field}) is "
+                                f"jerk-level content — not supported "
+                                f"(GH #469)."
+                            )
+                            raise NotImplementedError(msg)
+                    else:
+                        warned_unhandled.add(
+                            (eq.field_name, term.operator, target_field),
+                        )
+                continue
+
             ci = c_idx_map[eq.field_name]
             for term_idx, term in enumerate(eq.rhs_terms):
                 target_field = term.field
@@ -2617,13 +2565,19 @@ def _build_convolution_matrix_with_constraints(
                 t_order = decomp.time_order
 
                 if base_field in c_idx_map:
-                    # constraint → constraint (K_cc); only t_order=0 supported
+                    # residual → residual (K_cc). Time content here is
+                    # impossible: any inter-constraint time reference
+                    # promotes BOTH endpoints (GH #457) — the old code
+                    # silently dropped these (the h_3-class defect).
                     cj = c_idx_map[base_field]
                     if is_vel_ref or t_order > 0:
-                        warned_unhandled.add(
-                            (eq.field_name, term.operator, target_field),
+                        msg = (
+                            f"classification invariant violated: residual "
+                            f"row {eq.field_name!r} carries "
+                            f"{term.operator}({term.field}) of residual "
+                            f"field {base_field!r} (GH #457)"
                         )
-                        continue
+                        raise AssertionError(msg)
                     _emit_term(
                         K_cc,
                         ci,
@@ -2759,15 +2713,15 @@ def _build_convolution_matrix_with_constraints(
     if n_c_tot == 0:
         recovery = np.zeros((0, n_dyn_tot), dtype=np.complex128)
     else:
-        # Solve K_cc · q_c + K_cd · q_d = 0  →  q_c = -K_cc⁻¹ · K_cd · q_d
-        try:
-            recovery = -np.linalg.solve(K_cc, K_cd)
-        except np.linalg.LinAlgError:
-            logger.warning(
-                "K_cc singular in pos-dep Schur elimination; falling back to lstsq",
-            )
-            lstsq_result, *_ = np.linalg.lstsq(K_cc, K_cd, rcond=1e-12)
-            recovery = -lstsq_result
+        # Solve K_cc · q_c + K_cd · q_d = 0  →  q_c = -K_cc⁻¹ · K_cd · q_d.
+        # GH #459 (mirrored from the path-2 S_cc fix): rank-revealing
+        # pseudoinverse — a near-singular localized K_cc under plain
+        # solve/lstsq produced ~1e12-scale recovery that poisoned the
+        # pencil downstream; pinv solves consistent (possibly redundant)
+        # systems exactly with the documented min-norm convention.
+        recovery = -(
+            np.asarray(np.linalg.pinv(K_cc, rcond=1e-10), dtype=np.complex128) @ K_cd
+        )
 
     # ---- Compose A_reduced from dynamical block + constraint substitution ----
     A_reduced = A_dd + A_dc_field @ recovery
@@ -2799,24 +2753,6 @@ def _build_convolution_matrix_with_constraints(
         ] += temp @ recovery_block
         has_vel_coupling = True
 
-    # Handle deferred dyn-RHS terms referencing ẍ_c (d2_t(constraint))
-    # ẍ_c = d²/dt²(recovery · y_d) = recovery · d²y_d/dt² = recovery · A_reduced² · y_d
-    # Contribution: (vel_red row block) += temp @ recovery_block @ A_reduced²
-    # Combine with vel_coupling: this contributes a A_reduced² term, distinct from vel's A_reduced.
-    has_ddc_coupling = False
-    ddc_coupling_mat = np.zeros_like(A_reduced)
-    for vel_red, eq_idx, term_idx, term, mult, cj, row_scale in deferred_terms_dyn_ddc:
-        # GH #444: same M⁻¹ application as the velc list above.
-        temp = _term_conv_block(
-            term, mult, scale=row_scale, eq_idx=eq_idx, term_idx=term_idx
-        )
-        recovery_block = recovery[cj * n_modes : (cj + 1) * n_modes, :]
-        ddc_coupling_mat[
-            vel_red * n_modes : (vel_red + 1) * n_modes,
-            :,
-        ] += temp @ recovery_block
-        has_ddc_coupling = True
-
     # If A_dc_vel is non-trivial (first-order eq RHS → v_c), its contribution is
     # A_dc_vel @ v_c = A_dc_vel @ recovery · A_reduced → folded into vel_coupling.
     # A_dc_vel is zero-size when the spec has no constraint fields (n_c == 0,
@@ -2827,14 +2763,51 @@ def _build_convolution_matrix_with_constraints(
         vel_coupling_mat += A_dc_vel @ recovery
         has_vel_coupling = True
 
-    # Resolve A_reduced including the v_c and ẍ_c contributions.
-    # A_reduced satisfies:
-    #   A_reduced = (A_dd + A_dc_field·recovery) + vel_coupling_mat · A_reduced + ddc_coupling_mat · A_reduced²
-    # The ddc (A²) term gives a quadratic equation in A_reduced, not generally solvable in closed form.
-    # Heuristic for the present scope: drop the ddc term if its operator norm is small relative to A_reduced;
-    # otherwise log a warning. The deferred-velc piece IS handled via B_lhs pre-solve:
-    #   (I - vel_coupling_mat) · A_reduced = A_dd + A_dc_field·recovery
-    if has_vel_coupling:
+    # ---- Final composition of the pencil B·ẏ = A·y ----------------------
+    #   A = A_dd + A_dc_field·recovery   (accumulated above)
+    #   B = I_adj − B_mass − vel_coupling_mat
+    # where I_adj zeroes the implicit-dynamical velocity-row diagonals (their LHS is
+    # algebraic — no v̇_self, GH #457). When B has mass content the pencil
+    # is composed by the deflating-subspace engine (singular B: the
+    # implicit-dynamical sector's constraint chains are deflated exactly, with the
+    # manifold projector returned for on-manifold ICs); when only velocity
+    # coupling is present, B = I − vc is the classic invertible pre-solve.
+    manifold_proj_out: NDArray[np.complex128] | None = None
+    if has_b_mass:
+        eye_adj = np.eye(n_dyn_tot, dtype=np.complex128)
+        for fname in promoted_fields:
+            vel_red_p = orig_to_reduced[layout.velocity_slot_map[fname]]
+            for m in range(n_modes):
+                idx = vel_red_p * n_modes + m
+                eye_adj[idx, idx] = 0.0
+        if constraints_as_slots:
+            # Residual constraint rows are algebraic pencil rows too.
+            for cname in constraint_field_names:
+                c_red = orig_to_reduced[layout.field_slot_map[cname]]
+                for m in range(n_modes):
+                    idx = c_red * n_modes + m
+                    eye_adj[idx, idx] = 0.0
+        b_total = eye_adj - B_mass - vel_coupling_mat
+        A_reduced, manifold_proj_out = _pencil_deflate(
+            A_reduced,
+            b_total,
+            context="pos-dep evolution pencil",
+            diagnostics=diagnostics,
+            tag=("evolution", 0),
+        )
+        if diagnostics is not None:
+            _record_pin_overlap(
+                diagnostics,
+                layout,
+                orig_to_reduced,
+                n_modes,
+                n_dyn_tot // n_modes,
+                "evolution",
+                per_mode=False,
+                grid_shape=tuple(grid.shape),
+                mode_shape=tuple(grid.shape),
+            )
+    elif has_vel_coupling:
         B_lhs = np.eye(A_reduced.shape[0], dtype=np.complex128) - vel_coupling_mat
         try:
             A_reduced = np.linalg.solve(B_lhs, A_reduced)
@@ -2843,22 +2816,6 @@ def _build_convolution_matrix_with_constraints(
                 "B_lhs singular in pos-dep velocity-coupling solve; falling back to lstsq",
             )
             A_reduced = np.linalg.lstsq(B_lhs, A_reduced, rcond=1e-12)[0]
-
-    if has_ddc_coupling:
-        # First-order Newton iteration: A_reduced ← A_reduced + ddc_coupling_mat · A_reduced²
-        # Adds one correction order. For δ₁ ~ 0.001 the contribution is O(δ₁²) ~ 10⁻⁶, negligible
-        # vs. the dominant ~10⁻⁴ a_1 signal. Apply once; iterate only if needed.
-        correction = ddc_coupling_mat @ (A_reduced @ A_reduced)
-        corr_norm = float(np.max(np.abs(correction)))
-        a_norm = float(np.max(np.abs(A_reduced)))
-        if corr_norm > 0.1 * a_norm and a_norm > 0:
-            logger.warning(
-                "d2_t(constraint) in dyn RHS contributes %.2e (cf %.2e in A_reduced); "
-                "single-iteration Newton may be insufficient",
-                corr_norm,
-                a_norm,
-            )
-        A_reduced += correction
 
     if warned_unhandled:
         warnings.warn(
@@ -2877,8 +2834,11 @@ def _build_convolution_matrix_with_constraints(
     return (
         A_reduced.astype(np.complex128, copy=False),
         recovery.astype(np.complex128, copy=False),
-        constraint_field_names,
+        # GH #468 slots mode: constraint values live in the evolved
+        # slots (o2r covers them) — no recovery-based reconstruction.
+        [] if constraints_as_slots else constraint_field_names,
         orig_to_reduced,
+        manifold_proj_out,
     )
 
 
@@ -3058,6 +3018,544 @@ def _warn_eigenvalue_growth(
                 f"Consider --scheme cvode for numerical stability.",
                 stacklevel=3,
             )
+
+
+class SingularPencilError(RuntimeError):
+    """The per-mode pencil λB − A is singular (det ≡ 0): true gauge freedom.
+
+    Raised by :func:`_pencil_deflate` when an (α, β) ≈ (0, 0) pair is
+    found — some state direction is genuinely undetermined by the
+    equations. There is no correct evolution for such a direction; a
+    silent choice (freeze, minimum-norm, Tikhonov) is a wrong theory
+    with exit code 0. Gauge-fix the theory (``[[gauge]]`` in the TOML)
+    or file the spec on GH #457's follow-up.
+    """
+
+
+class PencilDiagnostics:
+    """Pinned (gauge-quotiented) directions recorded during deflation.
+
+    GH #468 "pin + certify": every state direction the gauge quotient
+    sets to zero (the explicit min-norm choice) is recorded here, and the
+    builders turn the records into ``pin_overlap[mode, slot]`` — the
+    squared norm of the pinned subspace's rows on that state slot. A
+    measurement whose field support carries no pinned content is
+    provably independent of the pin (certified); one that does is
+    flagged with the magnitude by ``tidal measure`` instead of being
+    reported as if it were gauge-invariant.
+    """
+
+    def __init__(self) -> None:
+        self.entries: list[tuple[tuple[str, int], NDArray[np.complex128], float]] = []
+        self.slot_names: list[str] = []
+        self.pin_overlap: NDArray[np.float64] | None = None  # (n_modes, n_slots)
+        self.pinned_dims: int = 0
+        self.determination_floor: float = 0.0
+        # Real-space probes of the pinned subspace, (K, n_slots, *grid):
+        # random combinations of the pinned directions, for the
+        # perturb-and-remeasure certificate in `tidal measure`.
+        self.probes: NDArray[np.float64] | None = None
+
+    def record(
+        self, tag: tuple[str, int], pinned: NDArray[np.complex128], tau: float
+    ) -> None:
+        """Record one deflation's pinned basis (``(n, w_dim)``, may be empty)."""
+        self.entries.append((tag, pinned, tau))
+        self.determination_floor = max(self.determination_floor, tau)
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready summary for run metadata (``solver_diagnostics``)."""
+        overlap = (
+            self.pin_overlap
+            if self.pin_overlap is not None
+            else np.zeros((0, len(self.slot_names)))
+        )
+        return {
+            "slot_names": list(self.slot_names),
+            "pin_overlap_max": [
+                float(v) for v in (overlap.max(axis=0) if overlap.size else [])
+            ],
+            "pin_overlap": [[float(v) for v in row] for row in overlap],
+            "pinned_dims": int(self.pinned_dims),
+            "determination_floor": float(self.determination_floor),
+        }
+
+
+def _reduced_slot_names(
+    layout: StateLayout, orig_to_reduced: dict[int, int], n_red: int
+) -> list[str]:
+    """Names of the reduced state slots (fields and ``v_``-velocities)."""
+    names = [""] * n_red
+    for name, s in layout.field_slot_map.items():
+        if s in orig_to_reduced:
+            names[orig_to_reduced[s]] = name
+    for name, s in layout.velocity_slot_map.items():
+        if s in orig_to_reduced:
+            names[orig_to_reduced[s]] = f"v_{name}"
+    return names
+
+
+def _record_pin_overlap(
+    diagnostics: PencilDiagnostics,
+    layout: StateLayout,
+    orig_to_reduced: dict[int, int],
+    n_modes: int,
+    n_red: int,
+    kind: str,
+    *,
+    per_mode: bool,
+    grid_shape: tuple[int, ...],
+    mode_shape: tuple[int, ...],
+    max_probes: int = 8,
+) -> None:
+    """Turn recorded pinned bases into ``pin_overlap[mode, slot]`` and probes.
+
+    ``per_mode=True``: one pencil per mode (rfft bins, ``mode_shape`` =
+    rfft shape), rows = reduced slots. ``per_mode=False``: one full-FFT
+    pencil, row ``r*n_modes + m`` (``mode_shape`` = grid shape).
+
+    Probes: up to ``max_probes`` random complex combinations of ALL pinned
+    directions, transformed to real space per slot and normalized — a
+    random vector in the pinned subspace detects any observable that
+    depends on it (rank-revealing), which is what the certificate needs.
+    """
+    overlap = np.zeros((n_modes, n_red))
+    cols: list[tuple[int, NDArray[np.complex128]]] = []
+    total = 0
+    for (tag_kind, m), w, _tau in diagnostics.entries:
+        if tag_kind != kind or w.shape[1] == 0:
+            continue
+        total += w.shape[1]
+        cols.append((m, w))
+        rows = np.sum(np.abs(w) ** 2, axis=1)
+        if per_mode:
+            overlap[m, :] += rows
+        else:
+            overlap += rows.reshape(n_red, n_modes).T
+    diagnostics.slot_names = _reduced_slot_names(layout, orig_to_reduced, n_red)
+    diagnostics.pin_overlap = overlap
+    diagnostics.pinned_dims = total
+    if not cols:
+        diagnostics.probes = None
+        return
+    rng = np.random.default_rng(468)
+    k_probes = min(max_probes, total)
+    probes = np.zeros((k_probes, n_red, *grid_shape))
+    for p in range(k_probes):
+        hat = np.zeros((n_red, n_modes), dtype=np.complex128)
+        for m, w in cols:
+            coeff = rng.standard_normal(w.shape[1]) + 1j * rng.standard_normal(
+                w.shape[1]
+            )
+            vec = w @ coeff
+            if per_mode:
+                hat[:, m] += vec
+            else:
+                hat += vec.reshape(n_red, n_modes)
+        for s in range(n_red):
+            if per_mode:
+                real = np.fft.irfftn(hat[s].reshape(mode_shape), s=grid_shape)
+            else:
+                real = np.fft.ifftn(hat[s].reshape(grid_shape)).real
+            probes[p, s] = real
+        scale = float(np.max(np.abs(probes[p])))
+        if scale > 0.0:
+            probes[p] /= scale
+    diagnostics.probes = probes
+
+
+def _gauge_quotient_pencil(
+    A_n: NDArray[np.complex128],
+    B_n: NDArray[np.complex128],
+    probe_points: tuple[complex, ...],
+    context: str,
+    *,
+    tau: float,
+) -> tuple[
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+    NDArray[np.complex128],
+]:
+    """Quotient a singular pencil by its Kronecker column-chain space.
+
+    For a singular pencil, ``λ₀B − A`` is singular at EVERY λ₀, and its
+    null vectors at generic probe points are evaluations of the
+    polynomial (Kronecker chain) null family — e.g. for a byte-identical
+    equation pair (GH #465), ``x(λ) = q_diff + λ·v_diff``. The union of
+    those null spaces over a few generic λ₀ spans the gauge chain space
+    W: the state combinations the equations genuinely never determine.
+
+    The quotient: gauge-fix W to ZERO (the min-norm convention the
+    pre-#457 machinery documented for undetermined modes), restrict the
+    pencil to W's orthogonal complement C, and row-compress the
+    restricted equations to a square regular pencil. Returns
+    ``(A_red, B_red, C, W)`` with the reduced pencil expressed in the
+    C-basis and ``W`` the orthonormal basis of the pinned (zeroed)
+    directions; the caller composes the generator back through C, uses
+    ``C·C^H`` as the (gauge-zeroing) part of the IC projection, and
+    records ``W`` for the measurement-time gauge certificate (GH #468).
+
+    KNOWN LIMIT (GH #474): the row compression assumes the restricted
+    equations have exactly ``n_red`` independent combinations — true for
+    exact chains (GH #465), false for near-null quotients of localized
+    backgrounds, where it discards genuine equations; the general fix is
+    the Kronecker-like staircase reduction (GH #473).
+
+    Emits a warning — a spec that hits this every run should be
+    re-derived without the redundancy (GH #465) or gauge-fixed in the
+    theory (``[[gauge]]``). Raises :class:`SingularPencilError` when the
+    quotient does not yield a regular pencil (structure beyond gauge
+    chains).
+    """
+    import warnings as _warnings  # noqa: PLC0415
+
+    n = A_n.shape[0]
+    tol = tau  # determination floor from the adaptive loop (GH #468)
+
+    # Gauge chain space W: union of null(λ₀B − A) over generic probes.
+    null_vecs: list[NDArray[np.complex128]] = []
+    for lam0 in probe_points:
+        _u, s_p, vh_p = np.linalg.svd(lam0 * B_n - A_n)
+        scale = float(s_p[0]) if s_p.size else 1.0
+        n_null = int(np.sum(s_p <= tol * max(scale, 1.0)))
+        if n_null:
+            null_vecs.append(vh_p[-n_null:, :].conj().T)  # (n, n_null)
+    if not null_vecs:
+        ctx = f" ({context})" if context else ""
+        msg = f"gauge quotient called on a regular pencil{ctx}"
+        raise SingularPencilError(msg)
+    w_stack = np.hstack(null_vecs)
+    # Orthonormalize W and take the complement C from a full SVD.
+    u_w, s_w, _ = np.linalg.svd(w_stack, full_matrices=True)
+    w_dim = int(np.sum(s_w > 1e-10 * max(float(s_w[0]), 1.0)))
+    c_basis = u_w[:, w_dim:] if w_dim < n else np.zeros((n, 0), dtype=np.complex128)
+    n_red = c_basis.shape[1]
+    if n_red == 0:
+        ctx = f" ({context})" if context else ""
+        msg = f"Singular pencil{ctx}: every state direction is gauge. GH #457."
+        raise SingularPencilError(msg)
+
+    # Restrict to the complement and row-compress to a square system.
+    a_rest = A_n @ c_basis  # (n, n_red)
+    b_rest = B_n @ c_basis
+    u_r, s_r, _ = np.linalg.svd(np.hstack([a_rest, b_rest]))
+    row_scale = float(s_r[0]) if s_r.size else 1.0
+    row_rank = int(np.sum(s_r > tol * max(row_scale, 1.0)))
+    if row_rank < n_red:
+        ctx = f" ({context})" if context else ""
+        msg = (
+            f"Singular pencil{ctx}: the gauge quotient leaves "
+            f"{n_red - row_rank} dependent equation combination(s) beyond "
+            f"the chain space — structure no frozen-gauge choice "
+            f"resolves. Gauge-fix the theory ([[gauge]]). GH #457."
+        )
+        raise SingularPencilError(msg)
+    u_keep = u_r[:, :n_red].conj().T  # (n_red, n)
+    a_red = u_keep @ a_rest
+    b_red = u_keep @ b_rest
+    _warnings.warn(
+        f"Singular pencil ({context}): {w_dim} undetermined (gauge) state "
+        f"combination(s) quotiented out and set to zero at determination "
+        f"floor τ = {tau:.1e} — the explicit form of the min-norm choice "
+        f"the pre-#457 machinery made silently. For a localized "
+        f"background this is the far-field gauge restoration (GH #468); "
+        f"for redundant equations re-derive the theory (GH #465) or "
+        f"gauge-fix it ([[gauge]] in the TOML).",
+        stacklevel=4,
+    )
+    return a_red, b_red, c_basis, u_w[:, :w_dim]
+
+
+def _pencil_deflate(
+    A_pencil: NDArray[np.complex128],
+    B_pencil: NDArray[np.complex128],
+    *,
+    context: str = "",
+    diagnostics: PencilDiagnostics | None = None,
+    tag: tuple[str, int] = ("pencil", 0),
+) -> tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    """Deflating-subspace reduction of one mode's pencil ``B·ẏ = A·y``.
+
+    The general engine for DAE structure of ANY index (GH #457): ordered
+    QZ separates finite eigenvalues (dynamics) from infinite ones
+    (algebraic constraint chains). For the HOMOGENEOUS free evolution the
+    infinite sector is exactly ``z_i ≡ 0`` (the nilpotent chain
+    ``T_ii·ż_i = S_ii·z_i`` with ``S_ii`` invertible forces it), so the
+    constraint manifold is the finite deflating subspace with an
+    ORTHONORMAL basis ``Z_f`` and reduced generator
+    ``G_red = T_ff⁻¹·S_ff`` (triangular solve). Conditioning note: the
+    v0.31 eigendecomposition retirement (cond(V) blowup, Higham 2008
+    §2.3) does not apply here — Q/Z are unitary and the only inversion
+    is triangular.
+
+    Returns
+    -------
+    A_eff : ndarray (n, n)
+        ``Z_f · G_red · Z_f^H`` — the evolution generator on the full
+        slot space. Off-manifold components are annihilated by ``A_eff``
+        and therefore stay frozen under ``exp(A_eff·t)`` (matching the
+        existing null-projection semantics); project the IC with
+        ``proj`` for on-manifold initialization.
+    proj : ndarray (n, n)
+        ``Z_f · Z_f^H`` — orthogonal projector onto the manifold.
+
+    Raises
+    ------
+    SingularPencilError
+        If the pencil is singular ((α, β) ≈ (0, 0) pair): true gauge
+        freedom that no evolution choice can silently resolve.
+    """
+    n = A_pencil.shape[0]
+    # ROW-equilibrate the pencil: each row (equation) is scaled to unit
+    # max magnitude. This is a left diagonal preconditioner — it changes
+    # neither the solution set, the generalized eigenvalues, nor the
+    # RIGHT deflating subspaces (Z), so no un-scaling is needed below.
+    # Without it, rows carrying small physical scales (e.g. B0²-weight
+    # constraint rows) make both the regularity probe and QZ's (α, β)
+    # magnitudes unreliable — the same scale-blindness as the det-gated
+    # regularizer of GH #459.
+    row_scale = np.maximum(
+        np.max(np.abs(A_pencil), axis=1), np.max(np.abs(B_pencil), axis=1)
+    )
+    row_scale[row_scale == 0.0] = 1.0  # all-zero row → the probe rejects it
+    A_n = A_pencil / row_scale[:, np.newaxis]
+    B_n = B_pencil / row_scale[:, np.newaxis]
+
+    probe_points = (0.5488 + 0.7152j, -1.3113 + 0.4227j)
+
+    def _probe_smin(
+        a_mat: NDArray[np.complex128], b_mat: NDArray[np.complex128]
+    ) -> float:
+        smin = 0.0
+        for lam0 in probe_points:
+            sv = np.linalg.svd(lam0 * b_mat - a_mat, compute_uv=False)
+            smin = max(smin, float(sv[-1]) if sv.size else 0.0)
+        return smin
+
+    # ---- Adaptive determination-floor quotient (GH #468) ----
+    # Localized backgrounds produce a CONTINUOUS cascade of weakly
+    # determined state combinations: the Gaussian B₀(x) tail restores
+    # gauge symmetry smoothly toward the far field (measured on the
+    # E.cal constraints-as-slots pencil: singular values 2e-13 … 1e-9
+    # with no gap), so no single tolerance separates "gauge" from
+    # "weakly determined". Instead: quotient at a determination floor
+    # τ, verify the retained sector against the deflation contract, and
+    # RAISE τ decade by decade until the contract passes. Each step is
+    # SELF-VERIFIED, so the choice cannot silently violate the retained
+    # equations; the quotiented combinations are gauge-fixed to zero
+    # (the documented min-norm convention) and the warning reports the
+    # final floor and dimension. If no floor up to τ_max yields a
+    # contract-consistent operator, the last refusal propagates
+    # (genuine near-index breakdown, GH #467).
+    tau0 = n * 1e-12
+    # tau_max = 1e-4 is the ACCEPTED determination floor for the
+    # localized implicit-dynamical class (user decision 2026-08-26, GH #468/#470):
+    # the far-field gauge-restoration continuum makes machine-precision
+    # closure unachievable at float64, and content determined more
+    # weakly than ~1e-4 is physically fading (B0 -> 0 there). The
+    # contract tolerance is floor-linked, so every acceptance is
+    # quantified and warned.
+    tau_max = 1e-4
+    tau = tau0
+    last_err: SingularPencilError | None = None
+    while tau <= tau_max:
+        pinned = np.zeros((n, 0), dtype=np.complex128)
+        try:
+            if _probe_smin(A_n, B_n) < tau:
+                a_red, b_red, c_basis, pinned = _gauge_quotient_pencil(
+                    A_n, B_n, probe_points, context, tau=tau
+                )
+                a_eff_red, proj_red = _deflate_regular_pencil(
+                    a_red, b_red, context, tau
+                )
+                a_eff_full = (c_basis @ a_eff_red) @ c_basis.conj().T
+                proj_full = (c_basis @ proj_red) @ c_basis.conj().T
+                result = (
+                    np.asarray(a_eff_full, dtype=np.complex128),
+                    np.asarray(proj_full, dtype=np.complex128),
+                )
+            else:
+                result = _deflate_regular_pencil(A_n, B_n, context, tau)
+        except SingularPencilError as exc:
+            last_err = exc
+            tau *= 10.0
+            continue
+        if diagnostics is not None:
+            diagnostics.record(tag, pinned, tau)
+        if tau > tau0:
+            import warnings as _warnings  # noqa: PLC0415
+
+            _warnings.warn(
+                f"Pencil deflation ({context}): determination floor raised "
+                f"to τ = {tau:.1e} — state content determined more weakly "
+                f"than τ is treated as algebraic/gauge (contract-verified "
+                f"at each step; near-breakdown or far-field content beyond "
+                f"the floor is quotiented). See GH #467/#468.",
+                stacklevel=3,
+            )
+        return result
+    assert last_err is not None
+    raise last_err
+
+
+def _deflate_regular_pencil(
+    A_n: NDArray[np.complex128],
+    B_n: NDArray[np.complex128],
+    context: str,
+    tau: float,
+) -> tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    """Ordered-QZ deflation of a (nominally regular) equilibrated pencil.
+
+    ``tau`` is the determination floor: generalized-eigenvalue pairs
+    with ``|β|/(|α|+|β|) ≤ tau``-scale are classified infinite. The
+    deflation contract ``B·Z_f·G = A·Z_f`` is verified before returning
+    — its violation raises :class:`SingularPencilError` (caught by the
+    adaptive floor loop in :func:`_pencil_deflate`, which retries with a
+    larger floor; the final failure is the honest near-index-breakdown
+    refusal of GH #467).
+    """
+    from scipy.linalg import ordqz, solve_triangular  # noqa: PLC0415
+
+    n = A_n.shape[0]
+
+    def _is_finite_eig(
+        alpha: NDArray[np.complex128], beta: NDArray[np.complex128]
+    ) -> NDArray[np.bool_]:
+        return np.abs(beta) > tau * (np.abs(alpha) + np.abs(beta) + tau)
+
+    qz_out = ordqz(  # pyright: ignore[reportUnknownVariableType, reportCallIssue]
+        A_n,
+        B_n,
+        sort=_is_finite_eig,  # pyright: ignore[reportArgumentType]
+        output="complex",
+    )
+    s_mat = np.asarray(qz_out[0], dtype=np.complex128)
+    t_mat = np.asarray(qz_out[1], dtype=np.complex128)
+    alpha = np.asarray(qz_out[2], dtype=np.complex128)
+    beta = np.asarray(qz_out[3], dtype=np.complex128)
+    z_mat = np.asarray(qz_out[5], dtype=np.complex128)
+
+    finite = _is_finite_eig(alpha, beta)
+    n_fin = int(np.sum(finite))
+    # ordqz sorts selected (finite) eigenvalues to the leading block.
+    z_f = z_mat[:, :n_fin]
+    if n_fin == 0:
+        zero = np.zeros((n, n), dtype=np.complex128)
+        return zero, zero
+    t_ff = t_mat[:n_fin, :n_fin]
+    s_ff = s_mat[:n_fin, :n_fin]
+    # Row equilibration is a LEFT transformation: the equilibrated system
+    # has the same solutions, so G_red is the physical generator directly.
+    g_red = np.asarray(solve_triangular(t_ff, s_ff), dtype=np.complex128)
+
+    # SELF-VERIFICATION of the deflation contract B·Z_f·G = A·Z_f
+    # (measured necessity, GH #467): near constraint-index breakdown a
+    # genuine eigenvalue |λ| ~ 1/eps^(1/2..1) appears whose float64
+    # representation cannot be both faithful and integrable — keeping it
+    # pollutes the composition (eps·|λ| = O(1) on ordinary rows),
+    # zeroing it violates the equations. Harmless huge-but-consistent
+    # modes (β-rounding of true infinite pairs) pass this check; only a
+    # composition that fails its own defining equation refuses.
+    tol_contract = max(1e-8, tau)
+    contract_res = _contract_residual(A_n, B_n, z_f, g_red)
+    if contract_res > tol_contract:
+        # ordqz's eigenvalue REORDERING through many ill-conditioned
+        # infinite pairs is numerically unstable at large n (measured:
+        # contract 3.7e2 → 1.3e-2 on the 600-dim E.cal pencil, never
+        # reaching tolerance). Second rung: a reordering-free
+        # construction — right eigenvectors of the retained finite
+        # spectrum (|λ| ≤ 1/τ), orthonormalized, with G from the
+        # contract's own least-squares — judged by the SAME contract.
+        z_f, g_red, contract_res = _deflate_eig_subspace(A_n, B_n, tau)
+        if contract_res > tol_contract:
+            ctx = f" ({context})" if context else ""
+            msg = (
+                f"Deflation contract violated{ctx}: best residual "
+                f"{contract_res:.2e} exceeds the floor-linked tolerance "
+                f"{tol_contract:.1e} at determination floor τ = {tau:.1e} "
+                f"(both the ordered-QZ and the reordering-free "
+                f"constructions). The pencil is within machine precision "
+                f"of constraint-index breakdown at these parameters — no "
+                f"double-precision operator is both faithful to the "
+                f"equations and integrable. This parameter point cannot "
+                f"be simulated as posed. GH #467/#468."
+            )
+            raise SingularPencilError(msg)
+
+    a_eff = (z_f @ g_red) @ z_f.conj().T
+    proj = z_f @ z_f.conj().T
+    return np.asarray(a_eff, dtype=np.complex128), np.asarray(proj, dtype=np.complex128)
+
+
+def _contract_residual(
+    A_n: NDArray[np.complex128],
+    B_n: NDArray[np.complex128],
+    z_f: NDArray[np.complex128],
+    g_red: NDArray[np.complex128],
+) -> float:
+    """Relative residual of the deflation contract ``B·Z_f·G = A·Z_f``."""
+    contract_lhs = B_n @ (z_f @ g_red)
+    contract_rhs = A_n @ z_f
+    contract_scale = max(float(np.max(np.abs(contract_rhs))), 1e-300)
+    return float(np.max(np.abs(contract_lhs - contract_rhs))) / contract_scale
+
+
+def _deflate_eig_subspace(
+    A_n: NDArray[np.complex128],
+    B_n: NDArray[np.complex128],
+    tau: float,
+) -> tuple[NDArray[np.complex128], NDArray[np.complex128], float]:
+    """Reordering-free deflating-subspace construction (GH #468).
+
+    Span the retained finite spectrum (|lambda| <= 1/tau — the
+    determination floor's rate horizon) with right eigenvectors,
+    orthonormalize, and obtain the reduced generator from the contract's
+    own least-squares ``G = argmin ||B·Q·G − A·Q||``. Eigenvector
+    conditioning is NOT trusted: the returned contract residual is the
+    sole acceptance criterion (checked by the caller against the
+    floor-linked tolerance). Avoids ordqz's eigenvalue reordering, whose
+    swaps through large ill-conditioned infinite clusters are the
+    measured unstable step on big localized pencils.
+    """
+    from scipy.linalg import eig, lstsq  # noqa: PLC0415
+
+    out = eig(A_n, B_n, homogeneous_eigvals=True)
+    alpha, beta = out[0]
+    vr = np.asarray(out[1], dtype=np.complex128)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = np.where(
+            np.abs(beta) > 0.0,
+            alpha / np.where(np.abs(beta) > 0.0, beta, 1.0),
+            np.inf,
+        )
+    # Retention-horizon scan: the contract residual is non-monotonic in
+    # the horizon R (too small excludes genuine modes; too large retains
+    # ill-conditioned near-horizon content) — take the best over decades.
+    # NOTE (measured 2026-08-26, GH #468/#470): on the localized E.cal
+    # class even the best retention carries RESOLUTION-DIVERGENT spurious
+    # growth (maxRe +85→+472 for N 12→32), so the floor-linked contract
+    # refusal is expected to stand there; this construction serves the
+    # cases where a clean subspace exists.
+    n = A_n.shape[0]
+    best: tuple[NDArray[np.complex128], NDArray[np.complex128], float] | None = None
+    for horizon in (1e1, 1e2, 1e3, 1e4):
+        keep = np.isfinite(lam) & (np.abs(lam) <= horizon)
+        if not np.any(keep):
+            continue
+        q_basis, _ = np.linalg.qr(vr[:, keep])
+        bq = B_n @ q_basis
+        aq = A_n @ q_basis
+        lstsq_out = lstsq(bq, aq)
+        assert lstsq_out is not None  # scipy stubs type the result Optional
+        g_red = np.asarray(lstsq_out[0], dtype=np.complex128)
+        res = _contract_residual(A_n, B_n, q_basis, g_red)
+        if best is None or res < best[2]:
+            best = (np.asarray(q_basis, dtype=np.complex128), g_red, res)
+    if best is None:
+        zero = np.zeros((n, 0), dtype=np.complex128)
+        return zero, np.zeros((0, 0), dtype=np.complex128), 0.0
+    return best
 
 
 def _build_m_with_null_projection(
@@ -3945,6 +4443,10 @@ def solve_modal(
 
     has_pos_dep = _has_position_dependent_terms(spec)
     has_time_ops = _has_time_derivative_operators(spec)
+    # GH #468 "pin + certify": the builders record every gauge-quotiented
+    # (pinned) direction here; the per-slot overlap goes into the run's
+    # metadata so `tidal measure` can certify each observable.
+    diagnostics = PencilDiagnostics()
 
     # Single evolution-matrix builder handles:
     #   - algebraic constraint fields (time_derivative_order=0) via Schur
@@ -4006,6 +4508,7 @@ def solve_modal(
             recovery_2d,
             c_names_list,
             orig_to_reduced_map,
+            conv_manifold_proj,
         ) = _build_convolution_matrix_with_constraints(
             spec,
             layout,
@@ -4013,6 +4516,7 @@ def solve_modal(
             coeff_eval,
             k_grid_full,
             full_shape,
+            diagnostics=diagnostics,
         )
         recovery_matrix = recovery_2d
         c_names = c_names_list
@@ -4047,6 +4551,15 @@ def solve_modal(
         for orig_si, red_pos in orig_to_reduced.items():
             y0_hat_dyn[red_pos] = y0_hat_full[orig_si]
 
+        # GH #457: implicit-dynamical sector — project the IC onto
+        # the constraint manifold (off-manifold directions are frozen by
+        # the deflated generator; a component left off the manifold
+        # would persist as a constant constraint violation).
+        if conv_manifold_proj is not None:
+            y0_hat_dyn = (conv_manifold_proj @ y0_hat_dyn.ravel()).reshape(
+                y0_hat_dyn.shape
+            )
+
         # Evolve the reduced matrix via Krylov expm_multiply
         times, dyn_snapshots = _evolve_full_matrix(
             A_reduced_2d,
@@ -4063,7 +4576,19 @@ def solve_modal(
         n_full = layout.num_slots * n_pts
         snapshots = np.zeros((len(t_eval), n_full))
 
+        # GH #468 slots mode: c_names is empty and constraint values live
+        # in the evolved slots; their velocities come from the
+        # generator's constraint-slot rows below.
+        slots_mode_constraints: list[tuple[str, int]] = []
+        if conv_manifold_proj is not None:
+            for _si, _slot in enumerate(layout.slots):
+                if _slot.kind == "constraint" and _si in orig_to_reduced:
+                    slots_mode_constraints.append(
+                        (_slot.field_name, orig_to_reduced[_si])
+                    )
         for c_name in c_names:
+            constraint_vel_arrays[c_name] = np.zeros((len(t_eval), *grid.shape))
+        for c_name, _red in slots_mode_constraints:
             constraint_vel_arrays[c_name] = np.zeros((len(t_eval), *grid.shape))
 
         for ti in range(len(t_eval)):
@@ -4097,6 +4622,11 @@ def solve_modal(
                 full_state[c_slot * n_pts : (c_slot + 1) * n_pts] = np.real(c_phys)
                 v_c_phys = np.fft.ifftn(v_c_hat[ci].reshape(grid.shape))
                 constraint_vel_arrays[c_name][ti] = np.real(v_c_phys)
+            for c_name, c_red in slots_mode_constraints:
+                # v_C = Ċ from the generator's constraint-slot row (exact).
+                vc_hat_row = dy_hat_dyn_flat[c_red * n_modes : (c_red + 1) * n_modes]
+                v_c_phys = np.fft.ifftn(vc_hat_row.reshape(grid.shape))
+                constraint_vel_arrays[c_name][ti] = np.real(v_c_phys)
 
             snapshots[ti] = full_state
             if snapshot_callback is not None:
@@ -4118,6 +4648,7 @@ def solve_modal(
             orig_to_reduced,
             Scc_inv_modes,
             Scc_singular_mask_modes,
+            manifold_proj_modes,
         ) = _build_evolution_matrices(
             spec,
             layout,
@@ -4125,6 +4656,7 @@ def solve_modal(
             coeff_eval,
             k_grid,
             rfft_shape,
+            diagnostics=diagnostics,
         )
 
         n_dyn = A_reduced.shape[1]
@@ -4135,6 +4667,14 @@ def solve_modal(
         y0_hat_dyn = np.zeros((n_dyn, n_modes), dtype=np.complex128)
         for orig_si, red_pos in orig_to_reduced.items():
             y0_hat_dyn[red_pos] = y0_hat[orig_si]
+
+        # GH #457: when the pencil engine reduced the sector (implicit-dynamical or
+        # singular-mass), project the IC onto the constraint manifold —
+        # off-manifold directions are frozen by the generator, so a
+        # component left off the manifold would persist as a constant constraint
+        # violation for the whole run.
+        if manifold_proj_modes is not None:
+            y0_hat_dyn = np.einsum("mij,jm->im", manifold_proj_modes, y0_hat_dyn)
 
         # Build a reduced StateLayout for eigendecomposition
         sorted_orig = sorted(orig_to_reduced.keys())
@@ -4293,6 +4833,15 @@ def solve_modal(
     if progress is not None:
         progress.finish()
 
+    # A modal run that never needed the pencil engine (invertible fast path,
+    # plain position-dependent builder) pinned nothing — say so explicitly
+    # so `tidal measure` can certify "no pins" rather than stay silent.
+    if not diagnostics.slot_names:
+        diagnostics.slot_names = [*layout.field_slot_map] + [
+            f"v_{name}" for name in layout.velocity_slot_map
+        ]
+        diagnostics.pin_overlap = np.zeros((1, len(diagnostics.slot_names)))
+
     result: SolverResult = {
         "t": times,
         "y": snapshots,
@@ -4305,6 +4854,10 @@ def solve_modal(
     # systems, constraint_vel_arrays is empty.
     if constraint_vel_arrays:
         result["constraint_velocities"] = constraint_vel_arrays  # type: ignore[typeddict-unknown-key]
+    if diagnostics.slot_names:
+        result["diagnostics"] = diagnostics.to_dict()  # type: ignore[typeddict-unknown-key]
+    if diagnostics.probes is not None:
+        result["pin_probes"] = diagnostics.probes  # type: ignore[typeddict-unknown-key]
 
     # Stage 3 (v6): expose Pass 0 eigendecomposition for Pass 1 Duhamel.
     if return_eigendata:

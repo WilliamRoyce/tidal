@@ -43,7 +43,20 @@ _FULL_PATH = (
     Path(__file__).parent.parent / "examples" / "data" / "torsion_gertsenshtein.json"
 )
 
-pytestmark = pytest.mark.slow
+pytestmark = [
+    pytest.mark.slow,
+    # GH #464 (user decision 2026-08-25): promoted∩demoted fence on the
+    # deferred R̃² class — torsion_gertsenshtein's demoted h_4/h_7/h_9 are
+    # promoted to the second-order sector (GH #457); routing their O(ε¹)
+    # corrections through promoted state slots belongs to the deferred
+    # #321 program. Resume when #464 lifts. The machinery-level anchor
+    # (TestAugmentedRecoveryMatchesMpmath, synthetic spec, empty promoted
+    # set) stays green and keeps covering #290's augmented recovery.
+    pytest.mark.skip(
+        reason="GH #464: promoted∩demoted fence on the deferred R̃² class "
+        "(h_4/h_7/h_9); re-enable when the fence lifts"
+    ),
+]
 
 
 @pytest.fixture(scope="module")

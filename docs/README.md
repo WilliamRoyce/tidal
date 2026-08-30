@@ -48,6 +48,7 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `json_schema.tex` | `docs/tex/json_schema.tex` | Complete JSON specification reference |
 | `solver_migration.tex` | `docs/tex/solver_migration.tex` | py-pde to SUNDIALS migration |
 | `modal_solver.tex` | `docs/tex/modal_solver.tex` | Fourier modal solver |
+| `pencil_engine.tex` | `docs/tex/pencil_engine.tex` | Matrix-pencil engine: deflation contract, implicit-dynamical sector, gauge quotient, rejected alternatives, pin + certify and observable-sector closure (GH #457–#474) |
 | `solver_optimizations.tex` | `docs/tex/solver_optimizations.tex` | FD stencils, Yoshida, spectral, component E-L |
 | `adaptive_timestepping.tex` | `docs/tex/adaptive_timestepping.tex` | Tolerance-controlled solvers |
 | `kinetic_matrix.tex` | `docs/tex/kinetic_matrix.tex` | Non-diagonal kinetic matrix handling |

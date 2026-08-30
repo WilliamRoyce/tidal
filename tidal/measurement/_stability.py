@@ -153,7 +153,7 @@ class ConversionStabilityResult:
     :data:`PROBE_PROFILE_NAME` for results produced by this module."""
 
 
-def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
+def check_conversion_stability(  # noqa: C901, PLR0911, PLR0912, PLR0913, PLR0914, PLR0915
     spec: EquationSystem,
     grid: GridInfo,
     parameters: dict[str, float],
@@ -257,6 +257,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     from tidal.measurement._stability_cache import get_structural_context
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
+        SingularPencilError,
         _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
         _build_m_with_null_projection,  # type: ignore[reportPrivateUsage]
         find_independent_blocks,
@@ -307,7 +308,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     # tachyonic with infinite excess.
     ce = CoefficientEvaluator(spec, grid, parameters)
     try:
-        A_test, B_test, _, _, _, mapping, _, _ = _build_evolution_matrices(
+        A_test, B_test, _, _, _, mapping, _, _, _ = _build_evolution_matrices(
             spec,
             layout,
             grid,
@@ -326,6 +327,19 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
                 f"({type(exc).__name__}: {exc}); simulation cannot run, "
                 f"treating as tachyonic."
             ),
+        )
+    except SingularPencilError as exc:
+        # GH #467: near constraint-index breakdown (or true gauge the
+        # quotient cannot resolve). This is a NUMERICAL-VALIDITY verdict,
+        # not a growth-rejection: no double-precision operator is both
+        # faithful and integrable at this point, so any P_max would be
+        # an artifact. The message carries the diagnosis.
+        return ConversionStabilityResult(
+            stable=False,
+            max_excess=float("inf"),
+            k_tachyonic=None,
+            n_tachyonic_modes=1,
+            message=f"Not simulatable as posed: {exc}",
         )
 
     # Find independent blocks using low-k coupling structure.  block_slots
@@ -566,7 +580,7 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
 
     # Build systems
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, _, _, _, _, mapping, _, _ = _build_evolution_matrices(
+    A_test, _, _, _, _, mapping, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
@@ -577,7 +591,7 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
 
     baseline_params = {**parameters, **baseline_overrides}
     ce_bl = CoefficientEvaluator(spec, grid, baseline_params)
-    A_bl, _, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_bl, _, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
