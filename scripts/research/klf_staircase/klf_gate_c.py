@@ -28,7 +28,7 @@ from tidal.solver.modal import (
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import EquationSystem
 
-REPO = Path("/workspaces/torsion-gertsenshtein")
+REPO = Path(__file__).resolve().parents[3]
 PARAMS = {"kappa": 1.0, "Bpeak": 0.01, "sigB": 5.0, "zc1": 25.0, "zc2": 75.0}
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 16
 TAU = float(sys.argv[2]) if len(sys.argv) > 2 else 1e-6
