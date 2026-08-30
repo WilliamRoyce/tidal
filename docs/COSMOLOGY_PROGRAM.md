@@ -170,6 +170,22 @@ adds unknowns.
 | **O3** | **Gertsenshtein mixing on FRW** — graviton↔photon with Hubble damping | time-dependent solver on the thesis's own physics; **core goal** (thesis couplings) | GH #209; Cembranos arXiv:2302.08186 (local); reduces to flat-space result as `H → 0` |
 | **O4** | **Cosmic birefringence (E→B)** + V-modes | parity-odd sector + polarization observables | `β = 0.277° ± 0.057°` (4.8σ, joint ACT+Planck, arXiv:2608.06480); distinctive channels beat the `N_eff` bound where broadband conversion does not |
 
+**Two O4 prerequisites, found 2026-08-30 — neither is a lookup, both are derivation work:**
+
+- **Frequency scaling has no single answer.** It is *per-operator*, and TIDAL's own theory
+  documents do not derive it: `general_quadratic_lagrangian.tex` contains no
+  frequency-scaling discussion, and its CS section states only that `χ^CS_2` sources
+  magnetic helicity `A·B`. The Das et al. `ξ₁ ∇T×F̃` structure gives `α = 2ξ₁p²T₁t` (`ν²`);
+  an induced-axion `θFF̃` gives `ν⁰`. These are *different sectors* in the enumeration's
+  language (`ζ̃₁₋₆` vs `d₁₈`/`χ^CS`), so "the torsion coupling's scaling" is not a
+  well-posed question. Scope it as a derivation task per operator (**GH #499**).
+- **No example implements the Chern–Simons couplings.**
+  `examples/torsion_gertsenshtein/theory_parity_odd.toml` explicitly *defers* `cs1`–`cs3`
+  ("require bare `A_μ`, special handling"). O4 therefore needs new derivation work, and
+  the bare-`A_μ` gauge handling is an unsolved problem, not a configuration step (**GH #499**).
+  (That file's `description` field claimed CS *was* included, contradicting its own
+  header; corrected 2026-08-30.)
+
 O0 is the validation gate, then O1. Strategic note (H7): CMB bounds from broadband
 conversion are typically weaker than `N_eff` unless the signal is spectrally narrow or
 structurally distinctive — V-modes and birefringence are exactly that, justifying the
@@ -188,6 +204,21 @@ perturbation theory as future work. Full findings: `docs/cosmology/spectator_rou
 ## Workstreams
 
 Order: **WS0 → WS1 → WS2 ∥ WS3 → WS4 → WS5.** WS6 independent.
+
+**FRW is blocked in three independent places, each owned by a different workstream** (found
+2026-08-30). No single fix clears it, and they must be tracked separately:
+
+| # | Blocker | Owner |
+|---|---|---|
+| a | Modal solver refuses non-trivial `volume_element` and any `time_dependent` term (`tidal/solver/modal.py`) | WS3 (#492) |
+| b | Hamiltonian/energy export filters `t` (`ExportJSON.wl:1638`; `_energy.py` hardcodes `t=0.0`) | WS2 (#491) |
+| c | **Conversion measurement is energy-ratio-based**, so it inherits (b)'s `t=0.0` bug *and* the `P_max`-vs-`P_final` distinction | WS4 (#493) |
+
+(c) is the dangerous one: it would silently corrupt an O3 number rather than fail loudly.
+
+**Cost basis:** use the **v0.33.9 measured table** in `docs/tex/derivation_performance.tex`.
+The per-theory derivation-timing headers in the TOMLs are declared untrustworthy there
+(§lines 108–114) — treat them as ceilings, not estimates.
 
 - **WS0 — Research & scoping** (no code): handoffs H1–H5; integration-target decision
   (patch CAMB Fortran vs DISCO-EB [arXiv:2311.03291 — from-scratch differentiable

@@ -41,7 +41,7 @@
 
 [theory]
 name = "Parity-Odd PGT (all safe torsion-EM couplings)"
-description = "Parity-even + parity-odd cross-couplings + Chern-Simons, no R̃²"
+description = "Parity-even + parity-odd cross-couplings, no R̃². Chern-Simons EXCLUDED (see header: cs1-cs3 deferred, need bare A_mu handling)"
 
 [spacetime]
 dimension = 4
