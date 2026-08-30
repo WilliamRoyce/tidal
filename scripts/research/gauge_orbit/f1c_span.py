@@ -33,13 +33,17 @@ A, B, _ = equilibrate(ctx.A, ctx.B)
 C, D, labels = joint_operator(ctx, A, B)
 sig, prof, chains = grade(C, D)
 print(f"N={N} dim={ctx.dim}  joint profiles={C.shape[1]}  kept={len(sig)}")
-print(f"sigma spectrum: min={sig[0]:.3e}  median={np.median(sig):.3e}  max={sig[-1]:.3e}")
+print(
+    f"sigma spectrum: min={sig[0]:.3e}  median={np.median(sig):.3e}  max={sig[-1]:.3e}"
+)
 
 # --- (1) are the least-determined profiles far-field localized? ---
 z, p = ctx.z, ctx.params
 near = (np.abs(z - p["zc1"]) <= 2 * p["sigB"]) | (np.abs(z - p["zc2"]) <= 2 * p["sigB"])
 print("\n--- (1) real-space localization of the least-determined gauge profiles ---")
-print("(profile = the gauge FUNCTION xi(z); 'near' = within 2 sigma of either Gaussian)")
+print(
+    "(profile = the gauge FUNCTION xi(z); 'near' = within 2 sigma of either Gaussian)"
+)
 for rank in (0, 1, 2, len(sig) // 2, len(sig) - 1):
     u = prof[:, rank]
     tot = np.zeros(N, dtype=np.complex128)
@@ -50,8 +54,14 @@ for rank in (0, 1, 2, len(sig) // 2, len(sig) - 1):
             tot += np.fft.ifftn(hat)
     e = np.abs(tot) ** 2
     share = float(e[near].sum() / max(e.sum(), 1e-300))
-    tag = "least-determined" if rank < 3 else ("median" if rank == len(sig) // 2 else "most-determined")
-    print(f"  rank {rank:3d}  sigma={sig[rank]:.3e}  near-Gaussian energy share={share:.3f}  [{tag}]")
+    tag = (
+        "least-determined"
+        if rank < 3
+        else ("median" if rank == len(sig) // 2 else "most-determined")
+    )
+    print(
+        f"  rank {rank:3d}  sigma={sig[rank]:.3e}  near-Gaussian energy share={share:.3f}  [{tag}]"
+    )
 
 # --- (2) principal angles: symbolic orbit vs the pencil's own weak sector ---
 # The pencil null vector of a chain at probe lambda is v(lam) = sum_j lam^j R_j
@@ -69,7 +79,9 @@ def orbit_at(lam: complex, ncols: int) -> np.ndarray:
 
 pen = A - LAM * B
 _, s_pen, vh_pen = np.linalg.svd(pen)
-print(f"pencil singular values: min={s_pen[-1]:.3e}  s[-32]={s_pen[-32]:.3e}  max={s_pen[0]:.3e}")
+print(
+    f"pencil singular values: min={s_pen[-1]:.3e}  s[-32]={s_pen[-32]:.3e}  max={s_pen[0]:.3e}"
+)
 res = np.linalg.norm(pen @ orbit_at(LAM, 32), axis=0)
 print(
     f"residual ||(A-lam B) v_orbit|| for the 32 least-determined: "
@@ -97,14 +109,20 @@ Q = np.linalg.qr(orbit_at(LAM, min(64, chains.shape[1])))[0]
 for dim in (4, 8, 16, 32, 64):
     weak = vh_pen[-dim:].conj().T
     resid = np.linalg.norm(weak - Q @ (Q.conj().T @ weak), axis=0)
-    print(f"  dim={dim:3d}  unexplained component of each weak vector: "
-          f"min={resid.min():.3f} max={resid.max():.3f}")
+    print(
+        f"  dim={dim:3d}  unexplained component of each weak vector: "
+        f"min={resid.min():.3f} max={resid.max():.3f}"
+    )
 inv = {v: k for k, v in ctx.slot.items()}
 w0 = vh_pen[-1].conj()
-per_slot = np.array([np.linalg.norm(w0[s * ctx.N : (s + 1) * ctx.N]) for s in range(ctx.n_slots)])
+per_slot = np.array(
+    [np.linalg.norm(w0[s * ctx.N : (s + 1) * ctx.N]) for s in range(ctx.n_slots)]
+)
 top = np.argsort(per_slot)[::-1][:6]
-print("  weakest pencil direction lives on slots: "
-      + ", ".join(f"{inv.get(s, s)}={per_slot[s]:.2f}" for s in top))
+print(
+    "  weakest pencil direction lives on slots: "
+    + ", ".join(f"{inv.get(s, s)}={per_slot[s]:.2f}" for s in top)
+)
 
 worst = float(
     np.max(

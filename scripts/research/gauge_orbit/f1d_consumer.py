@@ -74,14 +74,19 @@ def build(ctx, A, B, tau_pin: float):
     sol, *_ = np.linalg.lstsq(M, rhs, rcond=None)
     ydot = Cb @ sol[: Cb.shape[1], :]
     G = slice_man.conj().T @ ydot
-    lsq_resid = float(
-        np.linalg.norm(M @ sol - rhs) / max(np.linalg.norm(rhs), 1e-300)
-    )
+    lsq_resid = float(np.linalg.norm(M @ sol - rhs) / max(np.linalg.norm(rhs), 1e-300))
     return {
-        "G": G, "S": slice_man, "W": W, "p": p, "sigma": sig,
-        "n_profiles": len(pinned), "lsq_resid": lsq_resid,
+        "G": G,
+        "S": slice_man,
+        "W": W,
+        "p": p,
+        "sigma": sig,
+        "n_profiles": len(pinned),
+        "lsq_resid": lsq_resid,
         "sigma_pinned_max": float(sig[pinned].max()),
-        "sigma_first_retained": float(sig[len(pinned)]) if len(pinned) < len(sig) else float("nan"),
+        "sigma_first_retained": float(sig[len(pinned)])
+        if len(pinned) < len(sig)
+        else float("nan"),
     }
 
 
@@ -102,7 +107,9 @@ def run(n: int, taus: list[float]) -> int:
             print(f"  tau={tau:.0e}: nothing pinned / empty slice")
             continue
         G, S, W, p = out["G"], out["S"], out["W"], out["p"]
-        x = rng.standard_normal((S.shape[1], 8)) + 1j * rng.standard_normal((S.shape[1], 8))
+        x = rng.standard_normal((S.shape[1], 8)) + 1j * rng.standard_normal(
+            (S.shape[1], 8)
+        )
         y, ydot = S @ x, S @ (G @ x)
         contract = float(
             np.linalg.norm(B @ ydot - A @ y) / max(np.linalg.norm(A @ y), 1e-300)
@@ -131,9 +138,13 @@ def run(n: int, taus: list[float]) -> int:
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     tau_arg = next((a for a in sys.argv[1:] if a.startswith("--tau")), None)
-    taus = [float(x) for x in tau_arg.split("=")[1].split(",")] if tau_arg else [1e-6, 1e-5, 1e-4]
+    taus = (
+        [float(x) for x in tau_arg.split("=")[1].split(",")]
+        if tau_arg
+        else [1e-6, 1e-5, 1e-4]
+    )
     rc = 0
-    for nn in ([int(a) for a in args] or [16, 24]):
+    for nn in [int(a) for a in args] or [16, 24]:
         rc |= run(nn, taus)
     print("\nGATE F1-d:", "PASS" if rc == 0 else "FAIL")
     sys.exit(rc)

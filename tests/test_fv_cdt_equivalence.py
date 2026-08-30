@@ -45,9 +45,7 @@ MT2 = 2.0 * ALPHA3  # the NEW-convention equivalence map
 pytestmark = pytest.mark.slow
 
 
-def _simulate_and_measure(
-    spec: Path, params: dict[str, float], out_dir: Path
-) -> float:
+def _simulate_and_measure(spec: Path, params: dict[str, float], out_dir: Path) -> float:
     from tidal.cli import main
 
     sim_args = [

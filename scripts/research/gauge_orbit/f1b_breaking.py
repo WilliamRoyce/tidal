@@ -63,7 +63,9 @@ def split_defect(ctx, A, B, R):
 
 
 print(f"N={N}  gauge profile = Fourier mode {MODE}")
-print("\n--- (1) SCALING: d log||defect|| / d log Bpeak  (identity predicts a:1, h:2) ---")
+print(
+    "\n--- (1) SCALING: d log||defect|| / d log Bpeak  (identity predicts a:1, h:2) ---"
+)
 records: dict[str, dict[str, list[float]]] = {g: {"a": [], "h": []} for g in GENERATORS}
 ctxs = {}
 for bp in BPEAKS:
@@ -119,7 +121,9 @@ print("\n--- (2) LOCALIZATION: fraction of defect energy in the far field ---")
 ctx = ctxs[BASE_PARAMS["Bpeak"]]
 A, B, _ = equilibrate(ctx.A, ctx.B)
 z, p = ctx.z, ctx.params
-far = (np.abs(z - p["zc1"]) > FAR * p["sigB"]) & (np.abs(z - p["zc2"]) > FAR * p["sigB"])
+far = (np.abs(z - p["zc1"]) > FAR * p["sigB"]) & (
+    np.abs(z - p["zc2"]) > FAR * p["sigB"]
+)
 print(f"far field = {far.sum()}/{ctx.N} grid points (|z-zc| > {FAR:g} sigma)")
 for g in GENERATORS:
     _, blocks = split_defect(ctx, A, B, chain(ctx, g, MODE))
@@ -140,7 +144,9 @@ for g in GENERATORS:
         / max(float(np.linalg.norm(np.concatenate(chain(ctx, g, m)))), 1e-300)
         for m in range(ctx.N)
     ]
-    print(f"  {g:10s} median={np.median(sig):.3e}  min={np.min(sig):.3e}  max={np.max(sig):.3e}")
+    print(
+        f"  {g:10s} median={np.median(sig):.3e}  min={np.min(sig):.3e}  max={np.max(sig):.3e}"
+    )
 
 print("\n--- (4) REPRESENTATIVE (gate F1-f): full Lie vs covariant photon action ---")
 print("delta a_mu = L_xi Abar_mu   vs   delta a_mu = xi^nu Fbar_{nu mu}")
