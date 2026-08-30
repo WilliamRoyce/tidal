@@ -525,6 +525,10 @@ orchestrator or by other handoffs):
 
 ## 7. Issues to open
 
+> **Status: all filed 2026-08-30 as #500–#510** (WS2 #500–#504, WS3 #505, WS4 #506–#508,
+> WS5 #509–#510). The two owner edits in §6 are also done: `COSMOLOGY_PROGRAM.md` companion
+> table + O3 PMF note, and `handoffs/H3.md` extended to two solver kinds.
+
 1. **WS2** — FRW derivation mode: symbolic `a(η)`, `ℋ(η)`, conformal time; 2⁺ tensor sector
    first; zero-coupling limit reproduces `h'' + 2ℋh' + k²h = 0`.
 2. **WS2** — background-EOM residual check on the CAMB background, including the
