@@ -90,9 +90,157 @@ retroactively covered; see `git log` for the full history.
   directions carry no energy — the energy certificate doubles as a
   pin-validity check), while a scalar reading the pinned torsion
   component's raw value is flagged.
+### Changed
+
+- **One `run_point`, and the two orchestrators become the policy they always
+  were (#480 step 2)**. `tidal sweep` and `tidal sample` each hand-rolled
+  **probe -> simulate -> measure -> classify** and interleaved policy with
+  mechanism, so a change to the sequence had to be made twice — which is how a
+  probe-policy change reached only one of them for four months (#454).
+  `tidal.measurement._run_stages.run_point(ctx) -> PointOutcome` is that
+  sequence, written once. It is **total**: every path returns an outcome,
+  including failures, which is what lets `_run_single` map outcome->row and
+  `_evaluate_likelihood` map outcome->`(logL, metadata)` without either
+  re-implementing exception handling. The soft floor stays at the inference
+  call site: its noise is seeded on `theta` (#408), a correctness property for
+  nested sampling, and `run_point` has no `theta`.
+
+  Verified by capturing sweep rows and `(logL, metadata)` for fixed parameter
+  points before and after — success on both the memory and disk backends plus
+  the failure branches — and asserting exact equality. The soft-floor values
+  compare exactly because they are deterministic in `theta`.
+
+  That proof earned its keep: it caught a missing spec path being re-tagged
+  `measurement_error`, because `RunStatus.from_exception` mapped
+  `OSError -> MEASUREMENT_ERROR`. Inferring the *stage* from the exception
+  *type* over-claims — a bare `OSError` is a missing spec as readily as an
+  unreadable output. `from_exception` now classifies only what a type genuinely
+  identifies (`SimulationDivergedError`, `KineticEvaluationError`), and
+  `MEASUREMENT_ERROR` is set by `run_point` where it knows it is measuring:
+  attribution by position, not by type.
+
+- **`tidal.cli._sweep.simulate_run` is public** — it is consumed through the
+  `_run_stages` seam rather than privately, and the underscore said otherwise.
+
+- **GH #480 step 4 is not viable as scoped, and the seam records why.** Moving
+  the ~450 lines of execution wrappers into the library layer would leave both
+  couplings exactly where they are: `simulate_run` / `run_inference_step` call
+  the ~3000-line driver `tidal.cli._simulate._simulate`, and
+  `measure_from_sim_data` calls eleven private dispatchers in the ~1000-line
+  `tidal.cli._measure`. The wrappers are not the dependency. Relocating the
+  driver and the dispatchers is a different and much larger project.
 
 ### Fixed
 
+- **`--baseline-formula` is refused at launch instead of collapsing a chain onto
+  the soft floor (#407)**. A formula referencing spec constants that were never
+  passed via `--param` failed per evaluation, was swallowed to `None` by
+  `_eval_baseline`, became `-inf`, and landed on the v3 soft floor — so
+  `tidal sample` **ran to completion and produced a posterior built entirely
+  from floor values**. #270 fixed half of this by merging spec defaults into
+  `eval_params`, but that half is inert for production: only **6 of 48**
+  committed specs carry a `metadata.parameters` block and none is a PGT or
+  dark-photon theory, so `--param` is the only working channel for every
+  campaign spec. #270's own prescribed remedy — raise if the formula
+  references an unresolvable name — is now implemented.
+
+  `unresolved_formula_names` reports **every** missing name at once rather
+  than the first, and `sample`, `plot` and `analyze` each check before doing
+  any work. The available set is built per entry point rather than by a shared
+  resolver, because they genuinely differ (sampled priors vs sweep columns vs
+  recorded chain metadata) — a common resolver would be a false commonality.
+  Sampled parameter names count as available: a formula over a swept coupling
+  is legitimate and must not be rejected.
+
+  `_eval_baseline` also stops returning `None` for "could not evaluate".
+  Callers read that identically to a baseline of zero, so a **configuration**
+  error was indistinguishable from a legitimate physics outcome. A formula
+  evaluating to a non-positive number still soft-floors exactly as before.
+
+- **One `run_status` vocabulary, and divergence is finally distinguishable
+  (#480)**. `run_status` is the column that tells a reader whether a row is
+  usable, and it had no single definition: sweep emitted `success`,
+  `solver_error`, `measurement_error`, `diverged`; inference emitted `success`,
+  `simulation_failed`, `metric_missing`, `metric_nan`, `logl_minus_inf`,
+  `below_noise_floor`, `exception`. They shared exactly one value. Three
+  documents described three mutually inconsistent taxonomies, two naming tags no
+  code ever emitted. `tidal.measurement._run_stages.RunStatus` is now the single
+  definition, a `StrEnum` so every existing consumer
+  (`row["run_status"] == "success"`) keeps working untouched. Two defects fall
+  out of it:
+  - **`SimulationDivergedError` was invisible on the inference path.** It fell
+    into the bare `except Exception` and was tagged `exception` —
+    indistinguishable from a `KeyError` in measurement code — while
+    `docs/V3_ARCHITECTURE.md` had promised `simulation_diverged` since May 2026.
+    That matters now that the probe gates nothing (#454): divergence is the
+    failure mode the campaign watches for. The tag is emitted on both paths, and
+    since the soft floor is applied identically either way, **logL is unchanged
+    and no recorded chain can shift** — asserted by test.
+  - **Sweep recorded configuration errors as a physics verdict.** A single
+    `except (ValueError, TypeError, KeyError, OSError, RuntimeError, SystemExit)`
+    tagged all of them `diverged`, `KineticEvaluationError` included — so a
+    parameter missing from `--param` read as a divergence. That is the
+    mislabeling #447 prevented at the probe (by making the exception a
+    `RuntimeError`, not a `ValueError`), reintroduced one layer up. Now split
+    into `simulation_diverged` / `kinetic_error` / `measurement_error` /
+    `exception` via `RunStatus.from_exception`.
+
+  `KineticEvaluationError` is now exported from `tidal.solver` alongside
+  `SimulationDivergedError` — an exception callers are expected to catch belongs
+  in the public surface.
+
+
+- **The stability probe now runs on the grid the simulation will actually use
+  (#479)**. The probe built its grid from private fallbacks when `--grid-shape`
+  / `--bounds` were absent — 256 on `(0, 100)` from the sweep path, 64 on
+  `(0, 50)` from inference, 256 on `(0, 100)` again in the prior-stability
+  sweep — and all three disagreed with the simulation's own default of 64 on
+  `(0, 10)`. Because the probe's box was *larger* while its point count was
+  not, its Nyquist came out **below** the solver's: k_max 8.0 and 4.0
+  respectively against the solver's 20.1. Modes between those and the
+  solver's cutoff were evolved and never examined — a false negative in a
+  probe whose stated design principle is never to risk one, and which
+  compounds with the measured box-dependence of probe verdicts (#344). The
+  grid now comes from `_parse_grid_shape` / `_parse_bounds` via the
+  `_run_stages` seam, so probe and solver describe the same system, and a
+  test asserts the probe's Nyquist is never below the solver's. Recorded
+  campaign chains are unaffected: every landscape/rescue template passes both
+  flags explicitly.
+- **`tidal sample` writes its prior-stability overlay again (#479)**. The
+  prior-stability sweep read `int(getattr(base_args, "grid_shape", 256))`, but
+  `--grid-shape` defaults to `None`, so the `getattr` default never fired and
+  this was `int(None)` — a `TypeError` caught by the caller and reported as
+  `Prior stability sweep skipped: ...`. Every run without an explicit
+  `--grid-shape` therefore produced no `_rejected_prior.csv` and no
+  prior-stability overlay on its corner plot. It is now a fourth caller of the
+  shared probe stage rather than a third copy of it.
+- **`tidal sweep` no longer blocks simulations on the tachyonic probe
+  (#454)**. The v3 architecture made the pre-flight probe a metadata-only
+  diagnostic on 2026-05-10 (`60cb70d8`) — but that commit rewrote the inference
+  path and never touched `tidal/cli/_sweep.py`, whose blocking pre-check dates
+  from 2026-04-08 (`c2afda64`, #238). For four months a sweep returned
+  `run_status="tachyonic"` with `wall_time_s = 0.0` and no measurement, while
+  `tidal sample` recorded the same verdict as metadata and simulated the point.
+  Rejection on numerical growth is abandoned as policy: growth cannot be
+  classified as physics or artifact without theory-level analysis (PSALTer,
+  #360), and numerical divergence is addressed through `t_end` and localized-B
+  geometry. **Behavior change:** points that previously produced a blocked row
+  are now simulated and produce a real measurement plus the probe columns.
+  `--gated` (now on both `sweep` and `sample`) reproduces the old rows for
+  archived configurations and is not a physics option. Recorded sweeps are not
+  re-run and keep their blocked rows.
+- **The probe stage lives once (#454)**. Both entry points carried a copy of the
+  ~40-line preamble; the copy is what let the policy change reach only one of
+  them. It now lives in `tidal.measurement._stability.probe_for_run`, and
+  `tidal/measurement/_run_stages.py` is a named seam for the stages both paths
+  share — `tidal/inference/` and `tidal/measurement/` no longer import private
+  names out of a CLI module. Two defects surfaced with the merge: the two paths
+  recorded **different metadata key sets** (three columns vs five, one under a
+  different name), so sweep rows and chain samples could not be joined — now a
+  fixed key set asserted by test; and the sweep copy passed `bounds=None` into
+  `GridInfo` whenever `--bounds` was omitted, raising `TypeError` into a bare
+  `except`, so **those sweeps ran no probe at all** and silently recorded no
+  diagnostic columns.
 - **Marginal D_KL is now computed in the space where each prior is uniform
   (#420)**. `compute_parameter_importance` transformed only `log_uniform`
   columns; `arctan_uniform`, `normal` and `radial_angular` were histogrammed
@@ -216,19 +364,21 @@ retroactively covered; see `git log` for the full history.
   corner-collapsed O(ε) correction coefficients. Localized sweep/sampling
   gating now refuses loudly pending the #441 gate design.
 
-### Added
+### Removed
 
-- **Position-dependent kinetic coefficients in modal (#427)**. The
-  convolution paths fold the per-grid-point `M⁻¹(x)`
-  (grid-aware `build_inverse_kinetic_diag`, #382) into each velocity-row
-  coefficient in real space before the FFT — mathematically identical to
-  the mass-side `M̂⁻¹(k−k′)` convolution. Routing is kinetics-aware,
-  `can_use_modal` requirement 6 is retired, and auto-selection accepts
-  such specs; the strictly per-mode engines (genEig/stability-probe/
-  modal-jax entry, Pass-1 Duhamel) keep an updated refusal. Validated:
-  stripped-EH modal-vs-CVODE RMS < 1%, spectral-rate convergence,
-  cross-path kinetic-contract pins on both convolution paths, and the
-  intact EH spec runs end-to-end via `--perturbative-order 0`.
+- **`--gated` (BREAKING, CLI)**. The flag restored the pre-v3 hard rejection of
+  tachyonic points on `tidal sample` (since 2026-05-10) and `tidal sweep` (since
+  v0.49.5), as a reproducibility affordance for archived runs. Rejection on
+  tachyonic growth is abandoned policy — growth cannot be classified as physics
+  or artifact without theory-level analysis (PSALTer, #360) — and keeping a
+  switch for an abandoned policy leaves it one flag away from being used. The
+  probe is now unconditionally a diagnostic on both paths. `LikelihoodConfig`
+  loses its `permissive` field and `parse_likelihood` its `permissive` kwarg.
+  **Consequence:** chains and sweeps recorded with `--gated` can no longer be
+  reproduced bit-for-bit from the current codebase, only from a checkout of the
+  release that produced them. Their rows carry `run_status=tachyonic_gated`,
+  retained in `RunStatus` as archive-only.
+
 
 ## [v0.34.0 – v0.47.9] — not individually recorded
 

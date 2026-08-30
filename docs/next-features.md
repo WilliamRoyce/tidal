@@ -740,7 +740,7 @@ Not all parameter combinations converge. In coupled field sweeps near instabilit
 
 | Column             | Type        | Description                                                           |
 | ------------------ | ----------- | --------------------------------------------------------------------- |
-| `run_status`       | str         | "success", "timeout", "diverged", "solver_error", "measurement_error" |
+| `run_status`       | str         | See `tidal.measurement._run_stages.RunStatus`: "success", "simulation_diverged", "solver_error", "kinetic_error", "measurement_error", "exception". ("timeout" was never emitted; "diverged" was the pre-v0.50.0 catch-all, now split — GH #480.) |
 | `error_message`    | str or None | Brief error description if status != "success"                        |
 | `solver_exit_code` | int         | 0 for success, nonzero for failure                                    |
 

@@ -23,8 +23,10 @@ Stage C investigation for the empirical foundations.
 from __future__ import annotations
 
 import csv
+import math
 import time
 import warnings
+from argparse import Namespace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -56,6 +58,18 @@ B0 = 0.01
 # Kept as a sentinel set so future regressions can be flagged here
 # without changing test logic.
 KNOWN_PROBE_RESIDUAL: set[str] = set()
+
+# A complete parameter set for T1 (dark_photon_plasma): the spec has four
+# free couplings plus kappa/B0, and an incomplete set makes the probe
+# raise rather than answer.
+T1_PARAMS: dict[str, float] = {
+    "kappa": 1.0,
+    "B0": 0.01,
+    "mA2": 0.05,
+    "deltam": 0.1,
+    "xi": 0.3,
+    "alpha3": 0.1,
+}
 
 
 def _load_d1() -> tuple[EquationSystem, GridInfo]:
@@ -342,3 +356,310 @@ class TestProbePerformance:
         # the observed median; a 50 % rise here would indicate a real
         # regression beyond the expected #341 cost.
         assert median_ms <= 80.0, f"median probe wall {median_ms:.2f} ms > 80 ms"
+
+
+# ---------------------------------------------------------------------
+# Shared probe stage and the sweep/sample policy (GH #454)
+# ---------------------------------------------------------------------
+
+
+class TestProbeForRunSharedStage:
+    """``probe_for_run`` is the ONE probe stage both entry points use.
+
+    ``tidal sweep`` and ``tidal sample`` each carried a copy of this
+    preamble, and the copies drifted into two different tachyonic
+    policies for four months (GH #454). These tests pin the properties
+    that make one shared stage worth having.
+    """
+
+    @staticmethod
+    def _args(**overrides: object) -> Namespace:
+        base: dict[str, object] = {
+            "param": [],
+            "grid_shape": 32,
+            "bounds": "0:50",
+            "ic_wavevector": None,
+        }
+        base.update(overrides)
+        return Namespace(**base)
+
+    def test_not_applicable_without_conversion_measurement(self) -> None:
+        from tidal.measurement._stability import probe_for_run
+
+        result, meta = probe_for_run(
+            T1_SPEC,
+            self._args(),
+            {},
+            source=("a_1",),
+            target=("a_2",),
+            measurements={"energy"},
+        )
+        assert result is None
+        assert meta == {}
+
+    def test_not_applicable_without_source_and_target(self) -> None:
+        from tidal.measurement._stability import probe_for_run
+
+        result, meta = probe_for_run(
+            T1_SPEC,
+            self._args(),
+            {},
+            source=None,
+            target=None,
+            measurements={"conversion"},
+        )
+        assert result is None
+        assert meta == {}
+
+    def test_metadata_key_set_is_fixed(self) -> None:
+        """Schema parity: a sweep row and a chain sample must be comparable.
+
+        The absence of this invariant is what let sweep record three
+        columns (one under a different name) while inference recorded
+        five, so nothing could be joined across the two.
+        """
+        from tidal.measurement._stability import (
+            PROBE_METADATA_KEYS,
+            probe_for_run,
+        )
+
+        _result, meta = probe_for_run(
+            T1_SPEC,
+            self._args(),
+            T1_PARAMS,
+            source=("a_1",),
+            target=("a_2",),
+            measurements={"conversion"},
+        )
+        assert set(meta) == set(PROBE_METADATA_KEYS)
+        # k_tachyonic is NaN, never absent, when nothing is tachyonic —
+        # so the column exists in every row.
+        assert "k_tachyonic" in meta
+
+    def test_missing_bounds_no_longer_silently_disables_the_probe(self) -> None:
+        """GH #454: sweeps without ``--bounds`` ran no probe at all.
+
+        The old sweep code passed ``bounds=None`` into ``GridInfo``,
+        which raises ``TypeError``, and a bare ``except Exception``
+        swallowed it at DEBUG. Since ``--bounds`` defaults to None in
+        every subparser, those sweeps got neither a verdict nor the
+        diagnostic columns.
+        """
+        from tidal.measurement._stability import probe_for_run
+
+        result, meta = probe_for_run(
+            T1_SPEC,
+            self._args(bounds=None),
+            T1_PARAMS,
+            source=("a_1",),
+            target=("a_2",),
+            measurements={"conversion"},
+        )
+        assert result is not None, "probe silently skipped without --bounds"
+        assert meta
+
+    def test_probe_grid_matches_the_grid_the_simulation_will_use(self) -> None:
+        """GH #479: the probe must describe the system that gets evolved.
+
+        Three private fallbacks (256, 64, 256) stood in for this and all
+        three disagreed with the simulation's own default of 64 points on
+        (0, 10), giving the probe a Nyquist 2.5-5x BELOW the solver's —
+        so modes the solver evolves were never examined. That is a false
+        negative in a probe whose design principle is never to risk one.
+        """
+        from tidal.measurement._run_stages import parse_bounds, parse_grid_shape
+        from tidal.symbolic._spec_cache import load_spec_cached
+
+        captured: dict[str, GridInfo] = {}
+        import tidal.measurement._stability as stability_mod
+
+        original = stability_mod.check_conversion_stability
+
+        def _capture(
+            _spec: object, grid: GridInfo, *_a: object, **_k: object
+        ) -> object:
+            captured["grid"] = grid
+            return original(_spec, grid, *_a, **_k)  # type: ignore[arg-type]
+
+        stability_mod.check_conversion_stability = _capture  # type: ignore[assignment]
+        try:
+            stability_mod.probe_for_run(
+                T1_SPEC,
+                self._args(grid_shape=None, bounds=None),
+                T1_PARAMS,
+                source=("a_1",),
+                target=("a_2",),
+                measurements={"conversion"},
+            )
+        finally:
+            stability_mod.check_conversion_stability = original  # type: ignore[assignment]
+
+        spec = load_spec_cached(T1_SPEC)
+        sim_shape = parse_grid_shape(None, spec.spatial_dimension)
+        sim_bounds = parse_bounds(None, spec.spatial_dimension)
+
+        probe_grid = captured["grid"]
+        assert probe_grid.shape[0] == sim_shape[0]
+        assert probe_grid.bounds[0] == sim_bounds[0]
+
+        # The property that actually matters: the probe must not examine a
+        # narrower band of k than the solver will evolve.
+        probe_k_max = (
+            math.pi
+            * probe_grid.shape[0]
+            / (probe_grid.bounds[0][1] - probe_grid.bounds[0][0])
+        )
+        sim_k_max = math.pi * sim_shape[0] / (sim_bounds[0][1] - sim_bounds[0][0])
+        assert probe_k_max >= sim_k_max, (
+            f"probe Nyquist {probe_k_max:.2f} < solver Nyquist {sim_k_max:.2f}: "
+            "tachyonic modes in the gap would be invisible to the probe"
+        )
+
+    def test_unavailable_meta_hook_is_used(self) -> None:
+        """The GH #421 posdep-kinetic refusal keeps its warn-once marker."""
+        import tidal.measurement._stability as stability_mod
+
+        calls: list[BaseException] = []
+
+        def _marker(exc: BaseException) -> dict[str, object]:
+            calls.append(exc)
+            return {"stability_profile": "unavailable-posdep-kinetic"}
+
+        def _boom(*_a: object, **_k: object) -> object:
+            msg = "position-dependent kinetic"
+            raise NotImplementedError(msg)
+
+        original = stability_mod.check_conversion_stability
+        stability_mod.check_conversion_stability = _boom  # type: ignore[assignment]
+        try:
+            result, meta = stability_mod.probe_for_run(
+                T1_SPEC,
+                self._args(),
+                {},
+                source=("a_1",),
+                target=("a_2",),
+                measurements={"conversion"},
+                unavailable_meta=_marker,
+            )
+        finally:
+            stability_mod.check_conversion_stability = original  # type: ignore[assignment]
+
+        assert result is None
+        assert meta == {"stability_profile": "unavailable-posdep-kinetic"}
+        assert len(calls) == 1
+
+
+class TestSweepTachyonicPolicy:
+    """``tidal sweep`` records the probe verdict; it does not block (GH #454).
+
+    Until v0.49.5 the sweep path returned early with
+    ``run_status="tachyonic"`` and never simulated, while ``tidal
+    sample`` recorded the same verdict as metadata and continued. That
+    was the April-2026 policy left behind by the 2026-05-10 v3 change,
+    not a decision.
+    """
+
+    @staticmethod
+    def _unstable() -> object:
+        from tidal.measurement._stability import ConversionStabilityResult
+
+        return ConversionStabilityResult(
+            stable=False,
+            max_excess=0.42,
+            k_tachyonic=0.31,
+            n_tachyonic_modes=7,
+            message="tachyonic at k=0.31",
+        )
+
+    def _patch(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        simulated: list[bool],
+    ) -> None:
+        """Patch the shared stages, not the caller.
+
+        ``_run_single`` delegates the sequence to ``run_point`` (GH #480),
+        so the stages are patched where they now live.  The behavior under
+        test is unchanged — that the probe verdict is recorded and the
+        point simulated anyway — only the seam moved.
+        """
+        import tidal.measurement._run_stages as stages
+        from tidal.measurement._stability import probe_metadata
+
+        unstable = self._unstable()
+
+        def _probe(*_a: object, **_k: object) -> tuple[object, dict[str, object]]:
+            return unstable, probe_metadata(unstable)  # type: ignore[arg-type]
+
+        def _simulate(*_a: object, **_k: object) -> tuple[int, float, None]:
+            simulated.append(True)
+            return 0, 1.25, None
+
+        def _measure(*_a: object, **_k: object) -> dict[str, object]:
+            return {"P_max": 0.017}
+
+        monkeypatch.setattr(stages, "probe_for_run", _probe)
+        monkeypatch.setattr(stages, "simulate_run", _simulate)
+        monkeypatch.setattr(stages, "measure_run", _measure)
+
+    @staticmethod
+    def _args() -> Namespace:
+        return Namespace(
+            param=[],
+            grid_shape=32,
+            bounds="0:50",
+            ic_wavevector=None,
+        )
+
+    def test_default_simulates_and_records_the_verdict(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        import tidal.cli._sweep as sweep_mod
+
+        simulated: list[bool] = []
+        self._patch(monkeypatch, simulated)
+
+        row = sweep_mod._run_single(
+            self._args(),
+            T1_SPEC,
+            {},
+            tmp_path,
+            {"conversion"},
+            ("a_1",),
+            ("a_2",),
+            0.99,
+        )
+
+        assert simulated == [True], "unstable point was not simulated"
+        assert row["run_status"] == "success"
+        assert row["P_max"] == 0.017
+        assert row["wall_time_s"] > 0.0
+        # The verdict is recorded, not acted on.
+        assert row["tachyonic_excess"] == 0.42
+        assert row["n_tachyonic_modes"] == 7
+        assert row["k_tachyonic"] == 0.31
+
+    def test_there_is_no_configuration_that_blocks(self) -> None:
+        """The probe verdict is unconditionally a diagnostic (v0.50.0).
+
+        ``--gated`` reproduced the pre-v0.49.5 blocking row for archived
+        sweeps; it was removed once rejection on tachyonic growth was
+        abandoned as policy, so the abandoned behavior is now structurally
+        unreachable rather than merely off by default.
+        """
+        from tidal.cli import _build_parser
+
+        with pytest.raises(SystemExit):
+            _build_parser().parse_args(
+                [
+                    "sweep",
+                    "x.json",
+                    "--sweep",
+                    "p=0:1:2",
+                    "--measure",
+                    "conversion",
+                    "--gated",
+                ]
+            )

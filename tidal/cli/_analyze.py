@@ -168,6 +168,53 @@ def _print_critical_field_summary(result: CriticalFieldResult) -> None:
             print(f"1/B_min range: [{min(inv_bmins):.4g}, {max(inv_bmins):.4g}]")
 
 
+def _audit_baseline_is_satisfiable(
+    args: Namespace,
+    data_path: Path,
+    baseline_formula: str,
+) -> bool:
+    """Check the audit's baseline formula before it re-simulates anything.
+
+    The audit evaluates the formula with ``FORMULA_NAMESPACE`` + the
+    chain's recorded parameters + ``t_end``, and swallows a failure to NaN
+    per snapshot — so an unresolvable name would silently produce an audit
+    with no baseline at all, after ~3 s of simulation per audited sample
+    (GH #407).  Reports and returns False rather than raising, matching the
+    surrounding CLI style.
+    """
+    import json as _json
+
+    from tidal.cli._console import error_with_hint
+    from tidal.cli._simulate import FORMULA_NAMESPACE, unresolved_formula_names
+
+    available = set(FORMULA_NAMESPACE) | {"t_end"}
+    available |= {s.split("=", 1)[0] for s in (getattr(args, "param", []) or [])}
+    meta_path = data_path / "inference.json"
+    if meta_path.exists():
+        try:
+            with meta_path.open(encoding="utf-8") as fh:
+                available |= set(_json.load(fh).get("param_names") or [])
+        except (OSError, ValueError):
+            pass  # unreadable metadata is the audit's error to report
+
+    missing = unresolved_formula_names(baseline_formula, available)
+    if not missing:
+        return True
+
+    names = ", ".join(sorted(missing))
+    error_with_hint(
+        f"--baseline-formula references {names}, which neither the chain "
+        f"nor --param supplies.",
+        [
+            "Pass each as a constant: "
+            + " ".join(f"--param {n}=<value>" for n in sorted(missing)),
+            "Otherwise every audited sample's baseline is NaN and the audit "
+            "reports no amplification at all (see GH #407).",
+        ],
+    )
+    return False
+
+
 def _run_posthoc_audit(data_path: Path, args: Namespace) -> int:
     """Run the post-hoc t-independence audit on a saved inference chain.
 
@@ -220,6 +267,11 @@ def _run_posthoc_audit(data_path: Path, args: Namespace) -> int:
 
     output_str = getattr(args, "output", None)
     output_dir = Path(output_str) if output_str else data_path / "audit"
+
+    if baseline_formula and not _audit_baseline_is_satisfiable(
+        args, data_path, baseline_formula
+    ):
+        return 1
 
     try:
         summary = run_posthoc_audit(

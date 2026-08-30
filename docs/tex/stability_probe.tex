@@ -69,7 +69,9 @@ campaign chains (D1 v5, Stage A v5, Phase 6.B/C) used $\tau = 0.3$
 with the same $t_{\text{test}} = 20$; bumping the probe is a public
 API change and the chain CSV's
 \texttt{stability\_profile} column records which probe version
-gated each chain.
+scored each chain.  (Before v0.49.5 that sentence read ``gated'';
+nothing is gated by default any more --- see
+\S\ref{sec:probe-is-diagnostic}.)
 
 \subsection{Why the block 2-norm, not the source-field amplitude}
 \label{sec:block-norm-not-source}
@@ -113,8 +115,94 @@ rate'' is the v2 mistake one layer down. Re-read this subsection,
 \S\ref{sec:why-all-k}, and \S\ref{sec:ieee-floor-verification}
 before merging.
 
-\subsection{Why we reject tachyonic samples at all: physical motivation}
+\subsection{The probe is a diagnostic, not a gate}
+\label{sec:probe-is-diagnostic}
+
+\textbf{Current policy (v3, and unconditional since v0.49.5).}  The
+probe records its verdict and the simulation runs regardless.  No entry
+point rejects a parameter point on tachyonic growth by default.
+
+The reason is epistemic rather than numerical: exponential growth in a
+linearised system cannot be classified as genuine physics or as an
+artifact \emph{from the growth rate alone}.  Deciding that question
+needs theory-level analysis of the Lagrangian's spectrum --- which is
+what the PSALTer integration (GH~\#360) is for --- not a per-point
+numerical measurement.  Blocking on the numerical probe assumed the
+answer.  The distinct problem the probe was originally reaching for,
+\emph{numerical} divergence of the solver, is addressed by choosing a
+shorter $t_{\text{end}}$ or a localised-$B$ geometry with a finite
+interaction time, and surfaces honestly as a diverged run rather than
+as an absent row.
+
+\textbf{There is no flag to re-enable rejection.}  A \texttt{--gated}
+escape hatch existed from 2026-05-10, restoring the pre-v3 hard
+rejection so archived v2 chains could be reproduced bit-for-bit; it was
+removed in v0.50.0.  Keeping a switch for an abandoned policy leaves it
+one flag away from being used, and the reproducibility it bought is
+still available from a checkout of the release that produced those
+chains.  Their rows carry \texttt{run\_status=tachyonic\_gated}, which
+is retained in \texttt{RunStatus} as an archive-only value.
+
+\paragraph{How the two entry points diverged (GH~\#454).}  The v3
+permissive change (2026-05-10) rewrote the inference path and left the
+sweep path untouched, so for four months \texttt{tidal sweep} silently
+returned \texttt{run\_status="tachyonic"} with \texttt{wall\_time\_s
+= 0} --- never simulating --- while \texttt{tidal sample} recorded the
+same verdict as metadata and continued.  The mechanism was duplication:
+the probe preamble had been copy-pasted into the second call site
+instead of shared, so the policy change reached only one copy.  The
+stage now lives once, in
+\texttt{tidal.measurement.\_stability.probe\_for\_run}.  Two further
+defects surfaced with it: the two paths recorded different metadata key
+sets (three columns versus five, one under a different name), so sweep
+rows and chain samples could not be joined; and the sweep copy passed
+\texttt{bounds=None} into \texttt{GridInfo} whenever \texttt{--bounds}
+was omitted, raising \texttt{TypeError} into a bare \texttt{except} ---
+so those sweeps ran no probe at all and recorded no diagnostic columns.
+
+\paragraph{The probe runs on the solver's grid (GH~\#479).}  The probe
+resolves \texttt{--grid-shape} and \texttt{--bounds} through the same
+functions the simulation uses, so it describes the system that is about
+to be evolved.  It previously carried three private fallbacks for the
+absent-flag case --- 256 points on $(0,100)$ from the sweep path, 64 on
+$(0,50)$ from inference, 256 on $(0,100)$ again in the prior-stability
+sweep --- and all three disagreed with the simulation's own default of
+64 on $(0,10)$.  Because those boxes were \emph{larger} without a
+matching point count, the probe's Nyquist came out \emph{below} the
+solver's:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+ & $N$ & $L$ & $k_{\max} = \pi N / L$ \\
+\midrule
+simulation (default)  & 64  & 10  & \textbf{20.1} \\
+old sweep probe       & 256 & 100 & 8.0 \\
+old inference probe   & 64  & 50  & 4.0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Modes between the probe's cutoff and the solver's were evolved and never
+examined, so a tachyonic onset in that band was invisible to a probe
+whose entire design principle (\S\ref{sec:why-all-k}) is that it must
+scan \emph{every} $k$ rather than risk a false negative.  This compounds
+with the measured box-dependence of probe verdicts (GH~\#344, a 2.8-nat
+amplification shift between $L = 50$ and $L = 100$): probing the wrong
+box is not a small error.  Recorded campaign chains are unaffected --- every
+landscape and rescue template passes both flags explicitly --- and a
+regression test now asserts the probe's Nyquist is never below the
+solver's.
+
+\subsection{Why the v2 campaign rejected tachyonic samples: the
+historical rationale}
 \label{sec:tachyonic-physical}
+
+\textbf{Historical.}  This subsection records the argument that
+justified hard rejection in the v2 campaign.  It is preserved because
+the archived chains were produced under it and their exclusions have to
+remain interpretable; it is no longer the operative policy --- see
+\S\ref{sec:probe-is-diagnostic}.
 
 A reasonable concern with the rejection cascade is that pre-flight
 exclusion of tachyonic samples could amount to a numerical workaround:

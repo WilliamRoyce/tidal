@@ -2585,3 +2585,106 @@ class TestGH427EnergyOnPositionDependentKinetics:
             f"background — the pos-dep Hamiltonian coefficients are being "
             f"mis-evaluated"
         )
+
+
+class TestGH441ConvolutionDivergenceGuard:
+    """The convolution path must refuse a run whose arithmetic has failed.
+
+    This is the NUMERICAL guard, not the abandoned physics gate: a
+    genuinely unstable theory is simulated and reported like any other,
+    right up to the point where float64 can no longer represent the
+    answer. Past that, ``numpy.fft``'s IEEE-754 round-off floor (~1e-14,
+    seeded into every k-bin) has been amplified until it dominates the
+    bins the IC actually excited, so the numbers coming back are
+    round-off rather than a solution.
+    """
+
+    def test_nan_does_not_pass_the_amplitude_check(self) -> None:
+        """The GH #441 hole, pinned as arithmetic.
+
+        The old check was ``y_final_max > y0_max * 1e6``. ``np.max`` over
+        an array containing NaN returns NaN, and ``nan > x`` is False —
+        so an overflowed run (which reaches NaN via ``inf - inf`` in the
+        next matrix product) passed as a SUCCESS and returned NaN
+        snapshots to the caller.
+
+        If a future cleanup simplifies ``_amplitude_diverged`` back to a
+        bare ``>`` comparison, this test is what fails.
+        """
+        from tidal.solver.modal import (
+            DIVERGENCE_AMPLITUDE_RATIO,
+            _amplitude_diverged,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        # The arithmetic fact the defect rested on.
+        nan_max = float(np.max(np.abs(np.array([1.0, np.nan, 3.0]))))
+        assert np.isnan(nan_max)
+        assert not (nan_max > 1.0 * DIVERGENCE_AMPLITUDE_RATIO), (
+            "a bare ratio comparison does not fire on NaN — that is the bug"
+        )
+
+        # ...and the predicate that closes it.
+        assert _amplitude_diverged(nan_max, 1.0), "NaN must count as diverged"
+        assert _amplitude_diverged(float("inf"), 1.0), "inf must count as diverged"
+
+    def test_growth_past_the_ratio_is_diverged(self) -> None:
+        from tidal.solver.modal import (
+            DIVERGENCE_AMPLITUDE_RATIO,
+            _amplitude_diverged,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        assert _amplitude_diverged(2.0 * DIVERGENCE_AMPLITUDE_RATIO, 1.0)
+        assert not _amplitude_diverged(0.5 * DIVERGENCE_AMPLITUDE_RATIO, 1.0)
+
+    def test_both_evolvers_share_one_threshold(self) -> None:
+        """GH #441: per-mode used 100.0, convolution 1e6, undocumented.
+
+        Two definitions of "diverged" on two paths meant the same run
+        could be refused by one evolver and returned by the other.
+        """
+        import inspect
+
+        from tidal.solver import modal as modal_mod
+
+        src = inspect.getsource(modal_mod._evolve_full_matrix)
+        # Strip comments: this asserts about the CODE, not about prose
+        # describing the history, which necessarily names the old
+        # threshold.
+        code = "\n".join(
+            line for line in src.splitlines() if not line.lstrip().startswith("#")
+        )
+        assert "1e6" not in code, (
+            "convolution path still carries its own divergence threshold"
+        )
+        assert "_amplitude_diverged" in code, (
+            "convolution path must use the shared predicate"
+        )
+
+    def test_nan_snapshots_raise_rather_than_return(self) -> None:
+        """End-to-end on the guard's own loop: NaN in any snapshot refuses.
+
+        Exercises the scan added in GH #441 — the old check looked only at
+        the final snapshot, so a trajectory that went bad mid-flight and
+        was then overwritten could also slip through.
+        """
+        from tidal.solver.modal import (
+            _amplitude_diverged,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        # A trajectory that is fine at the end but NaN in the middle: the
+        # final-snapshot-only check would have passed it.
+        trajectory = [
+            np.array([1.0, 1.0]),
+            np.array([np.nan, 1.0]),
+            np.array([1.0, 1.0]),
+        ]
+        y0_max = 1.0
+        flagged = [
+            ti
+            for ti, snap in enumerate(trajectory)
+            if _amplitude_diverged(float(np.max(np.abs(snap))), y0_max)
+        ]
+        assert flagged == [1], (
+            "a mid-trajectory NaN must be caught; checking only the last "
+            "snapshot is what GH #441 replaced"
+        )

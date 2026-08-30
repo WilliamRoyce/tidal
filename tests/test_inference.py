@@ -897,8 +897,8 @@ class TestLikelihoodBackendEquivalence:
         from tidal.cli._sweep import (
             _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
             _measure_run,  # pyright: ignore[reportPrivateUsage]
-            _simulate_run,  # pyright: ignore[reportPrivateUsage]
             run_inference_step,
+            simulate_run,
         )
         from tidal.symbolic import load_equation_system
 
@@ -918,7 +918,7 @@ class TestLikelihoodBackendEquivalence:
         # Disk path — uses the same fixed config.
         disk_dir = tmp_path / "disk_run"
         disk_dir.mkdir()
-        exit_code, _, _ = _simulate_run(args, spec_path, overrides, disk_dir, spec=spec)
+        exit_code, _, _ = simulate_run(args, spec_path, overrides, disk_dir, spec=spec)
         assert exit_code == 0
         disk_metrics = _measure_run(
             disk_dir,

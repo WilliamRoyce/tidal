@@ -1973,16 +1973,6 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     # v3 likelihood architecture flags (see docs/V3_ARCHITECTURE.md)
     sample_parser.add_argument(
-        "--gated",
-        action="store_true",
-        dest="gated",
-        help=(
-            "Reproduce v2 / canonical-probe hard-rejection: tachyonic samples "
-            "return -inf instead of being recorded as metadata. v3 default is "
-            "permissive (no probe gate)."
-        ),
-    )
-    sample_parser.add_argument(
         "--soft-floor-noise",
         type=float,
         default=1.0,

@@ -555,6 +555,47 @@ def _validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
             raise TypeError(msg)
 
 
+def unresolved_formula_names(expr: str, available: set[str]) -> set[str]:
+    """Names *expr* references that nothing in *available* will supply.
+
+    The launch-time counterpart to :func:`_validate_formula_ast`, which
+    raises on the FIRST offending name at evaluation time.  This collects
+    every one instead, so a user missing two parameters is told about both
+    rather than fixing one and re-running.
+
+    Motivation (GH #407): a ``--baseline-formula`` referencing spec
+    constants that were never passed via ``--param`` used to fail per
+    evaluation, get swallowed to ``None``, become ``-inf``, and land on
+    the v3 soft floor — so an inference chain ran to completion and
+    produced a posterior built entirely from floor values.  Callers check
+    up front instead, before any simulation runs.
+
+    *available* is supplied by the caller rather than computed here: the
+    entry points resolve names from genuinely different sources (sampled
+    priors, sweep rows, recorded chain metadata), and a single resolver
+    would be a false commonality.
+
+    Returns
+    -------
+    set[str]
+        Unresolvable names, empty when the formula is satisfiable.  A
+        syntactically invalid formula returns an empty set — that is
+        :func:`_validate_formula_ast`'s error to report, not this one's.
+    """
+    import ast
+
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError:
+        return set()
+
+    return {
+        node.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name) and node.id not in available
+    }
+
+
 def safe_formula_eval(expr: str, namespace: dict[str, object]) -> object:
     """Validate *expr* against *namespace*, then evaluate it.
 

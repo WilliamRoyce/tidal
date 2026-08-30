@@ -83,23 +83,36 @@ def run_prior_stability_sweep(
         output_path.write_text("", encoding="utf-8")
         return 0
 
-    from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
+    from tidal.measurement._run_stages import (
+        parse_bounds,
+        parse_grid_shape,
+        parse_params,
+    )
     from tidal.measurement._stability import check_conversion_stability
     from tidal.solver.grid import GridInfo
     from tidal.symbolic._spec_cache import load_spec_cached
 
     raw_spec = load_spec_cached(spec_path)
-    base_p = _parse_params(list(getattr(base_args, "param", []) or []), raw_spec)
-    grid_n = int(getattr(base_args, "grid_shape", 256))
-    bounds_str = getattr(base_args, "bounds", "0:100")
-    if isinstance(bounds_str, str):
-        bparts = bounds_str.split(":")
-        bounds_tuple: tuple[tuple[float, float], ...] = (
-            (float(bparts[0]), float(bparts[1])),
-        )
+    base_p = parse_params(list(getattr(base_args, "param", []) or []), raw_spec)
+    # Resolve the grid the way the simulation does (GH #479).  This used
+    # to read ``int(getattr(base_args, "grid_shape", 256))``, and since
+    # ``--grid-shape`` defaults to None in every subparser the getattr
+    # default never fired: it was ``int(None)``, a TypeError, caught by
+    # the caller at tidal/cli/_sample.py and reported as "Prior stability
+    # sweep skipped".  Every `tidal sample` run without an explicit
+    # --grid-shape therefore produced no _rejected_prior.csv and no
+    # prior-stability overlay on its corner plot.
+    spatial_dim = raw_spec.spatial_dimension
+    raw_shape = getattr(base_args, "grid_shape", None)
+    shape = parse_grid_shape(
+        str(raw_shape) if raw_shape is not None else None, spatial_dim
+    )
+    raw_bounds = getattr(base_args, "bounds", None)
+    if raw_bounds is None or isinstance(raw_bounds, str):
+        bounds_list = parse_bounds(raw_bounds, spatial_dim)
     else:
-        bounds_tuple = tuple(bounds_str)
-    grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
+        bounds_list = [tuple(b) for b in raw_bounds]
+    grid = GridInfo(shape=(shape[0],), bounds=(bounds_list[0],), periodic=(True,))
     ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
     ic_k: float | None = None
     if ic_wavevector_str:

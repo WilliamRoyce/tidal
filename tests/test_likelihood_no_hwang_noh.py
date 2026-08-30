@@ -88,23 +88,16 @@ class TestHwangNohRemoved:
         assert compute_log_likelihood(float("nan"), lc) == -math.inf
         assert compute_log_likelihood(float("inf"), lc) == -math.inf
 
-    def test_gated_mode_has_no_effect_on_compute_log_likelihood(self) -> None:
-        """The ``--gated`` CLI flag controls the upstream tachyonic gate, not
-        the value-level Hwang-Noh check.  In v3 the value cap is gone in
-        both modes — there's no separate "gated" code path that re-enables
-        the P_max>0.5 -> -inf behavior at the compute level.
+    def test_no_gate_can_reintroduce_the_value_cap(self) -> None:
+        """There is no configuration under which P_max > 0.5 is penalized.
+
+        This used to compare permissive against ``--gated``: that flag
+        controlled the upstream tachyonic gate, never the value-level
+        Hwang-Noh check, and neither mode re-enabled the cap.  With the
+        gate removed entirely (v0.50.0) there is only one mode left, and
+        the property to pin is simply that a large P_max is scored
+        faithfully.
         """
-        lc_permissive = LikelihoodConfig(
-            metric="P_max",
-            likelihood_type="maximize",
-            permissive=True,
-        )
-        lc_gated = LikelihoodConfig(
-            metric="P_max",
-            likelihood_type="maximize",
-            permissive=False,
-        )
-        # Both produce the same finite logL for P_max=0.7 since the
-        # perturbativity gate is removed for both.
-        assert compute_log_likelihood(0.7, lc_permissive) == 0.7
-        assert compute_log_likelihood(0.7, lc_gated) == 0.7
+        lc = LikelihoodConfig(metric="P_max", likelihood_type="maximize")
+        assert compute_log_likelihood(0.7, lc) == 0.7
+        assert compute_log_likelihood(5.0, lc) == 5.0

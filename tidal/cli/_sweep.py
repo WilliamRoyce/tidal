@@ -37,6 +37,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from tidal.measurement._run_stages import PointContext, RunStatus, run_point
+
 if TYPE_CHECKING:
     from argparse import Namespace
 
@@ -572,7 +574,7 @@ def _build_sim_args(  # noqa: PLR0913
     return sim_args
 
 
-def _simulate_run(  # noqa: PLR0913
+def simulate_run(  # noqa: PLR0913
     base_args: Namespace,
     spec_path: Path,
     param_overrides: dict[str, float],
@@ -624,7 +626,7 @@ def run_inference_step(
 ) -> SimulationData:
     """Run one simulation in-memory for the inference likelihood path.
 
-    Same setup as :func:`_simulate_run` but wires an
+    Same setup as :func:`simulate_run` but wires an
     :class:`InMemoryAccumulator` (via ``_simulate(..., in_memory_out=...)``)
     in place of the :class:`SnapshotWriter`, returning the resulting
     ``SimulationData`` directly without any disk round-trip.  This skips
@@ -944,112 +946,69 @@ def _run_single(  # noqa: PLR0913, PLR0917
     Returns a dict of scalar metrics for one row of the results table.
     Always includes ``run_status``, ``error_message``, and ``solver_exit_code``.
     """
-    # 0. Pre-flight tachyonic check (zero-cost eigenvalue analysis)
-    # Skips simulation if the conversion channel has tachyonic modes (#238).
-    sweep_stability_meta: dict[str, Any] = {}
-    conversion_measurements = {"peak_conversion", "conversion"} & measurements
-    if conversion_measurements and source and target:
-        try:
-            from tidal.cli._simulate import (
-                _parse_params,  # pyright: ignore[reportPrivateUsage]
-            )
-            from tidal.measurement._stability import check_conversion_stability
-            from tidal.solver.grid import GridInfo
-            from tidal.symbolic._spec_cache import load_spec_cached
-
-            raw_spec = load_spec_cached(spec_path)
-            base_p = _parse_params(base_args.param, raw_spec)
-            params = {**base_p, **param_overrides}
-            # normalize_kinetic_coefficients band-aid removed — root fix
-            # in _build_evolution_matrices reads kin coeff into M diag.
-            spec_ = raw_spec
-
-            grid_n = grid_shape_override or int(getattr(base_args, "grid_shape", 256))
-            bounds = getattr(base_args, "bounds", "0:100")
-            if isinstance(bounds, str):
-                parts = bounds.split(":")
-                bounds_tuple = ((float(parts[0]), float(parts[1])),)
-            else:
-                bounds_tuple = bounds
-            grid = GridInfo(
-                shape=(grid_n,),
-                bounds=bounds_tuple,
-                periodic=(True,),
-            )
-
-            ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
-            ic_k: float | None = None
-            if ic_wavevector_str:
-                try:
-                    ic_k = float(str(ic_wavevector_str).split(",")[0])
-                except (ValueError, IndexError):
-                    ic_k = None
-            stability = check_conversion_stability(
-                spec_,
-                grid,
-                params,
-                source=source[0],
-                target=target[0],
-                ic_wavevector=ic_k,
-            )
-            if not stability.stable:
-                return {
-                    "run_status": "tachyonic",
-                    "error_message": stability.message[:200],
-                    "solver_exit_code": 0,
-                    "wall_time_s": 0.0,
-                    "error": stability.message,
-                    "tachyonic_growth_rate": stability.max_excess,
-                    "stability_profile": stability.profile_name,
-                    "borderline_stability": False,
-                }
-            # Stash the profile + borderline flag for the success row.
-            sweep_stability_meta["stability_profile"] = stability.profile_name
-            sweep_stability_meta["borderline_stability"] = bool(stability.borderline)
-        except Exception:  # noqa: BLE001
-            import logging as _log_tach
-
-            _log_tach.getLogger(__name__).debug(
-                "Pre-flight tachyonic check failed (non-critical), "
-                "falling through to simulation",
-                exc_info=True,
-            )
-
-    # 1. Simulate
-    exit_code, wall_time, spec = _simulate_run(
-        base_args,
-        spec_path,
-        param_overrides,
-        output_dir,
-        grid_shape_override,
-        replicate_seed=replicate_seed,
-        ic_perturbation=ic_perturbation,
+    # 0. Pre-flight stability probe — DIAGNOSTIC ONLY (GH #454).
+    # Records gamma_eff / k_tachyonic / n_tachyonic_modes into the row and
+    # runs the simulation regardless.  It used to return early here, never
+    # simulating: that was the April-2026 policy (#238), left behind when
+    # the v3 architecture made the probe permissive everywhere else on
+    # 2026-05-10.  A blocked row is indistinguishable from a genuine zero,
+    # and the probe is deliberately conservative, so it over-rejected
+    # exactly the CDT/PGT models the campaign studies.  Growth cannot be
+    # called physics or artifact without theory-level analysis (PSALTer,
+    # #360); numerical divergence is handled by t_end and localized-B
+    # geometry, and surfaces below as ``solver_error``.
+    #
+    # Note also that this probe silently did NOTHING on any sweep that
+    # omitted ``--bounds``: the old code passed ``bounds=None`` straight
+    # into ``GridInfo``, which raises ``TypeError``, and the broad except
+    # below swallowed it at DEBUG.  Since ``--bounds`` defaults to None in
+    # every subparser, such sweeps got neither a block nor the diagnostic
+    # columns.  The probe now resolves the grid the same way the
+    # simulation does (GH #479), so it runs there and describes the
+    # system that is about to be evolved.
+    outcome = run_point(
+        PointContext(
+            spec_path=spec_path,
+            base_args=base_args,
+            param_overrides=param_overrides,
+            measurements=measurements,
+            source=source,
+            target=target,
+            threshold=threshold,
+            run_dir=output_dir,
+            grid_shape_override=grid_shape_override,
+            replicate_seed=replicate_seed,
+            ic_perturbation=ic_perturbation,
+        ),
+        backend="disk",
     )
 
-    if exit_code != 0:
+    # --- policy: outcome -> results row --------------------------------------
+    # ``run_point`` is total and never raises, but the sweep's error rows are
+    # assembled by the LOOP, which holds the swept values and the fixed
+    # parameters this function is not given.  So a caught exception is
+    # re-raised intact, preserving both the traceback and the existing
+    # contract that ``_run_single`` propagates.
+    if outcome.exception is not None:
+        raise outcome.exception
+
+    if outcome.status is RunStatus.SIMULATION_FAILED:
+        # Sweep records a non-zero exit under its own historical name; see
+        # RunStatus.SOLVER_ERROR on why the two are not unified.
         return {
-            "run_status": "solver_error",
-            "error_message": f"solver exit code {exit_code}",
-            "solver_exit_code": exit_code,
-            "wall_time_s": round(wall_time, 2),
+            "run_status": RunStatus.SOLVER_ERROR,
+            "error_message": f"solver exit code {outcome.exit_code}",
+            "solver_exit_code": outcome.exit_code,
+            "wall_time_s": round(outcome.wall_time_s, 2),
             "error": "simulation_failed",
         }
 
-    # 2. Measure (reuse spec from simulate — avoids redundant JSON parse)
-    metrics = _measure_run(
-        output_dir,
-        spec_path,
-        measurements,
-        source,
-        target,
-        threshold,
-        spec=spec,
-    )
-    metrics["wall_time_s"] = round(wall_time, 2)
-    metrics["run_status"] = "success"
+    metrics = outcome.metrics
+    metrics["wall_time_s"] = round(outcome.wall_time_s, 2)
+    metrics["run_status"] = RunStatus.SUCCESS
     metrics["error_message"] = None
     metrics["solver_exit_code"] = 0
-    metrics.update(sweep_stability_meta)
+    metrics.update(outcome.stability)
     return metrics
 
 
@@ -1089,12 +1048,12 @@ def _measure_existing(  # noqa: PLR0913, PLR0917
     except (ValueError, TypeError, KeyError, OSError, RuntimeError, SystemExit) as exc:
         return {
             "error": f"resume_measure_failed: {exc}",
-            "run_status": "measurement_error",
+            "run_status": RunStatus.MEASUREMENT_ERROR,
             "error_message": str(exc)[:200],
             "solver_exit_code": 0,
         }
     else:
-        metrics.setdefault("run_status", "success")
+        metrics.setdefault("run_status", RunStatus.SUCCESS)
         metrics.setdefault("error_message", None)
         metrics.setdefault("solver_exit_code", 0)
         return metrics
@@ -1289,7 +1248,10 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                     sim_settings,
                     {
                         "error": str(exc),
-                        "run_status": "diverged",
+                        # Was a flat "diverged" for every exception type,
+                        # so a missing --param or a KeyError in measurement
+                        # code read as a physics verdict (GH #480).
+                        "run_status": RunStatus.from_exception(exc),
                         "error_message": str(exc)[:200],
                         "solver_exit_code": -1,
                     },
@@ -1571,7 +1533,7 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
             print(f" ERROR: {exc}")
             metrics = {
                 "error": str(exc),
-                "run_status": "diverged",
+                "run_status": RunStatus.from_exception(exc),
                 "error_message": str(exc)[:200],
                 "solver_exit_code": -1,
             }
@@ -2398,7 +2360,7 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
     except (RuntimeError, SystemExit) as exc:
         metrics = {
             "error": str(exc)[:500],
-            "run_status": "diverged",
+            "run_status": RunStatus.from_exception(exc),
             "error_message": str(exc)[:200],
             "solver_exit_code": -1,
         }

@@ -7,7 +7,7 @@ authors:
 - family-names: "Royce"
   given-names: "William"
 version: 0.52.0
-date-released: "2026-08-25"
+date-released: "2026-08-30"
 license: MIT
 repository-code: "https://github.com/WilliamRoyce/tidal"
 keywords:

@@ -1,7 +1,7 @@
 """Simulation-based likelihood function for Bayesian inference.
 
-Wraps the existing ``_run_single`` + ``_measure_run`` pipeline from
-:mod:`tidal.cli._sweep` as a callable ``log_likelihood(theta) -> float``.
+Wraps the shared run stages (:mod:`tidal.measurement._run_stages`) as a
+callable ``log_likelihood(theta) -> float``.
 
 Each likelihood evaluation runs one PDE simulation and extracts a scalar
 metric (e.g. ``P_max``).
@@ -14,8 +14,8 @@ so PolyChord sees a gradient in the failure region.  The Hwang-Noh
 perturbativity gate (``P_max > 0.5 -> -inf``) is removed entirely; large
 ``P_max`` is faithful linearized-PDE output, not a probability-conservation
 violation.  The pre-flight tachyonic probe is run as a metadata measurement
-only — its verdict no longer gates samples (``--gated`` flag preserves the
-v2 hard-rejection behavior for reproducibility).
+only — nothing acts on its verdict (GH #454; the ``--gated`` escape hatch
+was removed in v0.50.0).
 """
 
 from __future__ import annotations
@@ -150,10 +150,6 @@ class LikelihoodConfig:
     sigma: float = 1.0
     min_value: float = 0.0
     baseline_formula: str | None = None
-    permissive: bool = True
-    """v3 default: don't gate on the pre-flight probe.  When False,
-    tachyonic samples return ``-inf`` (preserves v2 / canonical-probe
-    behavior, opt-in via ``--gated`` CLI flag for reproducibility)."""
     soft_floor_noise_sigma: float = 1.0
     """Standard deviation of the Gaussian noise added to the soft penalty
     floor (sim divergence / NaN / exception).  Default 1.0 gives the
@@ -203,7 +199,6 @@ def parse_likelihood(
     spec: str,
     *,
     baseline_formula: str | None = None,
-    permissive: bool = True,
     soft_floor_noise_sigma: float = 1.0,
     soft_floor_logl: float = SOFT_FLOOR_LOGL,
     noise_seed: int = 0,
@@ -227,11 +222,6 @@ def parse_likelihood(
     baseline_formula : str | None
         Baseline formula for ``extremize`` type (passed separately via
         ``--baseline-formula`` CLI flag).
-    permissive : bool
-        v3 default ``True``: pre-flight tachyonic probe is recorded as
-        metadata only, doesn't gate samples.  Set to ``False`` (via the
-        ``--gated`` CLI flag) to reproduce v2 / canonical-probe hard-
-        rejection behavior.
     soft_floor_noise_sigma : float
         Standard deviation of the Gaussian noise added to the soft penalty
         floor (sim divergence / NaN / exception).  Default 1.0; set to 0
@@ -251,7 +241,6 @@ def parse_likelihood(
     ltype = parts[1]
 
     common = {
-        "permissive": permissive,
         "soft_floor_noise_sigma": soft_floor_noise_sigma,
         "soft_floor_logl": soft_floor_logl,
         "noise_seed": noise_seed,
@@ -380,6 +369,19 @@ def _eval_baseline(
 
     Reuses the same ``FORMULA_NAMESPACE`` (sin, cos, sqrt, pi, etc.)
     as the sweep-results derived-columns computation.
+
+    Returns
+    -------
+    float | None
+        The baseline, or ``None`` when no formula is configured.  A
+        formula that evaluates to a non-positive number returns it
+        unchanged: that is a legitimate parameter-space outcome and the
+        caller soft-floors it.
+
+    Both exception types propagate from ``safe_formula_eval``: a name
+    nothing supplies raises ``ValueError``, a disallowed construct
+    ``TypeError``.  Those are configuration errors, not physics results,
+    and are deliberately not swallowed here — see GH #407.
     """
     if formula is None:
         return None
@@ -392,20 +394,19 @@ def _eval_baseline(
     if params:
         ns.update(params)
 
-    try:
-        from tidal.cli._simulate import safe_formula_eval
+    from tidal.cli._simulate import safe_formula_eval
 
-        return float(safe_formula_eval(formula, ns))  # type: ignore[arg-type]
-    except Exception as exc:  # noqa: BLE001
-        import logging
-
-        logging.getLogger("tidal.inference").warning(
-            "Baseline formula '%s' failed: %s (params: %s)",
-            formula,
-            exc,
-            sorted(ns.keys()) if params else "none",
-        )
-        return None
+    # Deliberately NOT wrapped in a bare except returning None.  Callers
+    # treat a None baseline exactly like a baseline of zero — both give
+    # -inf, which v3 soft-floors — so swallowing here made a CONFIGURATION
+    # error (a name nothing supplies) indistinguishable from a legitimate
+    # physics outcome (a baseline that genuinely evaluates to zero), and an
+    # inference chain ran to completion on floor values (GH #407).
+    #
+    # The launch-time check in tidal/cli/_sample.py, _plot_command.py and
+    # _analyze.py makes an unresolvable formula unreachable here; this is
+    # the backstop, and it is loud.
+    return float(safe_formula_eval(formula, ns))  # type: ignore[arg-type]
 
 
 class SimulationLikelihood:
@@ -528,15 +529,16 @@ def _evaluate_likelihood(
     tuple[float, dict]
         ``(log_likelihood, metadata)`` where ``metadata`` always contains
         a ``run_status`` key with one of:
-        ``"success"``, ``"tachyonic"``, ``"simulation_failed"``,
+        ``"success"``, ``"tachyonic_gated"``, ``"simulation_failed"``,
         ``"metric_missing"``, ``"exception"``.  When the rejection is
         tachyonic, ``metadata["tachyonic_excess"]`` carries the maximum
         Re(λ) found (a positive growth rate).  For successful evaluations,
         ``metadata`` may also include the measured metric value.
     """
-    from tidal.cli._sweep import (
-        _measure_run,  # pyright: ignore[reportPrivateUsage]
-        _simulate_run,  # pyright: ignore[reportPrivateUsage]
+    from tidal.measurement._run_stages import (
+        PointContext,
+        RunStatus,
+        run_point,
     )
 
     # Build parameter overrides
@@ -559,169 +561,72 @@ def _evaluate_likelihood(
         run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
         run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Pre-flight tachyonic guard — mirrors _run_row_inner in _sweep.py.
-    # Rejects parameter points where the source-containing block has growing
-    # eigenvalues (Re(λ) > threshold) before running any simulation.
-    # Uses conservative=True: when cond(V) is too high to trust the IC-coupling
-    # filter (typical for CDT/PGT models), counts the growing mode as tachyonic
-    # rather than risk a false-negative.  Cost: microseconds per evaluation.
-    stability_meta: dict[str, Any] = {}
-    if source and target and ({"conversion", "peak_conversion"} & measurements):
-        try:
-            from tidal.cli._simulate import (
-                _parse_params,  # pyright: ignore[reportPrivateUsage]
-            )
-            from tidal.measurement._stability import check_conversion_stability
-            from tidal.solver.grid import GridInfo
-            from tidal.symbolic._spec_cache import load_spec_cached
+    # Pre-flight stability probe — DIAGNOSTIC ONLY, unconditionally.
+    # Records gamma_eff / k_tachyonic / n_tachyonic_modes so chain CSVs
+    # support post-hoc filtering.  Nothing acts on the verdict: rejection
+    # on tachyonic growth was abandoned as policy (growth cannot be called
+    # physics or artifact without theory-level analysis — PSALTer, GH
+    # #360) and the ``--gated`` escape hatch was removed in v0.50.0.
+    # The probe itself is deliberately conservative:
+    # when cond(V) is too high to trust the IC-coupling filter (typical
+    # for CDT/PGT), a growing mode counts as tachyonic rather than risk a
+    # false negative.  Cost: microseconds per evaluation.
+    #
+    # The stage lives in tidal.measurement._stability because tidal sweep
+    # runs the identical preamble; it used to be copy-pasted here, and the
+    # copies drifted into two different policies (GH #454).
+    outcome = run_point(
+        PointContext(
+            spec_path=spec_path,
+            base_args=base_args,
+            param_overrides=param_overrides,
+            measurements=measurements,
+            source=source,
+            target=target,
+            threshold=threshold,
+            run_dir=run_dir,
+            sampled_params=tuple(param_names) if backend == "memory" else None,
+            unavailable_meta=_posdep_probe_unavailable_meta,
+        ),
+        backend=backend,
+    )
+    stability_meta = outcome.stability
 
-            raw_spec = load_spec_cached(spec_path)
-            base_p = _parse_params(
-                list(getattr(base_args, "param", []) or []), raw_spec
-            )
-            params = {**base_p, **param_overrides}
-            grid_n_raw = getattr(base_args, "grid_shape", None)
-            grid_n = int(grid_n_raw) if grid_n_raw is not None else 64
-            bounds_str = getattr(base_args, "bounds", None)
-            if isinstance(bounds_str, str):
-                bparts = bounds_str.split(":")
-                bounds_tuple: tuple[tuple[float, float], ...] = (
-                    (float(bparts[0]), float(bparts[1])),
-                )
-            elif bounds_str is not None:
-                bounds_tuple = tuple(bounds_str)
-            else:
-                bounds_tuple = ((0.0, 50.0),)
-            grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
-            ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
-            ic_k: float | None = None
-            if ic_wavevector_str:
-                try:
-                    ic_k = float(str(ic_wavevector_str).split(",")[0])
-                except (ValueError, IndexError):
-                    ic_k = None
-            stability = check_conversion_stability(
-                raw_spec,
-                grid,
-                params,
-                source=source[0],
-                target=target[0],
-                ic_wavevector=ic_k,
-            )
-            # Always record probe diagnostics in metadata (chain CSVs surface
-            # gamma_eff / k_tachyonic / n_tachyonic_modes / borderline_stability
-            # for post-hoc filtering).  Whether the verdict gates the sample
-            # depends on ``likelihood_config.permissive``.
-            stability_meta = {
-                "stability_profile": stability.profile_name,
-                "borderline_stability": bool(stability.borderline),
-                "tachyonic_excess": float(stability.max_excess),
-                "k_tachyonic": (
-                    float(stability.k_tachyonic)
-                    if stability.k_tachyonic is not None
-                    else float("nan")
-                ),
-                "n_tachyonic_modes": int(stability.n_tachyonic_modes),
-            }
-            if not stability.stable and not likelihood_config.permissive:
-                # Gated mode (``--gated`` CLI flag) reproduces the v2 / canonical-
-                # probe hard-rejection behavior for reproducibility.  Default v3
-                # is permissive: sim continues, tachyon-permissive sampling maps
-                # the structure of the unstable regions.
-                return -math.inf, {
-                    "run_status": "tachyonic_gated",
-                    **stability_meta,
-                }
-        except NotImplementedError as exc:
-            # GH #421 guard (position-dependent kinetic): record the marker
-            # and warn once — see _posdep_probe_unavailable_meta.
-            stability_meta = _posdep_probe_unavailable_meta(exc)
-        except Exception:  # noqa: BLE001
-            import logging
+    # --- policy: outcome -> (logL, metadata) ---------------------------------
+    # The soft floor stays HERE, not in run_point: its noise is seeded on
+    # theta (GH #408), which makes the likelihood a deterministic function
+    # of the parameter point — a correctness property for nested sampling,
+    # not a convenience — and run_point has no theta.
+    if outcome.status is RunStatus.SIMULATION_FAILED:
+        return _soft_floor_logl(
+            likelihood_config.soft_floor_noise_sigma,
+            likelihood_config.soft_floor_logl,
+            _floor_rng(likelihood_config.noise_seed, theta),
+        ), {
+            "run_status": RunStatus.SIMULATION_FAILED,
+            "exit_code": int(outcome.exit_code or 0),
+            **stability_meta,
+        }
 
-            logging.getLogger("tidal.inference").debug(
-                "Pre-flight tachyonic check failed (non-critical), "
-                "falling through to simulation",
-                exc_info=True,
-            )
+    if outcome.status is RunStatus.METRIC_MISSING:  # pragma: no cover - defensive
+        return -math.inf, {
+            "run_status": RunStatus.METRIC_MISSING,
+            "missing_metric": likelihood_config.metric,
+        }
+
+    if not outcome.ok:
+        # Divergence, kinetic-evaluation and everything else: all soft-floored
+        # identically, so the finer tag cannot move a chain (GH #480).
+        return _soft_floor_logl(
+            likelihood_config.soft_floor_noise_sigma,
+            likelihood_config.soft_floor_logl,
+            _floor_rng(likelihood_config.noise_seed, theta),
+        ), {"run_status": outcome.status, **stability_meta}
+
+    metrics = outcome.metrics
+    spec = outcome.spec
 
     try:
-        if backend == "memory":
-            # GH #384 Phase B: pass the already-cached spec through so
-            # run_inference_step doesn't reload+parse it on every call.
-            # load_spec_cached is keyed on (path, mtime) → per-rank singleton.
-            # GH #384 Phase A′: stash the sampled (BSM) parameter names on
-            # the spec's metadata so the modal convolution-block cache can
-            # identify which symbols vary per call (BSM) vs which are
-            # geometry-fixed. EquationSystem is frozen, so we
-            # dataclasses.replace to a new wrapper carrying the augmented
-            # metadata (~µs allocation, irrelevant vs the ~2 s simulate).
-            import dataclasses as _dc
-
-            from tidal.cli._sweep import (
-                _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
-                run_inference_step,
-            )
-            from tidal.symbolic._spec_cache import (
-                load_spec_cached,
-            )
-
-            raw_spec = load_spec_cached(spec_path)
-            spec_with_bsm = _dc.replace(
-                raw_spec,
-                metadata={
-                    **raw_spec.metadata,
-                    "_inference_sampled_params": tuple(param_names),
-                },
-            )
-            sim_data = run_inference_step(
-                base_args,
-                spec_path,
-                param_overrides,
-                spec=spec_with_bsm,
-            )
-            spec = sim_data.spec
-            metrics = _measure_from_sim_data(
-                sim_data,
-                measurements,
-                source,
-                target,
-                threshold,
-            )
-        else:
-            # Run simulation (disk path — preserved for rollback)
-            assert run_dir is not None  # set when backend == "disk"
-            exit_code, _wall_time, spec = _simulate_run(
-                base_args,
-                spec_path,
-                param_overrides,
-                run_dir,
-            )
-
-            if exit_code != 0:
-                # v3 soft floor: Normal(SOFT_FLOOR_LOGL, sigma_explore) so the
-                # chain learns "this region fails" without a flat plateau.
-                return _soft_floor_logl(
-                    likelihood_config.soft_floor_noise_sigma,
-                    likelihood_config.soft_floor_logl,
-                    _floor_rng(likelihood_config.noise_seed, theta),
-                ), {
-                    "run_status": "simulation_failed",
-                    "exit_code": int(exit_code),
-                    **stability_meta,
-                }
-
-            # Extract metrics
-            metrics = _measure_run(
-                run_dir,
-                spec_path,
-                measurements,
-                source,
-                target,
-                threshold,
-                spec=spec,
-            )
-
         # Get the target metric
         metric_value = metrics.get(likelihood_config.metric)
         if metric_value is None:
@@ -729,7 +634,7 @@ def _evaluate_likelihood(
             # plan, this is distinct from a NaN/Inf metric value (handled
             # below as ``metric_nan`` with the soft floor).
             return -math.inf, {
-                "run_status": "metric_missing",
+                "run_status": RunStatus.METRIC_MISSING,
                 "missing_metric": likelihood_config.metric,
             }
 
@@ -745,7 +650,7 @@ def _evaluate_likelihood(
                 likelihood_config.soft_floor_logl,
                 _floor_rng(likelihood_config.noise_seed, theta),
             ), {
-                "run_status": "metric_nan",
+                "run_status": RunStatus.METRIC_NAN,
                 likelihood_config.metric: metric_value_f,
                 **stability_meta,
             }
@@ -757,18 +662,16 @@ def _evaluate_likelihood(
         # at ``docs/meetings/2026-05-08_supervisor.md``.
 
         # Build eval_params for formula-based likelihoods.
-        # Merge order (same as _simulate_run): spec.metadata["parameters"]
+        # Merge order (same as simulate_run): spec.metadata["parameters"]
         # defaults -> CLI --param overrides -> swept theta.  Without the
         # first two, formulas like "sin(kappa * B0 * t_end / 2)**2" fail
         # with NameError, _eval_baseline returns None, and every logL
         # collapses to -inf (see #270).
         eval_params: dict[str, float] | None = None
         if likelihood_config.baseline_formula:
-            from tidal.cli._simulate import (
-                _parse_params,  # pyright: ignore[reportPrivateUsage]
-            )
+            from tidal.measurement._run_stages import parse_params
 
-            eval_params = _parse_params(
+            eval_params = parse_params(
                 list(getattr(base_args, "param", []) or []),
                 spec,
             )
@@ -784,7 +687,7 @@ def _evaluate_likelihood(
             eval_params,
         )
         success_meta: dict[str, Any] = {
-            "run_status": "success",
+            "run_status": RunStatus.SUCCESS,
             likelihood_config.metric: float(metric_value),
             **stability_meta,
         }
@@ -803,7 +706,7 @@ def _evaluate_likelihood(
                 _floor_rng(likelihood_config.noise_seed, theta),
             ), {
                 **success_meta,
-                "run_status": "logl_minus_inf",
+                "run_status": RunStatus.LOGL_MINUS_INF,
             }
         # Distinct tag for samples whose simulation succeeded but logL fell
         # below the soft-floor sentinel — typically P_max ~ 1e-44 or smaller
@@ -812,10 +715,16 @@ def _evaluate_likelihood(
         # clamping); only the run_status tag changes so post-chain analysis
         # can filter these from "physical" min/max summaries.
         if math.isfinite(logl) and logl < SOFT_FLOOR_LOGL:
-            return logl, {**success_meta, "run_status": "below_noise_floor"}
+            return logl, {**success_meta, "run_status": RunStatus.BELOW_NOISE_FLOOR}
         return logl, success_meta  # noqa: TRY300
 
     except Exception:  # noqa: BLE001
+        # Failures in the POLICY stage only — metric extraction, the
+        # likelihood formula.  Everything that can go wrong while probing,
+        # simulating or measuring is caught and classified by run_point,
+        # which is why the SimulationDivergedError / KineticEvaluationError
+        # handlers that used to sit here are gone: those exceptions can no
+        # longer reach this frame.
         import logging
 
         logging.getLogger("tidal.inference").debug(
@@ -830,7 +739,7 @@ def _evaluate_likelihood(
             likelihood_config.soft_floor_noise_sigma,
             likelihood_config.soft_floor_logl,
             _floor_rng(likelihood_config.noise_seed, theta),
-        ), {"run_status": "exception"}
+        ), {"run_status": RunStatus.EXCEPTION}
 
     finally:
         if run_dir is not None and not keep_sims and run_dir.exists():
@@ -844,11 +753,9 @@ _LIKELIHOOD_CONFIG: dict[str, Any] = {}
 
 def _likelihood_worker_init(config: dict[str, Any]) -> None:  # pyright: ignore[reportUnusedFunction]
     """Initialize worker process with likelihood config."""
-    from tidal.cli._sweep import (
-        _set_single_thread_blas,  # pyright: ignore[reportPrivateUsage]
-    )
+    from tidal.measurement._run_stages import set_single_thread_blas
 
-    _set_single_thread_blas()
+    set_single_thread_blas()
     _LIKELIHOOD_CONFIG.update(config)
 
 

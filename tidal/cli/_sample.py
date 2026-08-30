@@ -144,9 +144,10 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     from tidal.inference._likelihood import parse_likelihood
 
     baseline_formula: str | None = getattr(args, "baseline_formula", None)
-    # v3 architecture: --gated reverts to v2 hard-rejection; --soft-floor-noise
-    # tunes the Normal(0, sigma) noise on the soft penalty floor.
-    gated: bool = bool(getattr(args, "gated", False))
+    # v3 architecture: --soft-floor-noise tunes the Normal(0, sigma) noise
+    # on the soft penalty floor.  (There is no probe gate to configure:
+    # rejection on tachyonic growth was abandoned as policy and the
+    # --gated flag removed in v0.50.0 — see docs/tex/stability_probe.tex.)
     soft_floor_noise: float = float(getattr(args, "soft_floor_noise", 1.0))
     from tidal.inference._likelihood import SOFT_FLOOR_LOGL
 
@@ -158,7 +159,6 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         likelihood_config = parse_likelihood(
             likelihood_spec,
             baseline_formula=baseline_formula,
-            permissive=(not gated),
             soft_floor_noise_sigma=soft_floor_noise,
             soft_floor_logl=soft_floor_logl,
             noise_seed=seed,
@@ -215,6 +215,57 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     quiet: bool = getattr(args, "quiet", False)
 
     param_names = prior_param_names(priors)
+
+    # --- Baseline formula: refuse now, not 5000 evaluations from now (#407) ---
+    # An unresolvable name used to fail per evaluation, get swallowed to None
+    # by _eval_baseline, become -inf, and land on the v3 soft floor — so the
+    # chain ran to completion and produced a posterior built entirely from
+    # floor values.  Only 6 of 48 committed specs carry a metadata.parameters
+    # block and none is a PGT or dark-photon theory, so for every campaign
+    # spec --param is the only channel that supplies kappa/B0 at all.
+    #
+    # The available set mirrors what _evaluate_likelihood assembles at
+    # evaluation time; sampled parameter names are included because a formula
+    # referencing a swept coupling is legitimate — it resolves per sample.
+    if likelihood_config.baseline_formula:
+        from tidal.cli._simulate import (
+            FORMULA_NAMESPACE,
+            unresolved_formula_names,
+        )
+        from tidal.measurement._run_stages import parse_params
+        from tidal.symbolic import load_equation_system
+
+        available = set(FORMULA_NAMESPACE) | set(param_names) | {"t_end", "dt"}
+        try:
+            available |= set(
+                parse_params(
+                    list(getattr(args, "param", []) or []),
+                    load_equation_system(spec_path),
+                )
+            )
+        except (OSError, ValueError, KeyError):
+            # Spec unreadable here is reported by the simulate path with a
+            # better message; do not preempt it with a formula complaint.
+            available |= {
+                s.split("=", 1)[0] for s in (getattr(args, "param", []) or [])
+            }
+
+        missing = unresolved_formula_names(
+            likelihood_config.baseline_formula, available
+        )
+        if missing:
+            names = ", ".join(sorted(missing))
+            error_with_hint(
+                f"--baseline-formula references {names}, which nothing supplies.",
+                [
+                    "Pass each as a constant: "
+                    + " ".join(f"--param {n}=<value>" for n in sorted(missing)),
+                    'Or sample it: --prior "NAME=uniform:LO:HI"',
+                    "Without this every sample's baseline fails and the whole "
+                    "chain collapses onto the soft floor (see GH #407).",
+                ],
+            )
+            return 1
 
     # --- Print summary ---
     if not quiet:
