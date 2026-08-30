@@ -39,8 +39,10 @@ Wolfram*.tgz
 .Wolfram*
 .WolframEngine*
 
-# Literature — local arXiv TeX sources (large, not for VCS)
+# Literature — local arXiv TeX sources (large, not for VCS).
+# The README inventory is tracked so it travels with the repo; the sources are not.
 literature/*
+!literature/README.md
 
 # HPC shuttle
 scripts/.hpc_jobs

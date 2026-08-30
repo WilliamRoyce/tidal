@@ -148,6 +148,69 @@ calculus, and uses the curved-spacetime Maxwell conventions of Hwang & Noh
 | **Fabbrichesi, Gabrielli, Lanfranchi (2020)** — "The Dark Photon", [arXiv:2005.01515](https://arxiv.org/abs/2005.01515) | Comprehensive review of dark-photon phenomenology, conventions, and experimental constraints. |
 | **Caputo, Millar, O'Hare, Vitagliano (2021)** — "Dark photon limits: a cookbook", [arXiv:2105.04565](https://arxiv.org/abs/2105.04565) | Practical oscillation formulae for dark-photon experiments including haloscope / DM-radio analyses. |
 
+## Cosmology Program
+
+The reference set for the TIDAL → Cosmology program (`docs/COSMOLOGY_PROGRAM.md`,
+umbrella #488): spectator perturbations on a CAMB ΛCDM background, packaged as a Cobaya
+extension. All TeX sources are local under `literature/` — read them there rather than
+re-fetching.
+
+### CMB theory canon
+
+| Reference | Relevance |
+| --- | --- |
+| **Seljak & Zaldarriaga (1996)** — "A line-of-sight integration approach to CMB anisotropies", ApJ 469, 437, [arXiv:astro-ph/9603033](https://arxiv.org/abs/astro-ph/9603033) | The line-of-sight method every modern Boltzmann code uses: `C_ℓ` as sources × transfer functions instead of a full hierarchy. The route WS4 takes for per-rung observables, and the structure a birefringence rotation must be placed *inside* (see Murai below). |
+| **Ma & Bertschinger (1995)** — "Cosmological perturbation theory in the synchronous and conformal Newtonian gauges", ApJ 455, 7, [arXiv:astro-ph/9506072](https://arxiv.org/abs/astro-ph/9506072) | The reference statement of the standard-sector perturbation equations in both gauges, and the dictionary between them. WS2 derives the new sector's equations against this convention. |
+| **Moss (2026)** — "nanoCMB: a minimal CMB power spectrum calculator in Python", [arXiv:2602.23466](https://arxiv.org/abs/2602.23466) | A complete CMB solver in ~1400 readable lines — the onboarding reference for the pipeline as a whole, and an independent cross-check for the O0 gate (sub-percent vs CAMB/nanoCMB, `2 ≤ ℓ ≤ 2500`). |
+| **Hahn et al. (2023)** — "DISCO-DJ I: a differentiable Einstein-Boltzmann solver for cosmology", [arXiv:2311.03291](https://arxiv.org/abs/2311.03291) | Einstein-Boltzmann in JAX with gradients throughout; the differentiable-host candidate weighed in the H3 integration-target decision. |
+| **Blas, Lesgourgues & Tram (2011)** — "CLASS II: Approximation schemes", [arXiv:1104.2933](https://arxiv.org/abs/1104.2933) | Where the tight-coupling and free-streaming approximations come from, and what they buy (1069 s → 19.4 s). Sets WS3's performance budget: 10× slower than CAMB is acceptable, 100× is fatal. |
+
+### Numerical methods for oscillatory ODEs (WS3)
+
+WS3 replaces `expm(M·t)` with a solver for time-dependent `M(η)`. The ladder is
+exponential midpoint → Magnus → adiabatic/WKB switching → transfer matrices; these are its
+sources, and together they mark the research gap (**every published WKB-switching solver is
+scalar-only; no matrix RKWKB solver exists**).
+
+| Reference | Relevance |
+| --- | --- |
+| **Blanes, Casas, Oteo & Ros (2009)** — "The Magnus expansion and some of its applications", Phys. Rep. 470, 151, [arXiv:0810.5488](https://arxiv.org/abs/0810.5488) | The review for ladder rung 2: 4th-order Gauss-Legendre Magnus, batched over `k`, which reduces exactly to `expm(M t)` for constant `M` — giving a machine-precision regression test against the existing solver. |
+| **Agocs, Handley, Lasenby & Hobson (2019)** — "An efficient method for solving highly oscillatory ODEs" (oscode / RKWKB), [arXiv:1906.01421](https://arxiv.org/abs/1906.01421) | Rung 3: adiabatic/WKB regime switching for `kη ≫ 1`, without which Magnus alone must resolve every oscillation (`∫‖M‖ds < π`, `‖M‖ ~ k`). Scalar-only — half of the WS3 research gap. |
+| **Agocs & Barnett (2022)** — "An adaptive spectral method for oscillatory second-order linear ODEs with frequency-independent cost" (riccati), [arXiv:2212.06924](https://arxiv.org/abs/2212.06924) | The successor to oscode: cost independent of frequency. Same scalar-only limitation, so the same gap for a coupled system. |
+| **Ioannisian & Smirnov (2008)** — "Describing neutrino oscillations in matter with Magnus expansion", [arXiv:0803.1967](https://arxiv.org/abs/0803.1967) | The closest existing analogue to what WS3 needs: Magnus/WKB applied to a *matrix* oscillation problem with a varying background. The working template for a matrix RKWKB scheme. |
+| **Haddadin & Handley (2018)** — "Rapid numerical solutions for the Mukhanov-Sasaki equation", [arXiv:1809.11095](https://arxiv.org/abs/1809.11095) | Rung 4: piecewise-analytic transfer matrices for a cosmological mode equation — the fallback if WKB switching cannot be lifted to matrices. |
+
+### Particle spectrum / polology (WS6)
+
+| Reference | Relevance |
+| --- | --- |
+| **Barker et al. (2026)** — "Numerical polology: towards next-generation model-building for cosmology", [arXiv:2606.30785](https://arxiv.org/abs/2606.30785) | The WS6 algorithm source. States the case this program is built on: symbolic spectrum computation (PSALTer, [arXiv:2406.09500](https://arxiv.org/abs/2406.09500)) scales poorly through expression swell, so sampling *arbitrary* Lagrangians requires the numerical route. Minkowski-only is correct and sufficient — the spectrum screens in vacuo. |
+
+### Cosmic birefringence and polarization (O4)
+
+| Reference | Relevance |
+| --- | --- |
+| **Komatsu (2022)** — "New physics from the polarised light of the cosmic microwave background", Nat. Rev. Phys. 4, 452, [arXiv:2202.13919](https://arxiv.org/abs/2202.13919) | The review that frames O4: what a parity-odd sector does to `EB`/`TB`, how the measurement is actually made, and which systematics (miscalibrated polarization angles) it must be separated from. |
+| **Das, Mohanty & Prasanna (2009)** — "Constraints on background torsion from birefringence of CMB polarization", [arXiv:0908.0629](https://arxiv.org/abs/0908.0629) | The only existing torsion → CMB-rotation paper, and the reason O4 is a *distinctive* channel: torsion-induced rotation scales as `ν²`, unlike the frequency-independent axion case — so the two are separable by the frequency data below. |
+| **Minami & Komatsu (2020)** — "New extraction of the cosmic birefringence from the Planck 2018 polarization data", PRL 125, 221301, [arXiv:2011.11254](https://arxiv.org/abs/2011.11254) | The first `β ≠ 0` hint, and the method that made it possible: solving for the instrument's polarization-angle miscalibration simultaneously with `β`. |
+| **Eskilt & Komatsu (2022)** — "Improved constraints on cosmic birefringence from the WMAP and Planck CMB polarization data", [arXiv:2205.13962](https://arxiv.org/abs/2205.13962) | Tests the frequency dependence across WMAP + Planck and finds `β` frequency-independent — which is exactly the observable that bounds the `ν²` torsion channel. |
+| **Eskilt (2026)** — "Cosmic birefringence from a joint analysis of ACT and Planck", [arXiv:2608.06480](https://arxiv.org/abs/2608.06480) | The current measurement, `β = 0.277° ± 0.057°` (4.8σ) — O4's target number. |
+| **Murai et al. (2022)** — "Isotropic cosmic birefringence from early dark energy", [arXiv:2209.07804](https://arxiv.org/abs/2209.07804) | Where the naive `EB` formula fails: when the rotation is time-dependent it cannot be applied as a post-processing rotation of the final spectra but must sit inside the line-of-sight integral. WS4's rule — post-processing is exact only for constant, isotropic, frequency-independent rotation. |
+| **Cai & Guan (2021)** — "Computing microwave background polarization power spectra from cosmic birefringence" (class_rot), [arXiv:2111.14199](https://arxiv.org/abs/2111.14199) | A public implementation of rotated spectra; WS4's cross-validation target alongside CAMB and nanoCMB. |
+
+### Spectator methodology
+
+| Reference | Relevance |
+| --- | --- |
+| **Amendola, Ballesteros & Pettorino (2014)** — "Effects of modified gravity on B-mode polarization", [arXiv:1405.7004](https://arxiv.org/abs/1405.7004) | The O2 precedent: modified tensor propagation (friction, mass, speed) carried through the tensor transfer function to B-modes — the same chain O2 builds from a Lagrangian instead of a parametrization. |
+| **Kushwaha & Jain (2025)** — "Constraining circular polarization of high-frequency gravitational waves with CMB", [arXiv:2502.12517](https://arxiv.org/abs/2502.12517) | The V-mode channel: graviton → photon conversion imprinting circular polarization. Supports the H7 argument that distinctive channels (V-modes, `E→B`) can beat the `N_eff` bound where broadband conversion cannot. |
+
+The program's spectator-limit justification — the clean double expansion in which order 0
+gives the background equations (discarded in favour of CAMB's solution), order 1 tadpoles
+vanish on-shell, and order 2 retains the full quadratic action including all mixing terms —
+is stated in Cembranos et al., [arXiv:2302.08186](https://arxiv.org/abs/2302.08186), listed
+under Gertsenshtein Effect above and also local.
+
 ## Verification & Validation Methodology
 
 | Reference                                                                                                                             | Relevance                                                                                                       |
