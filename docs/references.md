@@ -205,6 +205,21 @@ scalar-only; no matrix RKWKB solver exists**).
 | **Amendola, Ballesteros & Pettorino (2014)** — "Effects of modified gravity on B-mode polarization", [arXiv:1405.7004](https://arxiv.org/abs/1405.7004) | The O2 precedent: modified tensor propagation (friction, mass, speed) carried through the tensor transfer function to B-modes — the same chain O2 builds from a Lagrangian instead of a parametrization. |
 | **Kushwaha & Jain (2025)** — "Constraining circular polarization of high-frequency gravitational waves with CMB", [arXiv:2502.12517](https://arxiv.org/abs/2502.12517) | The V-mode channel: graviton → photon conversion imprinting circular polarization. Supports the H7 argument that distinctive channels (V-modes, `E→B`) can beat the `N_eff` bound where broadband conversion cannot. |
 
+### Cosmological magnetic fields (O3's assumed background)
+
+O3 has no signal without an external coherent magnetic field — the mixing term is linear in
+it. These are the sources behind `docs/cosmology/magnetic_field_background.md`, which
+records what the expanding-universe Gertsenshtein literature assumes and what O3 adopts.
+
+| Reference | Relevance |
+| --- | --- |
+| **Subramanian (2016)** — "The origin, evolution and signatures of primordial magnetic fields", Rep. Prog. Phys. 79, 076901, [arXiv:1504.02311](https://arxiv.org/abs/1504.02311) | The energy-budget statement that makes a primordial field a legitimate spectator: `r_B = B₀²/(8πρ_γ0) ≈ 10⁻⁷ B₋₉²`, equipartition with the CMB only at `B₀ ~ 3.2 μG`. The number O3 reports per run. |
+| **Durrer & Neronov (2013)** — "Cosmological magnetic fields: their generation, evolution and observation", A&A Rev. 21, 62, [arXiv:1303.7121](https://arxiv.org/abs/1303.7121) | The conventions every conversion paper inherits: flux freezing giving `B ∝ a⁻²` and `ρ_B ∝ a⁻⁴`, the smoothing definition `B_λ² = 8π P_B(2π/λ)/λ³`, the coherence length, the 1 Mpc normalization, and the observational window. |
+| **Domcke & Garcia-Cely (2021)** — "Potential of radio telescopes as high-frequency GW detectors", PRL 126, 021104, [arXiv:2006.01161](https://arxiv.org/abs/2006.01161) | The template for O3's line-of-sight rate: patch averaging with `Δz₀ = min[λ_EQ, λ_B⁰]`, the transverse `2/3`, the `𝓕` boost for a realistic small-scale spectrum, and the `ΔN_eff` inequality the program enforces. |
+| **Addazi et al. (2024)** — "Resonant graviton-photon conversion with stochastic magnetic field in the expanding universe", [arXiv:2401.15965](https://arxiv.org/abs/2401.15965) | The stochastic-field treatment and the reason the domain model is a choice, not a default: conversion grows linearly in `λ_B` when `λ_B ≲ l_osc`, peaking at `λ_B = π l_osc`. |
+| **Dolgov & Ejlli (2013)** — "Conversion of relic gravitational waves into photons in cosmological magnetic fields", [arXiv:1211.0500](https://arxiv.org/abs/1211.0500) | The one paper in this set that engages with a backreaction bound (Caprini–Durrer) — and explicitly sets it aside in favor of the weaker CMB bounds. The reason the program computes `r_B` rather than citing an assertion. |
+| **Paoletti et al. (2022)** — "Constraints on primordial magnetic fields from their impact on the ionization history with Planck 2018", [arXiv:2204.06302](https://arxiv.org/abs/2204.06302) | The only source in the surveyed set that writes `ρ_B/ρ_γ` down explicitly, and the current CMB constraint methodology. |
+
 The program's spectator-limit justification — the clean double expansion in which order 0
 gives the background equations (discarded in favour of CAMB's solution), order 1 tadpoles
 vanish on-shell, and order 2 retains the full quadratic action including all mixing terms —

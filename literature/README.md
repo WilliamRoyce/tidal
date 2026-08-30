@@ -44,12 +44,14 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `1104.2933/` | [1104.2933](https://arxiv.org/abs/1104.2933) | `approximations2.tex` | The Cosmic Linear Anisotropy Solving System (CLASS) II: Approximation schemes | Blas et al. |
 | `1211.0500/` | [1211.0500](https://arxiv.org/abs/1211.0500) | `conversion-gw-gamma10.tex` | Conversion of relic gravitational waves into photons in cosmological magnetic fields | Dolgov & Ejlli |
 | `1302.3884/` | [1302.3884](https://arxiv.org/abs/1302.3884) | `DP_stars_revision.tex` | New stellar constraints on dark photons | An et al. |
+| `1303.7121/` | [1303.7121](https://arxiv.org/abs/1303.7121) | `IGMF_review_with_comments.tex` | Cosmological Magnetic Fields: Their Generation, Evolution and Observation | Durrer & Neronov |
 | `1308.3493/` | [1308.3493](https://arxiv.org/abs/1308.3493) | `xTras.tex` | xTras: a field-theory inspired xAct package for Mathematica | Nutma |
 | `1401.4173/` | [1401.4173](https://arxiv.org/abs/1401.4173) | `article_2.tex` | Massive Gravity | Rham |
 | `1405.7004/` | [1405.7004](https://arxiv.org/abs/1405.7004) | `cmb-lensing-prd.tex` | Effects of modified gravity on B-mode polarization | Amendola et al. |
 | `1406.6646/` | [1406.6646](https://arxiv.org/abs/1406.6646) | `main.tex` | Canonical variational completion of differential equations | Voicu & Krupka |
 | `1408.3978/` | [1408.3978](https://arxiv.org/abs/1408.3978) | `june2014revised.tex` | Advanced Virgo: a 2nd generation interferometric gravitational wave detector | Acernese et al. |
 | `1411.4547/` | [1411.4547](https://arxiv.org/abs/1411.4547) | -- (PDF only) | Advanced LIGO | The LIGO Scientific Collaboration |
+| `1504.02311/` | [1504.02311](https://arxiv.org/abs/1504.02311) | `earlyr.tex` | The origin, evolution and signatures of primordial magnetic fields | Subramanian |
 | `1506.02210/` | [1506.02210](https://arxiv.org/abs/1506.02210) | `main.tex` | The Theorem of Ostrogradsky | Woodard |
 | `1508.02401/` | [1508.02401](https://arxiv.org/abs/1508.02401) | `curvaturesquaregravityarxiv.tex` | A Stueckelberg Approach to Quadratic Curvature Gravity and its Decoupling Limits | Hinterbichler & Saravani |
 | `1510.06699/` | [1510.06699](https://arxiv.org/abs/1510.06699) | `ewgt-paper-submit2.tex` | Scale-invariant gauge theories of gravity: theoretical foundations | Lasenby & Hobson |
