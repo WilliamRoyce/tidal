@@ -9,6 +9,16 @@ load-bearing assumption and the unrebutted BGMF self-gravity criticism
 **Orchestration:** one orchestrator session holds this document current; workstream
 sessions are dispatched by the user from the prompts in `docs/cosmology/handoffs/`.
 
+**Companion documents** — this file is the *operational* record (decisions, ladder,
+workstreams, gates). The physics lives alongside it:
+
+| Document | Covers |
+|---|---|
+| `docs/cosmology/primer.md` | How a CMB pipeline computes `C_ℓ`, the two levels (background vs perturbations), what we reuse vs build, why an in-house solver, what a Cobaya `Theory` class is, the `a(η)` symbolic-vs-tabulated resolution. **Read first if new to the program.** |
+| `docs/cosmology/spectator_route.md` | The spectator/test-field approximation: validity criteria, reachable vs unreachable observables, the empty-niche argument (H7) |
+| `docs/cosmology/birefringence_notes.md` | O4's foundation: the CS/CFJ mechanism, conformal invariance as a solver fast path, frequency scaling, the linear-vs-circular terminology trap, the miscalibration degeneracy, likelihood availability |
+| `docs/cosmology/torc_pipeline_audit.md` | H1's audit of the TorC paper, forks and Zenodo archive |
+
 ## Goal
 
 Integrate a candidate Lagrangian's perturbations over the history of an expanding
