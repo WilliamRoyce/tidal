@@ -2,7 +2,10 @@
 
 **Status:** ACTIVE (program started 2026-08-29, after supervisor meeting 2026-08-28)
 **Tracking:** umbrella #488 · WS0 #489 · WS1 #490 · WS2 #491 · WS3 #492 · WS4 #493 ·
-WS5 #494 · WS6 #495 (anchors: #209 → O3, #43 answered, #360 scope updated, #477 halted)
+WS5 #494 · WS6 #495 · O4 prerequisites #499 (anchors: #209 → O3; **#43 answered only in
+its cosmological half** — its non-cosmological residue, `T̄ = 0` as the linearization's
+load-bearing assumption and the unrebutted BGMF self-gravity criticism
+(`literature/2510.17094/`), stays open; #360 scope updated; #477 halted)
 **Orchestration:** one orchestrator session holds this document current; workstream
 sessions are dispatched by the user from the prompts in `docs/cosmology/handoffs/`.
 
