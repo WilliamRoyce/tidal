@@ -17,6 +17,8 @@ workstreams, gates). The physics lives alongside it:
 | `docs/cosmology/primer.md` | How a CMB pipeline computes `C_ℓ`, the two levels (background vs perturbations), what we reuse vs build, why an in-house solver, what a Cobaya `Theory` class is, the `a(η)` symbolic-vs-tabulated resolution. **Read first if new to the program.** |
 | `docs/cosmology/spectator_route.md` | The spectator/test-field approximation: validity criteria, reachable vs unreachable observables, the empty-niche argument (H7) |
 | `docs/cosmology/birefringence_notes.md` | O4's foundation: the CS/CFJ mechanism, conformal invariance as a solver fast path, frequency scaling, the linear-vs-circular terminology trap, the miscalibration degeneracy, likelihood availability |
+| `docs/cosmology/observable_ladder.md` | H2's per-rung feasibility study: capabilities, known-answer targets, costs, invalidators, likelihood availability, ordering |
+| `docs/cosmology/magnetic_field_background.md` | O3's assumed primordial magnetic field: models, bounds, and why its spectator status must be computed rather than imported |
 | `docs/cosmology/torc_pipeline_audit.md` | H1's audit of the TorC paper, forks and Zenodo archive |
 
 ## Goal
@@ -180,7 +182,7 @@ adds unknowns.
 | **O0** | ΛCDM `C_ℓ`, new physics off (pass-through mode) | plumbing: Cobaya wiring, CAMB products, sampler, likelihood | reproduces CAMB `C_ℓ` + standard ΛCDM posterior; any TIDAL-computed piece sub-percent vs CAMB/nanoCMB, `2 ≤ ℓ ≤ 2500` |
 | **O1** | **Fixed-table pass-through** (H1 §R1): one `(a, ρ, P)` table generated offline at a chosen `(Ω_Λ, ϖ_r)` from TorC's published formulas, fed through our optional tabulated-background hook. Table generation is one-off data prep, **not** a package feature; no TorC physics inside the package | the hook + Cobaya wiring + CAMB seam, end to end | drive CAMB to the same `H(a)` and `C_ℓ` as a reference build. **Not** a posterior reproduction — see the note below. **First target.** |
 | **O2** | **Spectator perturbations on ΛCDM** — first: modified tensor/GW propagation (friction `ν`, mass `μ`, speed `c_T` derived from the Lagrangian) → tensor transfer → B-modes | the spine: TIDAL FRW-derived equations + new solver, strict spectator | TorC explicitly deferred this; first genuinely new result. Validity flags per run. Cembranos (local): `μ ≤ 10⁻³³ eV` does nothing; friction `ν` matters strongly |
-| **O3** | **Gertsenshtein mixing on FRW** — graviton↔photon with Hubble damping | time-dependent solver on the thesis's own physics; **core goal** (thesis couplings) | GH #209; Cembranos arXiv:2302.08186 (local); reduces to flat-space result as `H → 0` |
+| **O3** | **Gertsenshtein mixing on FRW** — graviton↔photon with Hubble damping | time-dependent solver on the thesis's own physics; **core goal** (thesis couplings) | GH #209; Cembranos arXiv:2302.08186 (local); reduces to flat-space result as `H → 0` **Requires an assumed PMF model** (`magnetic_field_background.md`) — an extra, irreducible assumption no other rung carries; its own spectator status `r_B ≈ 10⁻⁷ B₋₉²` is computed per run, not imported. **Different solver kind from O2** (eikonal + patch averaging, see below). |
 | **O4** | **Cosmic birefringence (E→B)** + V-modes | parity-odd sector + polarization observables | `β = 0.277° ± 0.057°` (4.8σ, joint ACT+Planck, arXiv:2608.06480); distinctive channels beat the `N_eff` bound where broadband conversion does not |
 
 **Two O4 prerequisites, found 2026-08-30 — neither is a lookup, both are derivation work:**
@@ -289,7 +291,7 @@ during planning; its findings are in `docs/cosmology/spectator_route.md`.
 | ID | Task | Artifact |
 |---|---|---|
 | H1 | TorC pipeline audit — **DONE** (2026-08-30). Settled R1 (O1 = fixed-table pass-through, above) and R2 (re-apply the CAMB patch, GH #498). Also for WS5: the provider→consumer wiring template (§3.1), the `planck_clik` NaN guard as a flagged rejection path (§3.3), and a caution that stock Cobaya's PolyChord does not give correct evidences under non-uniform priors without the Ormondroyd patch (§3.2). For the spectator flags: `ΔN_eff` (§1.7) is already parameterized for the torsion sector | `docs/cosmology/torc_pipeline_audit.md` ✅ |
-| H2 | Observable-ladder feasibility (O1–O4; recommend ordering) | `docs/cosmology/observable_ladder.md` |
+| H2 | Observable-ladder feasibility — **DONE** (2026-08-30). Found O3 needs a *different solver kind* from O2 (10²⁶ vs 10³ oscillations → eikonal + patch averaging; H3.md extended accordingly), that O4 splits into three channels with different prerequisites, and that no paper enforces the PMF's own spectator status | `docs/cosmology/observable_ladder.md` + `magnetic_field_background.md` ✅ |
 | H3 | Solver design study (matrix WKB; CAMB-Fortran vs DISCO-EB vs own; benchmark protocol) | `docs/cosmology/solver_design.md` |
 | H4 | New-package design (from the goal backwards; config spec; CLI separation; inference fate) | `docs/cosmology/repo_reshape.md` |
 | H5 | Literature acquisition — **DONE** (2026-08-30). 20/20 fetched and title-verified; `literature/README.md` now tracked and auto-generated by `scripts/bibaudit/index_literature.py` (GH #497) | populated `literature/` + `docs/references.md` ✅ |
