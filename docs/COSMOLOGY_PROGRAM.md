@@ -206,6 +206,35 @@ conversion are typically weaker than `N_eff` unless the signal is spectrally nar
 structurally distinctive — V-modes and birefringence are exactly that, justifying the
 polarization emphasis on physics grounds.
 
+### ⚠ Rung order after O1 — OPEN DECISION (user's call)
+
+The numbering O1→O2→O3→O4 is **capability order, not the recommended execution order**.
+H2 (`observable_ladder.md` §5) recommends **O2 → O4a → O3 → O4b/V-modes**, and flags the
+choice as *"a scientific-priority call, not a technical one"* — so it is yours, not the
+orchestrator's. Both options, faithfully:
+
+**H2's recommendation — O4a before O3.** O4a (isotropic `β`, post-processing rotation) is
+the **cheapest new observable in the ladder**: the CS/photon sector is conformally
+invariant, so `a(η)` drops out and `β` is a dispersion relation integrated against a
+zero-mode — **no FRW photon solver at all**, and the observable is an array rotation of
+CAMB's `C_ℓ` (Tier 3a, against O2/O3's Tier 3b). It reuses O1's wiring, it is the only
+rung targeting a **positive 4.8σ signal** rather than an upper limit, and its derivation
+work (#499) sits on the thesis's parity-odd critical path regardless.
+*Precondition:* the chosen operator is `n = 0` **and** `β` is effectively constant over
+recombination — otherwise it is O4b, which is much more expensive.
+
+**The alternative — O3 before O4a.** Puts the thesis's own Gertsenshtein couplings on FRW
+sooner, which has real scientific pull and matches the user's stated framing that O3 is a
+core goal. The cost: the eikonal engine (§0.1) and the magnetic-field modeling decisions
+(worth `10⁴` in the answer) land before any positive-signal observable exists, and before
+the validity machinery has been exercised on a cheaper rung. O3 also carries the most
+unknowns of any rung — a second solver kind, a mandatory PMF model, an amplitude-based
+measurement to replace the energy-ratio one, and a GR signal unobservable by 11+ orders,
+so its result is a torsion-*enhancement bound* whose interpretation leans on the very
+background-consistency and spectator flags O2/O4a would have exercised first.
+
+O2 is first either way, and builds the spine both routes reuse.
+
 ## The niche (H7 investigation, 2026-08-29)
 
 **"Arbitrary Lagrangian → spectator-sector perturbations on fixed ΛCDM → observables →
@@ -298,10 +327,9 @@ during planning; its findings are in `docs/cosmology/spectator_route.md`.
 | H6 | Numerical polology design (from #360 plan + Barker's code) | spectrum-package design doc |
 | H7 | Spectator-route scope — **DONE** | `docs/cosmology/spectator_route.md` |
 
-Dispatch order: **H1 ✅ and H5 ✅ done. H2 next** — its dependency (H1's audit) is now
-satisfied, and H1 left it two specific inputs: weigh O1 purely as a gate (it produces no
-new physics as scoped), and treat `ΔN_eff` as a ready-made spectator-validity input.
-Then H3 ∥ H4. H6 anytime.
+Dispatch order: **H1 ✅ H2 ✅ H5 ✅ H7 ✅ done. H3, H4, H6 running.** (H3's prompt was
+scope-extended after dispatch — see the two-solver note in `handoffs/H3.md`; that edit
+does not reach an already-running session and must be relayed.)
 
 ## Verification gates
 
