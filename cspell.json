@@ -556,6 +556,7 @@
     "xcoba",
     "xdot",
     "xelatex",
+    "xfails",
     "xlabels",
     "xlim",
     "xmap",
