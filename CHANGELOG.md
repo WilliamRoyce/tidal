@@ -12,6 +12,84 @@ retroactively covered; see `git log` for the full history.
 
 ## [Unreleased]
 
+### Added
+
+- **Research record: two closed attempts at a general fix for the
+  localized implicit-dynamical class (#473, #477)**. Both are preserved
+  under `scripts/research/` with READMEs carrying every measured table;
+  neither ships production code, and the localized class continues to
+  refuse honestly.
+  - `klf_staircase/` — a faithful, *verified* port of the
+    MatrixPencils.jl Kronecker-like staircase (kernel equivalence and
+    structure postconditions exact on random rank-deficient windows; a
+    known scrambled Kronecker canonical form recovered exactly; synthetic
+    gates at machine precision). It cannot deliver a usable operator
+    here: shallow tolerances march the staircase through the physical
+    sector, deep ones leave far-field directions live with unphysical
+    rates, and the usable window moves with resolution. It does certify
+    a full-system operator at deep tolerance (contract ~1e-10 against
+    ordered QZ's 2.66), which settles #474's construction defect and
+    shows identification was the deeper obstruction.
+  - `gauge_orbit/` — symbolic gauge-structure discovery. The linearized
+    Noether identity makes the chain defect exactly linear in the
+    background-EOM violation, so exact gauge structure requires a
+    self-consistent background. Measured: the diffeomorphism orbit
+    chains annihilate the vacuum pencil at 1e-17; the defect scales as
+    the identity demands (1.000 on photon rows, 1.999 on metric rows);
+    the symbolic orbit *is* the numerically weak sector (within 6e-3
+    rad); and a grading told nothing about the background rediscovers
+    far-field localization. Pinning those directions is nonetheless not
+    viable — they carry ~20% of the true motion (1.6e-15 in the
+    exact-symmetry control), so pinning deletes dynamics rather than
+    approximating it.
+  - Consequence recorded in `docs/tex/pencil_engine.tex`: for the
+    localized class the observable-sector closure route is the correct
+    treatment rather than a rescue, and no general float64 route is
+    known (extended precision, #470, is the surviving candidate).
+
+
+- **Observable-sector closure for the localized implicit-dynamical class
+  (#468, route 3)**. Specs with position-dependent coefficients AND an
+  implicit-dynamical sector (order-0 rows proven dynamical by the #457
+  classification — the ungauged localized Einstein–Maxwell roster) have
+  a full pencil that no double-precision operator can evolve faithfully:
+  the far-field background restores the linearized-diffeomorphism
+  freedom below machine precision, and the probe-based gauge quotient
+  discards independent equations there (#474). `tidal simulate` now
+  computes the dependency closure of the IC-excited components
+  (`EquationSystem.dependency_closure`); when that closure avoids the
+  implicit-dynamical sector, the run is restricted to it via
+  `restrict_spec_dict`, written as a first-class `restricted_spec.json`
+  that becomes the run's `spec_path`. Fields outside the closure are
+  ABSENT from the outputs (never zero), provenance lives under the spec's
+  `metadata.restriction`, and `tidal measure` refuses total energy (when
+  Hamiltonian terms were dropped) and conversion on omitted fields with
+  the sector alternative named. Activation is a recovery from refusal
+  only; `--no-closure-restriction` attempts the full system. Measured on
+  E.cal: the {h_5, a_1} conversion sector closes the residual oracle at
+  machine precision. The general in-solver mechanism (Kronecker-like
+  staircase reduction) is tracked on #473.
+- **Measurement-time gauge certificate ("pin + certify", #468)**. The
+  modal engine's gauge quotient pins undetermined state directions to
+  zero (the explicit min-norm choice); the run now records, per state slot
+  and mode, how much of the pinned subspace lives on that slot
+  (`solver_diagnostics.pin_overlap` in `metadata.json`, via
+  `PencilDiagnostics`). `tidal measure` stamps every result with a
+  `gauge_certificate`: `certified` when the measurement's field support
+  reads no pinned content (provably independent of the gauge choice),
+  `flagged` otherwise — a value is never presented as gauge-invariant
+  when it is not. The verdict is a DIRECT test ("perturb and
+  remeasure"): the run stores real-space probes of its pinned subspace
+  (`pin_probes.npy`); `measure` perturbs the state along them and re-runs
+  the measurement, reporting the relative sensitivity. This handles
+  observables that read a pinned field only through an invariant
+  combination, and pinned combinations mixing a value with a derivative,
+  which the per-slot overlap (kept as the fallback when no probes exist)
+  cannot. On the dark-photon CDT spec (#465 redundant triplets) the
+  h_5 → a_1 conversion and the total energy are certified (pure-gauge
+  directions carry no energy — the energy certificate doubles as a
+  pin-validity check), while a scalar reading the pinned torsion
+  component's raw value is flagged.
 ### Changed
 
 - **One `run_point`, and the two orchestrators become the policy they always

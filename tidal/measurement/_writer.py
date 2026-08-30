@@ -163,6 +163,9 @@ class SnapshotWriter:
         self._spec_path = spec_path
         self._bc_types = bc_types
         self._dt = dt
+        # Solver-side diagnostics attached before close() (e.g. the pinned
+        # gauge directions' per-slot overlap, GH #468 "pin + certify").
+        self.extra_metadata: dict[str, Any] | None = None
         self._count = 0
         self._closed = False
         self._flush_interval = max(flush_interval, 1)
@@ -297,7 +300,7 @@ class SnapshotWriter:
         """Directory where snapshot files are written."""
         return self._output_dir
 
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: C901
         """Flush all mmaps and write ``metadata.json``.
 
         It is safe to call ``close()`` multiple times.
@@ -342,6 +345,8 @@ class SnapshotWriter:
             metadata["dt"] = self._dt
         if self._spec_path is not None:
             metadata["spec_path"] = str(self._spec_path)
+        if self.extra_metadata:
+            metadata["solver_diagnostics"] = self.extra_metadata
 
         # Save FD order and spectral flag so that measurement tools can
         # restore the correct operators for energy computation (must match

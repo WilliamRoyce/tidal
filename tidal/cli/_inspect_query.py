@@ -193,11 +193,14 @@ def _equation_lines(  # noqa: PLR0913
     equation = spec.equations[index]
     keys = sorted({(t.operator, t.field) for t in equation.rhs_terms})
 
-    lhs = (
-        f"d{equation.time_derivative_order}_t({field})"
-        if equation.time_derivative_order
-        else f"{field} (constraint)"
-    )
+    if equation.time_derivative_order:
+        lhs = f"d{equation.time_derivative_order}_t({field})"
+    elif field in spec.implicit_dynamical_sector.fields:
+        # Algebraic LHS carrying inter-constraint time derivatives: the
+        # row belongs to the second-order sector (GH #457).
+        lhs = f"{field} (algebraic LHS — implicit-dynamical sector, GH #457)"
+    else:
+        lhs = f"{field} (constraint)"
     text = [
         f"{lhs}   kinetic = {equation.kinetic_coefficient_symbolic or '1'}",
         "",

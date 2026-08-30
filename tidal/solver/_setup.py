@@ -23,10 +23,18 @@ def warn_frozen_constraints(
 ) -> list[str]:
     """Detect constraint fields (time_order=0) and warn they are frozen.
 
+    Promoted second-order-sector fields (GH #457) keep time_order == 0 on
+    their SlotInfo (the true LHS fact) but have velocity slots and are
+    evolved — they are excluded here.
+
     Returns the list of constraint field names.
     """
     constraint_fields = [
-        s.field_name for s in layout.slots if s.kind == "field" and s.time_order == 0
+        s.field_name
+        for s in layout.slots
+        if s.kind == "field"
+        and s.time_order == 0
+        and s.field_name not in layout.implicit_dynamical_fields
     ]
     if constraint_fields:
         warnings.warn(

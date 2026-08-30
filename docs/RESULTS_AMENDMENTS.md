@@ -303,3 +303,62 @@ GH #420 (estimator bug) · #425 (arctan bounds) · #426/#431/#435 (fix, recomput
 hardening PRs) · #432 (this propagation) · #433 (noise floor) · #434 (fabricated
 priors) · `docs/dkl_recompute_report.md` (full evidence, per-chain tables,
 old-vs-new for both amp and sup directions).
+
+---
+
+## Amendment 2 (2026-08-27) — Localized E.cal calibration on the corrected operator (GH #449)
+
+### What happened
+
+The localized (position-dependent background) solver path carried a chain of
+defects when the Phase E calibration was recorded: the rfft convolution basis
+(#445), the missing velocity-row mass scale on deferred constraint terms (#444),
+and the inter-constraint time-derivative mishandling of the ungauged-gravity
+class (#457, with #458/#459/#460 on the same path). All are fixed (v0.49.x,
+branch `feat/ws2-localized-path-audit`). The corrected operator exposed that the
+FULL ungauged localized pencil cannot be evolved faithfully in double precision —
+the far-field background restores the linearized-diffeomorphism freedom below
+machine precision, and the probe-based gauge quotient discarded independent
+equations there (#474). The observable-sector closure route (#468) therefore
+evolves the exactly closed {h_5, a_1} sector on its own (aa8a3b38), which is the
+sector the Phase E conversion observable reads.
+
+### The corrected number
+
+Frozen Phase E geometry (`scripts/hpc_submit_drafts/v3e_localised/_geometry.env`:
+L = 100, N = 128, periodic; dual Gaussians at 25/75 with σ_B = 5, Bpeak = 0.01;
+wavepacket on h_5 at x_c = 8, σ_w = 3, k = 2, h0 = 0.01; κ = 1):
+
+| quantity | archived (PHASE_E_TRACKER 1.1, 2026-05-24) | corrected (2026-08-27) | status |
+|---|---|---|---|
+| P_peak(h_5 → a_1) | 0.0036 | **0.003912** (t_end = 40) | superseded |
+| Boccaletti sin²(κ·Bpeak·σ_B·√(2π)/2) | 0.0039 | 0.003922 | — |
+| ratio P / sin² | ~0.92 | **0.9975** | strengthened |
+| t_end independence | not checked | P_peak = 0.003914 at t_end = 80 (A(80)/A(40) = 1.0006) | new |
+| final P after the sign-flipped second Gaussian (t = 80) | — | 7.8e-6 (phase cancels, ∫B dz = 0 over the box) | new |
+
+The archived calibration claim ("matches Boccaletti within ~10%") **stands** in
+substance and is **strengthened**: the corrected operator reproduces the
+path-integrated Boccaletti prediction to a quarter of a percent, with no
+resolution- or t_end-dependent growth (the #455 spurious-operator signature is
+absent on the closure route).
+
+### What is affected, and what is not
+
+- The thesis manuscript's results rest on the uniform-background plane-wave
+  benchmark (Amendment 1 context; `results.tex`), which never ran the localized
+  path — nothing in the archive is superseded beyond the internal Phase E
+  bookkeeping number above.
+- The E.T2 amplification run (HPC 29640051) was produced on the defective
+  operator and is re-judged only when the localized programme resumes.
+- Torsion-roster localized specs need the same re-measurement; the closure fact
+  `closure({h_5, a_1}) == {h_5, a_1}` is pinned for E.cal only
+  (`tests/test_spec_restriction.py`) and must be verified per spec.
+- Total energy on closure-restricted runs is deliberately unavailable (81
+  Hamiltonian terms touch omitted fields); conversion is the exact observable.
+
+### Trail
+
+GH #445 · #444 · #457/#458/#459/#460 (defects) · #468 (closure route, aa8a3b38) ·
+#474 (quotient root cause) · #473 (general staircase reduction, future) · #449
+(this quantification) · `docs/PHASE_E_TRACKER.md` 1.1 (superseded line annotated).

@@ -25,7 +25,7 @@ from tidal.symbolic._kinetic_eval import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from tidal.solver.operators import SideBCSpec
 
@@ -103,6 +103,39 @@ def is_known_operator(name: str) -> bool:
         return True
     # Pure time derivative operators on RHS: d2_t, d3_t, d4_t
     return bool(re.match(r"^d\d+_t$", name))
+
+
+_PURE_TIME_OP_RE = re.compile(r"^d(\d+)_t$")
+_MIXED_T_OP_RE = re.compile(r"^mixed_T(\d*)")
+_MIXED_NUMERIC_OP_RE = re.compile(r"^mixed_(\d+)(?:_\d+)+$")
+
+
+def operator_time_order(name: str) -> int:
+    """Time-derivative order carried by an RHS operator name.
+
+    Complements :func:`is_known_operator`: static/spatial operators are
+    order 0, ``first_derivative_t`` is 1, ``d<N>_t`` is N, and mixed
+    time-space operators carry their T exponent (``mixed_T_S1x`` = 1,
+    ``mixed_T2_S1x`` = 2, numeric ``mixed_<t>_<s>...`` = t). The total
+    time order of a term is this value plus one when the term targets a
+    velocity slot (``v_``-prefixed field name).
+
+    This is the single symbolic-side source of truth used by
+    :attr:`EquationSystem.implicit_dynamical_sector` (GH #457); solver-side
+    operator decompositions must agree with it.
+    """
+    if name == "first_derivative_t":
+        return 1
+    m = _PURE_TIME_OP_RE.match(name)
+    if m:
+        return int(m.group(1))
+    m = _MIXED_T_OP_RE.match(name)
+    if m:
+        return int(m.group(1)) if m.group(1) else 1
+    m = _MIXED_NUMERIC_OP_RE.match(name)
+    if m:
+        return int(m.group(1))
+    return 0
 
 
 # --- LHS structure ---
@@ -890,6 +923,90 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
     return value
 
 
+# --- Second-order sector classification (GH #457) ---
+
+
+def _inter_constraint_time_edges(
+    equations: Sequence[ComponentEquation],
+    c_fields: set[str],
+) -> tuple[list[tuple[str, str, int]], set[str]]:
+    """Time-reference structure that promotes order-0 rows (GH #457).
+
+    Returns ``(edges, mass_targeted_from_dynamical)``:
+
+    * ``edges``: (row_field, target_field, total_t_order) for order-0
+      rows referencing another order-0 field with total time order ≥ 1
+      (operator time order plus one for a ``v_``-prefixed target).
+    * ``mass_targeted_from_dynamical``: order-0 fields whose
+      ACCELERATION (total time order ≥ 2) is referenced from a
+      DYNAMICAL row. Algebraic elimination cannot represent q̈ of an
+      eliminated field when its recovery is velocity-dependent (the
+      twice-differentiated recovery is jerk-level); promoting the field
+      turns the term into an ordinary B-side mass coupling. Velocity
+      references (total order 1) from dynamical rows do NOT promote —
+      ``Ċ = recovery·ẏ`` is exact as a B-side fold.
+    """
+    edges: list[tuple[str, str, int]] = []
+    dyn_mass_targets: set[str] = set()
+    second_order = 2
+    for eq in equations:
+        for term in eq.rhs_terms:
+            is_vel = term.field.startswith("v_")
+            base = term.field[2:] if is_vel else term.field
+            if base not in c_fields:
+                continue
+            t_total = operator_time_order(term.operator) + (1 if is_vel else 0)
+            if eq.time_derivative_order == 0:
+                if t_total >= 1:
+                    edges.append((eq.field_name, base, t_total))
+            elif t_total >= second_order:
+                dyn_mass_targets.add(base)
+    return edges, dyn_mass_targets
+
+
+@dataclass(frozen=True)
+class ImplicitDynamicalSector:
+    """Constraint-classified rows that carry second-order structure.
+
+    ``time_derivative_order == 0`` states the true LHS fact of a row; it
+    does NOT guarantee the row is algebraic. Rows whose RHS references
+    time derivatives of OTHER order-0 fields (``d2_t(C)`` → M_cc mass
+    coupling, ``first_derivative_t(C)`` / ``v_C`` → D_cc damping
+    coupling) form a coupled second-order subsystem that algebraic
+    (Schur) elimination cannot represent — folding them as algebraic is
+    the GH #457 defect, measured at O(1) residuals on 20 shipped specs.
+
+    ``fields`` is the closure of that subsystem: the connected
+    components (over order-0 rows, with an edge for every inter-constraint
+    time reference) that contain at least one edge. Promoted rows must be
+    routed through the rank-deficient-mass machinery (state slots, mass
+    matrix row M[fi,fi] = 0, per-mode Schur), consistently across the
+    modal paths; everything else about ``time_derivative_order`` — LaTeX
+    display, demotion detection, schema validation — keeps reading the
+    stored LHS fact.
+
+    ONE-DEFINITION RULE: this accessor is the only source of the
+    implicit-dynamical/residual split. Routing or layout code must consult it —
+    never test ``time_derivative_order == 0`` directly for a routing
+    decision, and never introduce a second classification path.
+
+    Attributes
+    ----------
+    fields : frozenset[str]
+        Field names of the implicit-dynamical order-0 rows.
+    reasons : Mapping[str, str]
+        Per implicit-dynamical field, why it is in the sector: ``carries M_cc`` /
+        ``carries D_cc`` (the row references another constraint's
+        acceleration / velocity), ``mass-targeted`` / ``velocity-targeted``
+        (another constraint row references this field's acceleration /
+        velocity), or ``closure`` (joined only through connectivity).
+        Multiple tags are ``+``-joined in sorted order.
+    """
+
+    fields: frozenset[str]
+    reasons: Mapping[str, str]
+
+
 # --- Equation system ---
 
 
@@ -1280,6 +1397,113 @@ class EquationSystem:
     def equation_map(self) -> dict[str, int]:
         """Map from field name to equation index. Cached on frozen dataclass."""
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
+
+    @cached_property
+    def implicit_dynamical_sector(self) -> ImplicitDynamicalSector:
+        """Promoted order-0 rows carrying second-order structure (GH #457).
+
+        See :class:`ImplicitDynamicalSector` for semantics and the
+        one-definition rule. The classification is provenance-agnostic:
+        it reads whatever equations this system holds, so JSON-native
+        order-0 rows and ε-demoted base-spec rows are treated
+        identically (the demotion-injected identity self-term has time
+        order 0 and never creates an edge).
+
+        Deliberately NOT edges (measured-healthy machinery, WS2 oracle):
+        constraint-row time references of DYNAMICAL fields (S_cd velocity
+        slots / deferred acceleration substitution) and dynamical-row
+        references of any kind (those route through A_dc/M/D/K — their
+        defects are GH #458, not classification).
+        """
+        c_fields = {
+            eq.field_name for eq in self.equations if eq.time_derivative_order == 0
+        }
+        edges, dyn_mass_targets = _inter_constraint_time_edges(self.equations, c_fields)
+
+        # Connected components over c_fields (union-find); promoted =
+        # union of components containing at least one edge, plus the
+        # components of fields whose acceleration a DYNAMICAL row
+        # references (their algebraic recovery cannot supply q̈).
+        parent: dict[str, str] = {f: f for f in c_fields}
+
+        def _find(a: str) -> str:
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
+
+        for row, tgt, _t in edges:
+            ra, rb = _find(row), _find(tgt)
+            if ra != rb:
+                parent[ra] = rb
+        edged_roots = (
+            {_find(row) for row, _tgt, _t in edges}
+            | {_find(tgt) for _row, tgt, _t in edges}
+            | {_find(f) for f in dyn_mass_targets}
+        )
+        promoted = frozenset(f for f in c_fields if _find(f) in edged_roots)
+
+        tag_sets: dict[str, set[str]] = {f: set() for f in promoted}
+        second_order = 2
+        for row, tgt, t_total in edges:
+            tag_sets[row].add(
+                "carries M_cc" if t_total >= second_order else "carries D_cc"
+            )
+            tag_sets[tgt].add(
+                "mass-targeted" if t_total >= second_order else "velocity-targeted"
+            )
+        for f in dyn_mass_targets:
+            tag_sets[f].add("mass-targeted")
+        reasons = {
+            f: "+".join(sorted(tags)) if tags else "closure"
+            for f, tags in tag_sets.items()
+        }
+        return ImplicitDynamicalSector(fields=promoted, reasons=reasons)
+
+    def dependency_closure(self, seeds: Iterable[str]) -> frozenset[str]:
+        """Fields whose equations the evolution of ``seeds`` can ever read.
+
+        The transitive closure of "the equation of X references Y" from
+        ``seeds`` (a velocity reference ``v_Y`` counts as Y). Every kept
+        equation is then complete — no kept row references an omitted
+        field — so the closure evolves EXACTLY on its own. Fields outside
+        the closure that are sourced BY it do not affect its exactness;
+        they are simply not computed (GH #468 route 3: the
+        observable-sector closure that rescues the localized
+        implicit-dynamical class from the full-pencil refusal).
+
+        Structural on purpose: an edge exists whenever a term references
+        the field, whatever its coefficient's value at the run's
+        parameters — the conservative direction (never fewer fields than
+        needed).
+
+        Raises
+        ------
+        ValueError
+            If a seed is not a component of this system.
+        """
+        names = set(self.component_names)
+        seed_list = list(seeds)
+        unknown = sorted(s for s in seed_list if s not in names)
+        if unknown:
+            msg = (
+                f"dependency_closure: unknown field(s) {unknown}; "
+                f"valid: {sorted(names)}"
+            )
+            raise ValueError(msg)
+        eq_map = self.equation_map
+        closure: set[str] = set()
+        frontier = list(seed_list)
+        while frontier:
+            field = frontier.pop()
+            if field in closure:
+                continue
+            closure.add(field)
+            for term in self.equations[eq_map[field]].rhs_terms:
+                base = term.field if term.field in names else _base_field(term.field)
+                if base not in closure:
+                    frontier.append(base)
+        return frozenset(closure)
 
     # ------------------------------------------------------------------ #
     # Perturbative-order filtering (v6 plan, Stage 2)                    #
@@ -1919,6 +2143,126 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
 
 
 # --- Public loader ---
+
+
+# --- Observable-sector restriction (GH #468 route 3) ---
+
+
+@dataclass(frozen=True)
+class SpecRestriction:
+    """Provenance of a spec restricted to a dependency closure (GH #468).
+
+    Stored under ``metadata["restriction"]`` of the restricted spec so the
+    artifact is self-describing: every downstream tool can see which
+    fields were evolved, which were omitted, and why.
+    """
+
+    parent_spec: str
+    seeds: tuple[str, ...]
+    evolved: tuple[str, ...]
+    omitted: tuple[str, ...]
+    dropped_hamiltonian_terms: int
+    reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready form."""
+        return {
+            "parent_spec": self.parent_spec,
+            "seeds": list(self.seeds),
+            "evolved": list(self.evolved),
+            "omitted": list(self.omitted),
+            "dropped_hamiltonian_terms": self.dropped_hamiltonian_terms,
+            "reason": self.reason,
+        }
+
+
+def restrict_spec_dict(  # noqa: C901
+    data: Mapping[str, Any],
+    keep: Iterable[str],
+    *,
+    parent_spec: str = "",
+    seeds: Iterable[str] = (),
+    reason: str = "",
+) -> tuple[dict[str, Any], SpecRestriction]:
+    """Restrict a raw spec dict to the fields in ``keep`` (a dependency closure).
+
+    Dict-level on purpose: the result is a first-class spec JSON that
+    :meth:`EquationSystem.from_dict` re-validates, so every downstream
+    tool (simulate, measure, inspect, resume) works on it unchanged.
+    Fields outside ``keep`` are ABSENT from the result — never
+    present-but-wrong. Hamiltonian terms touching an omitted field are
+    dropped and counted; the energy measurement refuses when the count is
+    nonzero and names the sector quantity instead.
+
+    Raises
+    ------
+    ValueError
+        If ``keep`` names an unknown field, or is not closed (a kept
+        equation references an omitted field) — pass a
+        :meth:`EquationSystem.dependency_closure`.
+    """
+    keep_set = set(keep)
+    all_names = [str(f["name"]) for f in data["fields"]]
+    unknown = sorted(keep_set - set(all_names))
+    if unknown:
+        msg = f"restrict_spec_dict: unknown field(s) {unknown}"
+        raise ValueError(msg)
+    kept_fields = [f for f in data["fields"] if f["name"] in keep_set]
+    kept_orig_idx = [int(f["index"]) for f in kept_fields]
+
+    def _base(name: str) -> str:
+        return name if name in all_names else _base_field(name)
+
+    equations: list[Any] = []
+    for eq in data["equations"]:
+        if eq["field"] not in keep_set:
+            continue
+        for term in eq["rhs"]["terms"]:
+            if _base(str(term["field"])) not in keep_set:
+                msg = (
+                    f"restrict_spec_dict: not closed — the equation for "
+                    f"{eq['field']} references omitted field {term['field']}; "
+                    f"pass a dependency closure"
+                )
+                raise ValueError(msg)
+        equations.append(eq)
+
+    out: dict[str, Any] = dict(data)
+    out["fields"] = [{**f, "index": i} for i, f in enumerate(kept_fields)]
+    out["equations"] = equations
+    for key in (
+        "mass_matrix",
+        "coupling_matrix",
+        "mass_matrix_symbolic",
+        "coupling_matrix_symbolic",
+    ):
+        matrix = data.get(key)
+        if isinstance(matrix, list) and len(matrix) == len(all_names):
+            out[key] = [[matrix[i][j] for j in kept_orig_idx] for i in kept_orig_idx]
+
+    dropped = 0
+    canonical = data.get("canonical")
+    if canonical:
+        kept_terms: list[Any] = []
+        for term in canonical.get("hamiltonian_terms", []):
+            fa = _base(str(term["factor_a"]["field"]))
+            fb = _base(str(term["factor_b"]["field"]))
+            if fa in keep_set and fb in keep_set:
+                kept_terms.append(term)
+            else:
+                dropped += 1
+        out["canonical"] = {**canonical, "hamiltonian_terms": kept_terms}
+
+    record = SpecRestriction(
+        parent_spec=parent_spec,
+        seeds=tuple(seeds),
+        evolved=tuple(str(f["name"]) for f in kept_fields),
+        omitted=tuple(n for n in all_names if n not in keep_set),
+        dropped_hamiltonian_terms=dropped,
+        reason=reason,
+    )
+    out["metadata"] = {**data.get("metadata", {}), "restriction": record.to_dict()}
+    return out, record
 
 
 def load_equation_system(
