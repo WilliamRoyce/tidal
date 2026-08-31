@@ -528,6 +528,10 @@ orchestrator or by other handoffs):
 > **Status: all filed 2026-08-30 as #500–#510** (WS2 #500–#504, WS3 #505, WS4 #506–#508,
 > WS5 #509–#510). The two owner edits in §6 are also done: `COSMOLOGY_PROGRAM.md` companion
 > table + O3 PMF note, and `handoffs/H3.md` extended to two solver kinds.
+>
+> **Item 12 added 2026-08-31 as #511** — an omission from the original list: V-modes are
+> discussed as an observable throughout this report (§0.2, §4.2, §4.6) but no issue tracked
+> them, so the channel was silently unowned.
 
 1. **WS2** — FRW derivation mode: symbolic `a(η)`, `ℋ(η)`, conformal time; 2⁺ tensor sector
    first; zero-coupling limit reproduces `h'' + 2ℋh' + k²h = 0`.
@@ -547,6 +551,11 @@ orchestrator or by other handoffs):
 10. **WS5** — `β` likelihood escalation: Gaussian → Minami–Komatsu core port → candl
     anisotropic.
 11. **WS5** — test that `planck_2020_lollipop.lowlEB` consumes an injected `eb` spectrum.
+12. **WS4/WS5** — V-mode (Stokes `V`) observable and likelihood: two independent channels
+    (chiral conversion via #505; `E→V` linear birefringence from the principal part of
+    `χ^{abcd}`, Itin–Hehl classes 1–8, via #503). No Boltzmann code computes `V`, Cobaya's
+    `Cl` keys cannot express it, and no likelihood exists — only the published CLASS,
+    SPIDER and MIPOL upper limits.
 
 ---
 
