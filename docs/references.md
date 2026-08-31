@@ -226,6 +226,39 @@ vanish on-shell, and order 2 retains the full quadratic action including all mix
 is stated in Cembranos et al., [arXiv:2302.08186](https://arxiv.org/abs/2302.08186), listed
 under Gertsenshtein Effect above and also local.
 
+### Solver design study (H3 additions, 2026-08-31)
+
+The reference set behind `docs/cosmology/solver_design.md`: Boltzmann-code prior art,
+oscillatory/adiabatic matrix integrators beyond the WS3 ladder's original five sources,
+and the mixing/patch-averaging criteria for the O3 eikonal engine.
+
+| Reference | Relevance |
+| --- | --- |
+| **Sletmoen (2025)** — "SymBoltz.jl: a symbolic-numeric, approximation-free, and differentiable linear Einstein-Boltzmann solver", [arXiv:2509.24740](https://arxiv.org/abs/2509.24740) | The closest existing analogue to TIDAL's Lagrangian→JSON pipeline: species composed symbolically, stiff implicit integration, no approximation switches. Scalars only — tensors are listed as future work. |
+| **Zhou et al. (2026)** — "ABCMB: a Python+JAX package for the CMB power spectrum", [arXiv:2602.15104](https://arxiv.org/abs/2602.15104) | Fluid-class extension API ("add a new fluid without opening a source file") — the cleanest Python precedent for pluggable species; two-way coupled by design, which is exactly what the spectator premise forbids. |
+| **Lewis (2026)** — "CAMB 2: cosmological power spectra for high-precision surveys", [arXiv:2607.14854](https://arxiv.org/abs/2607.14854) | The current statement of what CAMB actually does — the null-hypothesis baseline the H3 bake-off measures against. |
+| **Alvermann & Fehske (2011)** — "High-order commutator-free exponential time-propagation of driven quantum systems", [arXiv:1102.5071](https://arxiv.org/abs/1102.5071) | Optimized commutator-free exponential integrators (CFETs) to order 8 with tabulated coefficients — the upgrade path past CF4 if the bake-off wants higher fixed order. |
+| **Hu & Bremer (2023)** — "A frequency-independent solver for systems of linear ordinary differential equations", [arXiv:2309.13848](https://arxiv.org/abs/2309.13848) | The only published frequency-independent *matrix* method (cyclic-vector phase functions). Conditioning collapses for n ≥ 5 and eigenvalues must stay distinct — usable as a reference oracle on small blocks, not as the engine. |
+| **Bamber & Handley (2019)** — "Beyond the Runge-Kutta-Wentzel-Kramers-Brillouin method", [arXiv:1907.11638](https://arxiv.org/abs/1907.11638) | States RKWKB is "essentially one-dimensional" — the group's own confirmation that the matrix generalization WS3 needs does not exist. |
+| **Casas, D'Olivo & Oteo (2016)** — "Efficient numerical integration of neutrino oscillations in matter", [arXiv:1611.06814](https://arxiv.org/abs/1611.06814) | A special-purpose Magnus solver ~100× faster than generic integrators on a 3×3 oscillation problem, unitary at every truncation — the strongest published evidence that the Magnus route pays off on exactly our problem shape. |
+| **Meyer, Davies & Kuhlmann (2021)** — "gammaALPs: photon-ALP oscillations in astrophysical environments", [arXiv:2108.02061](https://arxiv.org/abs/2108.02061) | The engineering pattern for the O3 front-end: ordered environment list, closed-form `expm` per constant cell, density-matrix propagation, batched random-field realizations. |
+| **Mirizzi, Raffelt & Serpico (2007)** — "Signatures of axion-like particles in the spectra of TeV gamma-ray sources", [arXiv:0704.3044](https://arxiv.org/abs/0704.3044) | Appendix A is the cleanest derivation of the incoherent-sum rule: conversion probability = power spectrum of `B_⊥` at the oscillation wavenumber; validity `Δ_M·s ≪ 1` and `N·P ≪ 1`, with the `⅓[1−e^{−3Pz/2s}]` continuum beyond. |
+| **Kartavtsev, Raffelt & Vogel (2016)** — "Extragalactic photon-ALP conversion at CTA energies", [arXiv:1611.04526](https://arxiv.org/abs/1611.04526) | The regime map (non-adiabatic / exact-P / quasi-adiabatic) and the decisive warning: hard-edged cell models are wrong by orders of magnitude once `l_osc` drops below the field's smoothing scale. |
+| **Carenza & Marsh (2023)** — "On the applicability of the Landau-Zener formula to axion-photon conversion", [arXiv:2302.02700](https://arxiv.org/abs/2302.02700) | When LZ fails (adiabatic regime with nearby boundaries) and the WKB-in-the-mixing-eigenvalue alternative — the resonance-crossing rules for the O3 regime chain. |
+| **Ito, Kohri & Nakayama (2023)** — "Gravitational wave search through electromagnetic telescopes", [arXiv:2309.14765](https://arxiv.org/abs/2309.14765) | The conservative patch prescription (drop the `N_G` enhancement when `l_osc < l_G`) and the per-interval integrand switch — the precedent for O3's auto-selected averaging chain. |
+| **Fujita, Kamada & Nakai (2020)** — "Gravitational waves from primordial magnetic fields via photon-graviton conversion", [arXiv:2002.07548](https://arxiv.org/abs/2002.07548) | The early-universe limit where the patch length is the photon mean free path (collision = measurement) and conversion becomes a production rate in a Boltzmann equation. |
+| **Chiba, Jinno & Nomura (2025)** — "Graviton-photon conversion in stochastic magnetic fields", [arXiv:2505.10926](https://arxiv.org/abs/2505.10926) | Born-kernel formulation on a Gaussian random field: expectation *and variance* of the conversion signal directly from `P_B(k)`, no Monte Carlo — the route to a likelihood covariance, and the `sinc²` criterion in kernel form. |
+| **Argüelles, Salvado & Weaver (2021)** — "nuSQuIDS: a toolbox for neutrino propagation", [arXiv:2112.13804](https://arxiv.org/abs/2112.13804) | Density-matrix master equation with non-Hermitian absorption and incoherent re-injection coexisting; interaction picture w.r.t. the fast diagonal so only the residual is stepped — both patterns the O3 engine copies. |
+| **Pshirkov & Baskaran (2009)** — "Limits on high-frequency gravitational wave background from its interplay with large-scale magnetic fields", [arXiv:0903.4160](https://arxiv.org/abs/0903.4160) | The cautionary tale: multiplying a per-patch probability by the patch count without the `N·P ≪ 1` check — the error the later literature corrects and O3's flags prevent. |
+| **Johns et al. (2016)** — "Neutrino flavor transformation in the lepton-asymmetric universe", [arXiv:1608.01336](https://arxiv.org/abs/1608.01336) | Magnus integrators applied to cosmological neutrino quantum kinetics — the nearest published neighbor to "Magnus for cosmological perturbations" (which itself remains unpublished, per the H3 survey). |
+| **Froustey et al. (2024)** — "Time dependence of neutrino quantum kinetics in a core-collapse supernova", [arXiv:2406.09504](https://arxiv.org/abs/2406.09504) | Recent large-scale Magnus-based QKE evolution — evidence the method scales in production on stiff oscillatory matrix systems. |
+
+Non-arXiv methods sources for H3 (no local TeX; cite by journal): Lorenz, Jahnke & Lubich,
+BIT 45 (2005) 91 (adiabatic Magnus with time-varying eigendecomposition — the §9 template);
+Jahnke & Lubich, Numer. Math. 94 (2003) 289; Blanes & Moan, Appl. Numer. Math. 56 (2006)
+1519 (CF4/CF6 coefficients); Iserles, BIT 42 (2002) 561 (modified Magnus); Raffelt &
+Stodolsky, PRD 37 (1988) 1237 (the eikonal reduction WS2 must reproduce).
+
 ## Verification & Validation Methodology
 
 | Reference                                                                                                                             | Relevance                                                                                                       |

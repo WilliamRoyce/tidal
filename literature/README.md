@@ -31,6 +31,7 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 
 | Directory | Source | Main TeX | Title | Authors |
 | --- | --- | --- | --- | --- |
+| `0704.3044/` | [0704.3044](https://arxiv.org/abs/0704.3044) | `paper.tex` | Signatures of axion-like particles in the spectra of TeV gamma-ray sources | Mirizzi et al. |
 | `0711.4866/` | [0711.4866](https://arxiv.org/abs/0711.4866) | `secDM5.tex` | Secluded WIMP Dark Matter | Pospelov et al. |
 | `0803.0862/` | [0803.0862](https://arxiv.org/abs/0803.0862) | `xPerm.tex` | xPerm: fast index canonicalization for tensor computer algebra | Martin-Garcia |
 | `0803.1967/` | [0803.1967](https://arxiv.org/abs/0803.1967) | `rmagnus.tex` | Describing neutrino oscillations in matter with Magnus expansion | Ioannisian & Smirnov |
@@ -38,9 +39,11 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `0810.2989/` | [0810.2989](https://arxiv.org/abs/0810.2989) | `main.tex` | Confining potential from interacting magnetic and torsion fields | Gaete & Helaÿel-Neto |
 | `0810.5488/` | [0810.5488](https://arxiv.org/abs/0810.5488) | `magnus-temp.tex` | The Magnus expansion and some of its applications | Blanes et al. |
 | `0811.1030/` | [0811.1030](https://arxiv.org/abs/0811.1030) | `VbelowZ.tex` | Secluded U(1) below the weak scale | Pospelov |
+| `0903.4160/` | [0903.4160](https://arxiv.org/abs/0903.4160) | `HFGW_draft_17072009.tex` | Limits on high-frequency gravitational wave background from its interplay with large scale magnetic fields | Pshirkov & Baskaran |
 | `0905.3732/` | [0905.3732](https://arxiv.org/abs/0905.3732) | `main.tex` | Infrared Modified Gravity with Dynamical Torsion | Nikiforova et al. |
 | `0908.0629/` | [0908.0629](https://arxiv.org/abs/0908.0629) | `0908.0629.tex` | Constraints on background torsion from birefringence of CMB polarization | Das et al. |
 | `0912.3767/` | [0912.3767](https://arxiv.org/abs/0912.3767) | `main.tex` | On the interplay between screening and confinement from interacting electromagnetic and torsion fields | Gaete & Helaÿel-Neto |
+| `1102.5071/` | [1102.5071](https://arxiv.org/abs/1102.5071) | `af10.tex` | High-order commutator-free exponential time-propagation of driven quantum systems | Alvermann & Fehske |
 | `1104.2933/` | [1104.2933](https://arxiv.org/abs/1104.2933) | `approximations2.tex` | The Cosmic Linear Anisotropy Solving System (CLASS) II: Approximation schemes | Blas et al. |
 | `1211.0500/` | [1211.0500](https://arxiv.org/abs/1211.0500) | `conversion-gw-gamma10.tex` | Conversion of relic gravitational waves into photons in cosmological magnetic fields | Dolgov & Ejlli |
 | `1302.3884/` | [1302.3884](https://arxiv.org/abs/1302.3884) | `DP_stars_revision.tex` | New stellar constraints on dark photons | An et al. |
@@ -55,6 +58,9 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `1506.02210/` | [1506.02210](https://arxiv.org/abs/1506.02210) | `main.tex` | The Theorem of Ostrogradsky | Woodard |
 | `1508.02401/` | [1508.02401](https://arxiv.org/abs/1508.02401) | `curvaturesquaregravityarxiv.tex` | A Stueckelberg Approach to Quadratic Curvature Gravity and its Decoupling Limits | Hinterbichler & Saravani |
 | `1510.06699/` | [1510.06699](https://arxiv.org/abs/1510.06699) | `ewgt-paper-submit2.tex` | Scale-invariant gauge theories of gravity: theoretical foundations | Lasenby & Hobson |
+| `1608.01336/` | [1608.01336](https://arxiv.org/abs/1608.01336) | `leptonasymmetry.tex` | Neutrino flavor transformation in the lepton-asymmetric universe | Johns et al. |
+| `1611.04526/` | [1611.04526](https://arxiv.org/abs/1611.04526) | `photonalp.tex` | Extragalactic photon-ALP conversion at CTA energies | Kartavtsev et al. |
+| `1611.06814/` | [1611.06814](https://arxiv.org/abs/1611.06814) | `DN11770.tex` | Efficient numerical integration of neutrino oscillations in matter | Casas et al. |
 | `1702.05185/` | [1702.05185](https://arxiv.org/abs/1702.05185) | `main.tex` | Gravitational waves in Poincaré gauge gravity theory | Obukhov |
 | `1706.07421/` | [1706.07421](https://arxiv.org/abs/1706.07421) | `higherderivpaper.tex` | Fixing extensions to General Relativity in the non-linear regime | Cayuso et al. |
 | `1710.01562/` | [1710.01562](https://arxiv.org/abs/1710.01562) | `main.tex` | Perturbative reduction of derivative order in EFT | Glavan |
@@ -67,8 +73,10 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `1903.02263/` | [1903.02263](https://arxiv.org/abs/1903.02263) | `main.tex` | Entropy in Poincaré gauge theory: Hamiltonian approach | Blagojević & Cvetković |
 | `1905.04768/` | [1905.04768](https://arxiv.org/abs/1905.04768) | `paper.tex` | anesthetic: nested sampling visualisation | Handley |
 | `1906.01421/` | [1906.01421](https://arxiv.org/abs/1906.01421) | `main.tex` | An efficient method for solving highly oscillatory ordinary differential equations with applications to physical systems | Agocs et al. |
+| `1907.11638/` | [1907.11638](https://arxiv.org/abs/1907.11638) | `BRKWKB.tex` | Beyond the Runge-Kutta-Wentzel-Kramers-Brillouin method | Bamber & Handley |
 | `1908.00232/` | [1908.00232](https://arxiv.org/abs/1908.00232) | `UHF_GW_Upper_limit_v3.tex` | Upper limits on the amplitude of ultra-high-frequency gravitational waves from graviton-photon mixing | Ejlli et al. |
 | `1910.07506/` | [1910.07506](https://arxiv.org/abs/1910.07506) | `StabilityPGTsEJPC.tex` | Revisiting the Stability of Quadratic Poincaré Gauge Gravity | Jiménez & Torralba |
+| `2002.07548/` | [2002.07548](https://arxiv.org/abs/2002.07548) | `RevisedDraft.tex` | Gravitational Waves from Primordial Magnetic Fields via Photon-Graviton Conversion | Fujita et al. |
 | `2003.00664/` | [2003.00664](https://arxiv.org/abs/2003.00664) | `Weyl_inv_cosmo0427.tex` | Consistent inflationary cosmology from quadratic gravity with dynamical torsion | Aoki & Mukohyama |
 | `2003.02690/` | [2003.02690](https://arxiv.org/abs/2003.02690) | `prd_paper.tex` | Addressing $H_0$ tension with emergent dark radiation in unitary gravity | Barker et al. |
 | `2004.02714/` | [2004.02714](https://arxiv.org/abs/2004.02714) | `main.tex` | Graviton-photon mixing. Exact solution in a constant magnetic field | Ejlli |
@@ -87,10 +95,12 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `2102.10579/` | [2102.10579](https://arxiv.org/abs/2102.10579) | `main.tex` | General method for including Stueckelberg fields | Lyakhovich |
 | `2105.04565/` | [2105.04565](https://arxiv.org/abs/2105.04565) | `main.tex` | Dark photon limits: a handbook | Caputo et al. |
 | `2106.09355/` | [2106.09355](https://arxiv.org/abs/2106.09355) | `main.tex` | Reducible Stueckelberg symmetry and dualities | Abakumova & Lyakhovich |
+| `2108.02061/` | [2108.02061](https://arxiv.org/abs/2108.02061) | `main.tex` | gammaALPs: An open-source python package for computing photon-axion-like-particle oscillations in astrophysical environments | Meyer et al. |
 | `2109.09546/` | [2109.09546](https://arxiv.org/abs/2109.09546) | `main.tex` | Gravity with dynamical torsion | Katanaev |
 | `2110.13319/` | [2110.13319](https://arxiv.org/abs/2110.13319) | `GoryachevComment.tex` | Did Goryachev et al. detect megahertz gravitational waves? | Lasky & Thrane |
 | `2111.14199/` | [2111.14199](https://arxiv.org/abs/2111.14199) | `draft_rot_ps.tex` | Computing Microwave Background Polarization Power Spectra from Cosmic Birefringence | Cai & Guan |
 | `2112.11465/` | [2112.11465](https://arxiv.org/abs/2112.11465) | `main_v2.tex` | Detecting High-Frequency Gravitational Waves with Microwave Cavities | Berlin et al. |
+| `2112.13804/` | [2112.13804](https://arxiv.org/abs/2112.13804) | `nusquids.tex` | nuSQuIDS: A toolbox for neutrino propagation | Argüelles et al. |
 | `2202.00032/` | [2202.00032](https://arxiv.org/abs/2202.00032) | `Ver2_MNRAS_Oct2023.tex` | Gertsenshtein-Zel$'$dovich effect: A plausible explanation for fast radio bursts? | Kushwaha et al. |
 | `2202.00695/` | [2202.00695](https://arxiv.org/abs/2202.00695) | `GWaxion.tex` | A novel search for high-frequency gravitational waves with low-mass axion haloscopes | Domcke et al. |
 | `2202.13919/` | [2202.13919](https://arxiv.org/abs/2202.13919) | `main_v5.tex` | New physics from the polarised light of the cosmic microwave background | Komatsu |
@@ -103,10 +113,13 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `2210.15980/` | [2210.15980](https://arxiv.org/abs/2210.15980) | `main.tex` | A discrete discontinuity between the two phases of gravity | Sengupta |
 | `2212.06924/` | [2212.06924](https://arxiv.org/abs/2212.06924) | `main-expanded.tex` | An adaptive spectral method for oscillatory second-order linear ODEs with frequency-independent cost | Agocs & Barnett |
 | `2301.02072/` | [2301.02072](https://arxiv.org/abs/2301.02072) | `main.tex` | A Simple Derivation of the Gertsenshtein Effect | Palessandro & Rothman |
+| `2302.02700/` | [2302.02700](https://arxiv.org/abs/2302.02700) | `LZ.tex` | On the applicability of the Landau-Zener formula to axion-photon conversion | Carenza & Marsh |
 | `2302.03545/` | [2302.03545](https://arxiv.org/abs/2302.03545) | `main.tex` | The effective field theory approach to the strong coupling issue in $f(T)$ gravity | Hu et al. |
 | `2302.08186/` | [2302.08186](https://arxiv.org/abs/2302.08186) | `conversionDef4arxiv.tex` | Graviton-photon oscillation in a cosmic background for a general theory of gravity | Cembranos et al. |
 | `2303.11094/` | [2303.11094](https://arxiv.org/abs/2303.11094) | `Manuscript.tex` | Does gravitational confinement sustain flat galactic rotation curves without dark matter? | Barker et al. |
 | `2308.09178/` | [2308.09178](https://arxiv.org/abs/2308.09178) | `article.tex` | Testing gravity with gauge-invariant polarization states of gravitational waves: Theory and pulsar timing sensitivity | Alves |
+| `2309.13848/` | [2309.13848](https://arxiv.org/abs/2309.13848) | `scalar2.tex` | A frequency-independent solver for systems of first order linear ordinary differential equations | Hu & Bremer |
+| `2309.14765/` | [2309.14765](https://arxiv.org/abs/2309.14765) | `draft.tex` | Gravitational wave search through electromagnetic telescopes | Ito et al. |
 | `2309.14783/` | [2309.14783](https://arxiv.org/abs/2309.14783) | `source.tex` | Manifestly covariant variational principle for gauge theories of gravity | Hobson et al. |
 | `2310.04150/` | [2310.04150](https://arxiv.org/abs/2310.04150) | `main.tex` | On graviton-photon conversions in magnetic environments | Hwang & Noh |
 | `2311.03291/` | [2311.03291](https://arxiv.org/abs/2311.03291) | `main.tex` | DISCO-DJ I: a differentiable Einstein-Boltzmann solver for cosmology | Hahn et al. |
@@ -122,6 +135,7 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `2405.11786/` | [2405.11786](https://arxiv.org/abs/2405.11786) | `main.tex` | Graviton-photon conversions in Euler-Heisenberg nonlinear electrodynamics | Hwang & Noh |
 | `2405.15581/` | [2405.15581](https://arxiv.org/abs/2405.15581) | `main.tex` | Nonlinear studies of modifications to general relativity: Comparing different approaches | Corman et al. |
 | `2406.09500/` | [2406.09500](https://arxiv.org/abs/2406.09500) | `Manuscript.tex` | PSALTer: Particle Spectrum for Any Tensor Lagrangian | Barker et al. |
+| `2406.09504/` | [2406.09504](https://arxiv.org/abs/2406.09504) | `menergy_v5.tex` | Neutrino quantum kinetics in a core-collapse supernova | Shalgar & Tamborra |
 | `2406.09540/` | [2406.09540](https://arxiv.org/abs/2406.09540) | `part2_R1.tex` | Metric-affine cosmological models and the inverse problem of the calculus of variations. Part II: Variational bootstrapping of the $Λ$CDM model | Ducobu & Voicu |
 | `2406.11956/` | [2406.11956](https://arxiv.org/abs/2406.11956) | `gravity_strong-CP_final_subm.tex` | Weyl-invariant Einstein-Cartan gravity: unifying the strong CP and hierarchy puzzles | Karananas et al. |
 | `2406.12826/` | [2406.12826](https://arxiv.org/abs/2406.12826) | `Manuscript.tex` | Every Poincaré gauge theory is conformal: a compelling case for dynamical vector torsion | Barker et al. |
@@ -137,6 +151,7 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `2503.18972/` | [2503.18972](https://arxiv.org/abs/2503.18972) | `f_R,Q_.tex` | Vulnerability of f(Q) gravity theory and a possible resolution | Saha & Sanyal |
 | `2505.00082/` | [2505.00082](https://arxiv.org/abs/2505.00082) | `Paper.tex` | Stable non-linear evolution in regularised higher derivative effective field theories | Figueras et al. |
 | `2505.08457/` | [2505.08457](https://arxiv.org/abs/2505.08457) | `main.tex` | Graviton-photon conversion in blazar jets as a probe of high-frequency gravitational waves | Matsuo & Ito |
+| `2505.10926/` | [2505.10926](https://arxiv.org/abs/2505.10926) | `main_v3.tex` | Graviton-photon conversion in stochastic magnetic fields | Chiba et al. |
 | `2505.23894/` | [2505.23894](https://arxiv.org/abs/2505.23894) | `Manuscript.tex` | Can metric-affine gravity be saved? | Barker et al. |
 | `2506.02111/` | [2506.02111](https://arxiv.org/abs/2506.02111) | `Manuscript.tex` | The particle spectra of parity-violating theories: A less radical approach and an upgrade of PSALTer | Barker et al. |
 | `2506.03609/` | [2506.03609](https://arxiv.org/abs/2506.03609) | `PBH.tex` | Experimental Limits on Planetary Mass Primordial Black Hole Mergers | Campbell et al. |
@@ -147,14 +162,17 @@ pre-arXiv or publisher-PDF entries have no TeX and are marked `-- (PDF only)`.
 | `2507.05349/` | [2507.05349](https://arxiv.org/abs/2507.05349) | `Manuscript.tex` | Infrared foundations for quantum geometry II: Catalogue of all torsion-like theories including new ghost-tachyon-free cases | Barker et al. |
 | `2507.09228/` | [2507.09228](https://arxiv.org/abs/2507.09228) | `paper_Qtorsion.tex` | Alleviating the Hubble tension with Torsion Condensation (TorC) | Legner et al. |
 | `2507.16609/` | [2507.16609](https://arxiv.org/abs/2507.16609) | `Gert.tex` | Gravitational Wave Scattering on Magnetic Fields | Domcke et al. |
+| `2509.24740/` | [2509.24740](https://arxiv.org/abs/2509.24740) | `aa57450-25.tex` | SymBoltz.jl: A symbolic-numeric, approximation-free, and differentiable linear Einstein-Boltzmann solver | Sletmoen |
 | `2510.08201/` | [2510.08201](https://arxiv.org/abs/2510.08201) | `spectrum_R2.tex` | Spectrum of pure $R^2$ gravity: full Hamiltonian analysis | Barker & Glavan |
 | `2510.17094/` | [2510.17094](https://arxiv.org/abs/2510.17094) | `Final_version.tex` | Gertsenshtein effect on the spacetime curved by background magnetic field with geometric optics | Tomomatsu et al. |
 | `2512.25007/` | [2512.25007](https://arxiv.org/abs/2512.25007) | `Manuscript.tex` | Fast Poisson brackets and constraint algebras in canonical gravity | Barker |
 | `2601.22007/` | [2601.22007](https://arxiv.org/abs/2601.22007) | `main.tex` | Stückelberg inspired approach for avoiding singular Hamiltonians in Lorentz violating models of antisymmetric tensor field | Aashish & Saif |
 | `2602.12114/` | [2602.12114](https://arxiv.org/abs/2602.12114) | `draft_sfj.tex` | Matrix bordering structure of the Faddeev-Jackiw algorithm: kernel reduction and symbolic automation | Chan-López et al. |
+| `2602.15104/` | [2602.15104](https://arxiv.org/abs/2602.15104) | `main.tex` | ABCMB: A Python+JAX Package for the Cosmic Microwave Background Power Spectrum | Zhou et al. |
 | `2602.23466/` | [2602.23466](https://arxiv.org/abs/2602.23466) | `main.tex` | nanoCMB: A minimal CMB power spectrum calculator in Python | Moss |
 | `2604.12775/` | [2604.12775](https://arxiv.org/abs/2604.12775) | `GZ20260413.tex` | Gravitational Gertsenshtein-Zeldovich mechanism for the Association between GW190425 and FRB 20190425A | Wu et al. |
 | `2606.30785/` | [2606.30785](https://arxiv.org/abs/2606.30785) | `Manuscript.tex` | Numerical polology: towards next-generation model-building for cosmology | Barker et al. |
+| `2607.14854/` | [2607.14854](https://arxiv.org/abs/2607.14854) | `CAMB2.tex` | CAMB v2: cosmological power spectra for high-precision surveys | Lewis |
 | `2608.06480/` | [2608.06480](https://arxiv.org/abs/2608.06480) | `main.tex` | Cosmic birefringence from a joint analysis of ACT and Planck | Eskilt |
 | `BF02721794/` | [BF02721794](https://doi.org/10.1007/BF02721794) | -- (PDF only) | Hamiltonian structure of the theory of gravity with R+T^2 type of Lagrangian | Blagojevic & Nikolic (1983) |
 | `PhysRep258.1/` | [PhysRep258.1](https://doi.org/10.1016/0370-1573(94)00111-F) | -- (PDF only) | Metric-affine gauge theory of gravity: field equations, Noether identities, world spinors, and breaking of dilation invariance | Hehl, McCrea, Mielke & Ne'eman (1995) |
