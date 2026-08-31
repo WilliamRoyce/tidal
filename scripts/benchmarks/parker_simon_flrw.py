@@ -1,5 +1,12 @@
 """Parker–Simon-style perturbative-reduction calibration.
 
+NOT an FLRW simulation, despite the filename. This integrates a **flat 1+1D
+Minkowski** spec (``signature: [-1, 1]``) with no time-dependent coefficients;
+"flrw" refers to Parker & Simon's FLRW context, not to what is solved here. The
+name is kept because it is baked into ``parker_simon_flrw.json``, the figure
+script, and a frozen manuscript appendix. If you are auditing FRW or
+time-dependent-coefficient exposure (e.g. GH #517), this file is not in scope.
+
 Calibrates the perturbative-reduction Pass 0 + Pass 1 machinery on a
 Parker--Simon-style higher-derivative correction (Parker & Simon 1993,
 gr-qc/9211002). The base theory is a 1+1D massive Klein--Gordon wave;
