@@ -513,7 +513,12 @@ Design decisions, each with its failure mode:
   with ≥95% of steps adiabatic; at a loose 0.15 threshold the error reaches 17%. The
   threshold **must** come from the bake-off, not from a guess — measured sensitivity is
   the proof.
-- **Degeneracy and crossings.** The *generic* case is horizon crossing (§3) — owned by
+- **Degeneracy and crossings.** `cond(V)` and `‖Γ‖·h` guard two *independent* failure
+  modes and neither substitutes for the other: `cond(V)` bounds whether `V⁻¹` is
+  representable **at a point**, while `‖Γ‖·h` bounds whether the eigenbasis is trackable
+  **across a step**. A step can be well conditioned at both endpoints and still straddle a
+  degeneracy in between — so an eigenbasis-tracking method must never be guarded by
+  `cond(V)` alone. The *generic* case here is horizon crossing (§3) — owned by
   Magnus, entered by classifier gate, not by runtime detection (prototype: `cond(V)`
   guards alone miss a straddled Jordan point and silently return an 11% error; the `Γ`
   trigger hands over and lands at 1.7×10⁻¹³). Genuine mid-flight crossings (our systems
