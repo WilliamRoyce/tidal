@@ -19,6 +19,7 @@ workstreams, gates). The physics lives alongside it:
 | `docs/cosmology/birefringence_notes.md` | O4's foundation: the CS/CFJ mechanism, conformal invariance as a solver fast path, frequency scaling, the linear-vs-circular terminology trap, the miscalibration degeneracy, likelihood availability |
 | `docs/cosmology/observable_ladder.md` | H2's per-rung feasibility study: capabilities, known-answer targets, costs, invalidators, likelihood availability, ordering |
 | `docs/cosmology/magnetic_field_background.md` | O3's assumed primordial magnetic field: models, bounds, and why its spectator status must be computed rather than imported |
+| `docs/cosmology/repo_reshape.md` | H4's new-package design: target layout, port inventory, the CAMB/PSALTer convention decision (#513), and why the `derive` gate is not a byte diff |
 | `docs/cosmology/torc_pipeline_audit.md` | H1's audit of the TorC paper, forks and Zenodo archive |
 
 ## Goal
@@ -247,7 +248,14 @@ perturbation theory as future work. Full findings: `docs/cosmology/spectator_rou
 
 ## Workstreams
 
-Order: **WS0 → WS1 → WS2 ∥ WS3 → WS4 → WS5.** WS6 independent.
+Order: **WS0 → WS1 → WS2 ∥ WS3 → WS4 → WS5.**
+
+**WS6 is NOT independent** (corrected 2026-08-31, flagged by H4). It was listed that way
+originally; H2's own dependency graph (`observable_ladder.md`) has
+`WS6 -.gates.-> O2` and `WS6 -.gates.-> O3`, and PSALTer's `_extract/likelihood.py` shows
+why: on the **sampling path** the vacuum-spectrum screen is what rejects sick coupling
+points before they reach the solver. WS6 can be *built* in parallel, but O2 and O3 depend
+on it once either is sampled rather than run at a single point.
 
 **FRW is blocked in three independent places, each owned by a different workstream** (found
 2026-08-30). No single fix clears it, and they must be tracked separately:
@@ -264,7 +272,7 @@ Order: **WS0 → WS1 → WS2 ∥ WS3 → WS4 → WS5.** WS6 independent.
 The per-theory derivation-timing headers in the TOMLs are declared untrustworthy there
 (§lines 108–114) — treat them as ceilings, not estimates.
 
-- **WS0 — Research & scoping** (no code): handoffs H1–H5; integration-target decision
+- **WS0 — Research & scoping** (no code): handoffs H1–H5; integration-target decision — **still OPEN, H3's call, not settled anywhere**:
   (patch CAMB Fortran vs DISCO-EB [arXiv:2311.03291 — from-scratch differentiable
   Einstein–Boltzmann in JAX, per-mille vs CAMB, built to be extended] vs own coupled-block
   solver chained to unmodified CAMB, the default assumption). Language is not a barrier
@@ -275,6 +283,19 @@ The per-theory derivation-timing headers in the TOMLs are declared untrustworthy
   with docstrings/why-comments/issue references traveling along; original kept as test
   oracle). Two fully separated packages/CLIs during transition; old `tidal` stays for
   cross-checks; legacy retired deliberately once covered.
+
+**⚠ The `derive` port gate is NOT a byte diff** (H4 §5.2 — this supersedes earlier
+orchestrator guidance that byte-equality on spec JSON was the strongest gate). That held
+only while we assumed legacy notation would be preserved. **#513 decides the opposite**:
+the rebuilt symbolic layer emits **CAMB and PSALTer conventions natively** — no conversion
+layer — so variable names, formats and gauge conventions change *deliberately*, and
+`tidal inspect OLD --diff NEW` would report every intended change as a failure.
+The gate instead: the frozen legacy spec stays the oracle **for the physics**, and
+equivalence is established by careful comparison — same equations, coefficients and signs
+under the new naming — **recorded as a written mapping committed alongside the fixtures**.
+Slower and more human than a diff; the honest gate for a deliberate reformatting. `--diff`
+stays useful *within* the new package for unintended drift between re-derivations.
+
 - **WS2 — General expanding background**: symbolic derivation with unspecified `a(η)`,
   `H(η)`; conformal time as a first-class coordinate; CAMB-table coefficient evaluation;
   conformal-weight fast-path detection (general path always the fallback; the conformal
@@ -322,12 +343,12 @@ during planning; its findings are in `docs/cosmology/spectator_route.md`.
 | H1 | TorC pipeline audit — **DONE** (2026-08-30). Settled R1 (O1 = fixed-table pass-through, above) and R2 (re-apply the CAMB patch, GH #498). Also for WS5: the provider→consumer wiring template (§3.1), the `planck_clik` NaN guard as a flagged rejection path (§3.3), and a caution that stock Cobaya's PolyChord does not give correct evidences under non-uniform priors without the Ormondroyd patch (§3.2). For the spectator flags: `ΔN_eff` (§1.7) is already parameterized for the torsion sector | `docs/cosmology/torc_pipeline_audit.md` ✅ |
 | H2 | Observable-ladder feasibility — **DONE** (2026-08-30). Found O3 needs a *different solver kind* from O2 (10²⁶ vs 10³ oscillations → eikonal + patch averaging; H3.md extended accordingly), that O4 splits into three channels with different prerequisites, and that no paper enforces the PMF's own spectator status | `docs/cosmology/observable_ladder.md` + `magnetic_field_background.md` ✅ |
 | H3 | Solver design study (matrix WKB; CAMB-Fortran vs DISCO-EB vs own; benchmark protocol) | `docs/cosmology/solver_design.md` |
-| H4 | New-package design (from the goal backwards; config spec; CLI separation; inference fate) | `docs/cosmology/repo_reshape.md` |
+| H4 | New-package design — **DONE** (2026-08-31). Target layout + `tidalcosmo/` scaffold (READMEs only, no Python); port inventory; **#513** adopt CAMB/PSALTer conventions natively (gauge as spec metadata), which is why the `derive` gate cannot be a byte diff; #514–#516 | `docs/cosmology/repo_reshape.md` ✅ |
 | H5 | Literature acquisition — **DONE** (2026-08-30). 20/20 fetched and title-verified; `literature/README.md` now tracked and auto-generated by `scripts/bibaudit/index_literature.py` (GH #497) | populated `literature/` + `docs/references.md` ✅ |
 | H6 | Numerical polology design (from #360 plan + Barker's code) | spectrum-package design doc |
 | H7 | Spectator-route scope — **DONE** | `docs/cosmology/spectator_route.md` |
 
-Dispatch order: **H1 ✅ H2 ✅ H5 ✅ H7 ✅ done. H3, H4, H6 running.** (H3's prompt was
+Dispatch order: **H1 ✅ H2 ✅ H4 ✅ H5 ✅ H7 ✅ done. H3, H6 running.** (H3's prompt was
 scope-extended after dispatch — see the two-solver note in `handoffs/H3.md`; that edit
 does not reach an already-running session and must be relayed.)
 
