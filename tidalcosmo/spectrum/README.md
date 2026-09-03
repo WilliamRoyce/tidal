@@ -5,6 +5,14 @@
 > (H3 solver, H6 polology) rather than after them. It records why the boundary was drawn here so
 > a later reader can weigh it — **it is expected to be revised or replaced.** Changing it does not
 > require re-litigating H4.
+>
+> **H6 landed (2026-09-03): the settled design is `docs/cosmology/spectrum_design.md`** —
+> two-stage architecture, the Schur-complement kinetic-matrix criterion as the primary
+> algorithm, the massless-sector layers, and the Stage-1 export contract. The boundary drawn
+> here survives (§3.2 of that document confirms it); the "Basis" paragraph below is corrected
+> there — the published `SupplementalMaterials-2607` is the standard reference, the tuned
+> (Julia) pipeline is the use-case match, and `psalter.tar.gz` is a WIP snapshot consulted but
+> not cited.
 
 **Responsibility.** Deciding whether a coupling point is a *healthy* theory — free of ghosts and
 tachyons — by screening the particle spectrum in vacuo.
