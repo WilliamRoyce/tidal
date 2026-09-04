@@ -585,7 +585,7 @@ retained as a release option; retirement is the classifier's job, never deletion
 - **Experimentation matrix**: every backend × every §10 system it claims — error, wall
   time, step count, fallback count — produced by a benchmark harness (under
   `scripts/benchmarks/` in the new package) and printed here in a future revision as the
-  evidence table. This artefact sets and revises the §3 classifier thresholds and decides
+  evidence table. This artifact sets and revises the §3 classifier thresholds and decides
   the implementation order, replacing any a-priori ranking.
 - **Prototype registry already run** (scratchpad, 2026-08-31): six steppers × A1–A3
   produced the measured numbers quoted in §8–§10 — including two findings reading alone

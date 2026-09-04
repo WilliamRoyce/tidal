@@ -118,7 +118,7 @@ Running that through stages 4–5 is **"integrating the perturbations over the h
 universe."**
 
 **Why it matters — and TorC invites it directly.** The paper argues TorC is a research
-*programme* with several realisations (bi-scalar-tensor, "tensor bypass", full PGT) that
+*program* with several realizations (bi-scalar-tensor, "tensor bypass", full PGT) that
 **share background dynamics but differ in their perturbations**: *"Different realisations may
 yield distinct perturbation theories."* So the perturbations are precisely what discriminates
 between them — background-only cannot. Additionally, background-only is an approximation of
@@ -141,7 +141,7 @@ observable ladder:
 - If the Lagrangian **couples torsion to electromagnetism** (O3, O4 — the thesis's own
   physics): photon propagation *is* modified and we must intervene, either as a modified
   line-of-sight source (Tier 3a) or by evolving a modified photon sector (Tier 3b).
-  **This is a core goal of the programme, not an optional extension**: the thesis is built on
+  **This is a core goal of the program, not an optional extension**: the thesis is built on
   the Gertsenshtein coupling, and seeing those couplings' cosmological effects is a key use
   case the supervisors want. The engine must handle modified photon sectors as first-class.
 

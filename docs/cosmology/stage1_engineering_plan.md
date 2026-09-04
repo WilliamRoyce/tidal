@@ -168,8 +168,12 @@ documents **both** routes explicitly, and Barker's own PGT work uses the first:
   PSALTer's own `M4`, give them `MakeRule` definitions in terms of the perturbation fields,
   then linearize by multiplying the fields by a bookkeeping constant
   (`PerturbativeParameter`), `Series`-expanding to second order, and canonicalizing with
-  `xAct`PSALTer`Private`ToNewCanonical`. The README's own words: "one can always obtain the
-  correct linearisation by reinterpreting the model as a field theory on flat spacetime:
+  `xAct`PSALTer`Private`ToNewCanonical`. The README's own words (quoted verbatim, British
+  spelling and all — the project writes American English, but quoted sources are not
+  rewritten):
+  <!-- cspell:disable -->
+  "one can always obtain the correct linearisation by reinterpreting the model as a
+  field theory on flat spacetime:
   this approach is guaranteed to work because particle physics is not actually sensitive to
   geometry per se."
 - **Two sessions, copy the expression across**: also documented — "prepare the linearised
@@ -177,6 +181,7 @@ documents **both** routes explicitly, and Barker's own PGT work uses the first:
   interpretation, and then copy the resulting *Wolfram Language* expression directly into
   the PSALTer session. Care must be taken in this case to ensure that the indices are
   correctly matched."
+  <!-- cspell:enable -->
 
 **Recommendation: single-session as primary**, two-session as the documented fallback. It
 removes an interchange format, an index-matching hazard, and a whole kernel invocation; it

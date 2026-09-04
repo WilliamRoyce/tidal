@@ -3,6 +3,10 @@ paths:
   - "tidal/inference/**"
   - "scripts/analysis/**"
 ---
+> **SCOPE (2026-09-04): `tidal/inference/` is scheduled for retirement under D9.** The
+> Cobaya extension replaces it, and it is retired at milestone **M1** — earlier than most of
+> legacy, because the frozen oracle is committed *data* (#525) rather than live code. The
+> invariants below remain correct for the legacy subject while it exists.
 
 # Inference Architecture Rules
 

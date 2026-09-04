@@ -1,6 +1,36 @@
 # Documentation Directory
 
-This directory contains living documentation in LaTeX format (`docs/tex/`) for easy inclusion in the project's Overleaf report, plus project management files in Markdown.
+This directory contains three kinds of document:
+
+- **`docs/cosmology/`** — the **active program**: the Cobaya-extension direction (umbrella #488). Start at `COSMOLOGY_PROGRAM.md`.
+- **`docs/tex/`** — living technical documentation in LaTeX, for inclusion in the project's Overleaf report. It describes the **legacy** `tidal/` pipeline, which still exists and still runs; it is accurate, not stale.
+- **Markdown files** — project management: roadmaps, trackers, campaign records. Most of the roadmap material is **parked** under the 2026-08-29 pivot; each carries an amendment banner saying so.
+
+## Cosmology Program (`docs/cosmology/`) — ACTIVE
+
+The current direction (pivot 2026-08-29): a **Cobaya extension** evolving a new sector's
+linear perturbations as **spectators** on a CAMB LCDM background, producing CMB observables
+and real likelihoods. Umbrella **#488**.
+
+**Read `COSMOLOGY_PROGRAM.md` first** — it carries the decisions register, the observable
+ladder, the workstreams and the current state. The rest are the research records behind it,
+produced by eight sequential handoff sessions (H1–H8).
+
+| File | Content |
+| ---- | ------- |
+| `../COSMOLOGY_PROGRAM.md` | **The operational record.** Decisions D1–D9, observable ladder O0–O4, workstreams WS0–WS6, verification gates. Start here |
+| `primer.md` | Physics orientation: what a Boltzmann code does, what a spectator field is, why this route works |
+| `spectator_route.md` | H7 — the three conditions a spectator sector must satisfy, and what breaks if one fails |
+| `torc_pipeline_audit.md` | H1 — audit of TorC (arXiv:2507.09228), the predecessor this program is framed against. Settles O1's scope (R1) and how the CAMB patch is made (R2) |
+| `observable_ladder.md` | H2 — per-rung feasibility: capabilities, known-answer targets, costs, risks. Establishes that O2 and O3 are **different numerical problems** |
+| `magnetic_field_background.md` | H2 — the primordial B-field model O3 needs, and the spectator condition no paper enforces on it |
+| `solver_design.md` | H3 — two engines over one shared core; the integration-target decision (option iii); the O2 ladder, matrix-WKB design, benchmark protocol |
+| `repo_reshape.md` | H4 — the strangler-fig migration: `tidalcosmo/` beside legacy `tidal/`, the capability ledger, milestones M0–M7, CI and oracle strategy |
+| `spectrum_design.md` | H6 — the two-stage spectrum architecture; Schur-complement kinetic-matrix criterion (arXiv:2506.02111) as the primary algorithm |
+| `stage1_engineering_plan.md` | H8 — Stage-1 engineering **study**: six live-source findings correcting H6 (#521, #522, #523) |
+| `birefringence_notes.md` | O4 foundation: rotation formulae, the per-operator frequency-scaling problem, likelihood options |
+| `planning_session_record.md` | Archived planning transcript. **Not authoritative** — kept for provenance only |
+| `handoffs/H1–H6, H8.md` | The prompts each session was given. All complete; each carries a status header. Kept as the record of *what was asked* |
 
 ## LaTeX Documentation (`docs/tex/`)
 
@@ -115,6 +145,11 @@ superseded.
 | `PHASE_E_TRACKER.md` | Phase E (localized geometry) tracker |
 | `PHASE_E_ATLAS_TRACKER.md` | Phase E cubed-sphere atlas tracker |
 | `lagrangian_depruning_audit.md` | Lagrangian de-pruning audit |
+| `V3_PHASE_C_REFERENCE.md` | v3 Phase C reference |
+| `V3_PHASE_D_DESIGN.md` | v3 Phase D design |
+| `V3_PHASE_E_DESIGN.md` | v3 Phase E design |
+| `V3_PHASE_E_PROTOTYPE.md` | v3 Phase E prototype record |
+| `hpc_workflow.md` | **Archived** CSD3 HPC workflow — inactive under D4 (no HPC without explicit permission); reactivate when authorized |
 
 ## Research (`research/`)
 
@@ -144,4 +179,4 @@ Auto-generated API documentation via Sphinx (`.rst` files). Build with `make htm
 
 ---
 
-Last updated: 2026-08-19
+Last updated: 2026-09-04

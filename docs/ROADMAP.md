@@ -1,8 +1,22 @@
 # TIDAL Pipeline Roadmap
 
+> **AMENDMENT (2026-09-04): most of this roadmap is PARKED.**
+>
+> The project pivoted on 2026-08-29 to the **cosmology program** — a Cobaya extension
+> evolving spectator perturbations on a CAMB LCDM background (umbrella **#488**, record at
+> `docs/COSMOLOGY_PROGRAM.md`). **Phases E, G, H and I below, and the Wolfram-CI item #69,
+> are parked**, not cancelled: they describe real work on a pipeline that still exists and
+> still runs, but nothing is being picked up from here.
+>
+> **Phase I in particular** (eigenvalue/dispersion solver, in `docs/NEXT_PHASES.md`) is
+> superseded in substance by **WS6 / #495**, which builds the same capability on a settled
+> design. Do not start it from this document.
+>
+> Anything you were about to start from this roadmap: check `docs/COSMOLOGY_PROGRAM.md` first.
+
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
-**Last Updated:** August 2026 (v0.47.9)
+**Last Updated:** September 2026 (v0.52.0) — parked, see the amendment above
 **Project Status:** Phase 13+ Complete; perturbative reduction v6 complete (Stage 7 closed 2026-04-20, issue #271 resolved). Euler–Heisenberg quartic-EM path fully supported; matter-only derivative-only theories now unblocked. 2,449 Python tests + 133 Wolfram test cases.
 
 ## Overview
@@ -34,7 +48,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 ---
 
-### Phase 2: Testing & CI Infrastructure — 🔄 PRIMARY REMAINING FOCUS
+### Phase 2: Testing & CI Infrastructure — ⏸️ PARKED (was "primary remaining focus" pre-pivot)
 
 **Goal:** Improve test coverage and CI reliability
 **Status:** Partially complete — coverage runs in CI, but key gaps remain
@@ -43,7 +57,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | ---------------------------------------------------------- | ----------- | ------- | ------------ |
 | [#73] Add Animation Module Test Coverage                   | 🟠 High     | Testing | ⛔ Obsolete  |
 | [#74] Add Code Coverage Reporting to CI                    | 🟠 High     | CI/CD   | ✅ Done      |
-| [#69] Add Wolfram Tests to GitHub Actions CI               | 🔴 Critical | CI/CD   | 🔄 Remaining |
+| [#69] Add Wolfram Tests to GitHub Actions CI               | ⏸️ Parked   | CI/CD   | ⏸️ Parked    |
 | [#78] Add Tests for Observers, Profiling, Runners Modules  | 🟡 Medium   | Testing | ⛔ Obsolete  |
 
 **Delivered so far:**

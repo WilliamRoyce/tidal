@@ -6,7 +6,7 @@
 \section{Bayesian Inference for Parameter Estimation}
 \label{sec:inference}
 
-\textbf{Status:} Implemented (Monte Carlo + nested sampling via dynesty/PolyChord) \\
+\textbf{Status:} Implemented (Monte Carlo + nested sampling via PolyChord) \\
 \textbf{Date:} 2026-04-02
 
 Parameter sweeps (\cref{sec:cli-reference}) explore a fixed grid, which scales
@@ -227,17 +227,20 @@ prior.  The evidence is accumulated as the prior volume shrinks.
 \toprule
 Backend     & \texttt{--sampler} & Install & Environment & Parallelism \\
 \midrule
-\textbf{dynesty}~\cite{speagle2020dynesty} & \texttt{dynesty}   & \texttt{pip install tidal[inference]} & Development & \texttt{pool.map} \\
-\textbf{PolyChord} & \texttt{polychord} & GitHub + gfortran & HPC (Newton/CSD3) & MPI + OpenMP \\
+\textbf{PolyChord} & (only backend) & GitHub + gfortran & Development + HPC & MPI + OpenMP \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{dynesty} is a pure-Python nested sampler installable with a single
-\texttt{pip} command and is the recommended backend for development and
-testing.  Dynamic nested sampling (\texttt{--dynamic}) allocates additional
-live points to regions of high posterior mass, improving parameter estimation
-at modest extra cost.
+\emph{Correction (2026-09-04).} Earlier revisions of this section documented a
+second backend, \textbf{dynesty}, selected with \texttt{--sampler dynesty} and
+installed by the \texttt{inference} extra.  \textbf{No such backend was ever
+implemented.}  \texttt{dynesty} appears nowhere in \texttt{tidal/}, is not a
+declared dependency (the \texttt{inference} extra is \texttt{anesthetic} alone),
+and there is no \texttt{--sampler} flag --- \texttt{tidal/cli/\_sample.py} passes
+\texttt{sampler="polychord"} unconditionally.  The references below to dynesty as
+a fallback, a default, or an install target are corrected in place.  PolyChord is
+the only nested-sampling backend.
 
 \textbf{PolyChord} (Handley et al.) uses slice sampling with excellent
 performance in high-dimensional curved posteriors and full MPI parallelism
@@ -245,9 +248,8 @@ on HPC clusters.  It is reserved for production runs on the Newton server
 or CSD3 because it requires a Fortran compiler (\texttt{gfortran}).
 
 \textbf{anesthetic}~\cite{handley2019anesthetic} (Handley 2019) handles all
-posterior visualization and is backend-agnostic: switching from dynesty to
-PolyChord requires only changing \texttt{--sampler} with no change to any
-analysis code.
+posterior visualization.  It is backend-agnostic by design, so a second
+backend could be added later without touching any analysis code.
 
 Key stopping parameters:
 \begin{itemize}
@@ -332,7 +334,6 @@ Flag & Type & Default & Description \\
 \texttt{--constraint EXPR}  & str (repeatable) & none       & Hard constraint expression \\
 \texttt{--likelihood SPEC}  & str              & (required) & Likelihood \texttt{METRIC:TYPE[:ARGS]} \\
 \texttt{--method}           & \texttt{\{mc,nested\}}    & \texttt{mc}    & Sampling method \\
-\texttt{--sampler}          & \texttt{\{dynesty,polychord\}} & \texttt{dynesty} & Nested sampling backend \\
 \texttt{--n-samples N}      & int              & 1000       & MC sample count \\
 \texttt{--nlive N}          & int              & 100        & Nested sampling live points \\
 \texttt{--dlogz F}          & float            & 0.01       & Evidence tolerance \\
@@ -371,7 +372,9 @@ with zero duplication:
 Install the optional inference dependencies:
 
 \begin{lstlisting}[style=bash]
-pip install "tidal[inference]"   # adds dynesty >= 2.1 and anesthetic >= 2.0
+pip install "tidal[inference]"   # adds anesthetic >= 2.0
+# PolyChord is installed separately (needs gfortran):
+#   bash scripts/install_polychord.sh
 \end{lstlisting}
 
 \subsection{Usage Examples}
@@ -409,7 +412,7 @@ tidal sample examples/data/torsion_dark_photon.json \
   --constraint "deltam**2 < 2*alpha*xi" \
   --likelihood "P_max:maximize" \
   --method nested --nlive 200 --dlogz 0.01 \
-  --sampler dynesty --parallel 8 --corner \
+  --parallel 8 --corner \
   --output results_nested/
 \end{lstlisting}
 
@@ -419,7 +422,7 @@ Evidence and parameter constraints are written to
 \subsubsection{Snapshot count for PolyChord/nested-sampling workloads}
 \label{sec:inference-snapshot-guidance}
 
-For PolyChord and dynesty nested-sampling runs where the likelihood is
+For PolyChord nested-sampling runs where the likelihood is
 \texttt{peak\_conversion} (or any measurement whose maximum occurs at
 $t = t_\mathrm{end}$ in the perturbative linear regime), pass
 \texttt{--snapshots=\$t\_end} to request exactly two snapshots
@@ -526,8 +529,8 @@ $\max(50d, 250)$.  For the 4D dark-photon model this gives 100/100/200;
 for 10D non-minimal PGT, 250/250/500.
 
 PolyChord's slice sampling scales better than rejection-based methods
-(dynesty/MultiNest) above $\sim$10 dimensions, making it the default
-backend.
+(dynesty/MultiNest) above $\sim$10 dimensions, which is why it is the backend
+that was implemented.
 
 \subsection{Design Decisions}
 \label{sec:inference-design}
@@ -538,14 +541,14 @@ PolyChord (Handley et~al.\ 2015) is the production nested sampler.
 It uses slice sampling (not rejection), handles multimodal distributions
 via clustering, and integrates natively with anesthetic.  It requires
 \texttt{gfortran}; install via \texttt{bash scripts/install\_polychord.sh}.
-dynesty remains available as a pure-Python fallback (\texttt{--sampler dynesty}).
+It is the only backend: no pure-Python fallback exists.
 
 \subsubsection{Why anesthetic for visualization?}
 
-anesthetic (Handley 2019)~\cite{handley2019anesthetic} reads posterior samples
-from both dynesty and PolyChord natively.  Using it for all visualization
-means the analysis layer is backend-agnostic: switching the sampler from
-dynesty to PolyChord requires no change to plotting code.
+anesthetic (Handley 2019)~\cite{handley2019anesthetic} reads PolyChord output
+natively (and dynesty's, should a second backend ever be added).  Using it for
+all visualization keeps the analysis layer backend-agnostic, so adding a sampler
+later would require no change to plotting code.
 
 \subsubsection{Why safe AST evaluation for constraints?}
 
@@ -566,8 +569,8 @@ without any security risk.
 
   \item \textbf{Speagle (2020)}~\cite{speagle2020dynesty}, ``dynesty: a dynamic
     nested sampling package'', MNRAS 493(3), 3132--3158.
-    \url{https://github.com/joshspeagle/dynesty} --- The dynesty library
-    used as the default development backend; dynamic nested sampling extension.
+    \url{https://github.com/joshspeagle/dynesty} --- Cited for the algorithmic
+    comparison in \S\ref{sec:inference-design}; \textbf{not} a TIDAL backend.
 
   \item \textbf{Handley (2019)}~\cite{handley2019anesthetic}, ``anesthetic:
     nested sampling visualisation'', JOSS 4(37), 1414.

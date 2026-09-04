@@ -5,6 +5,24 @@ paths:
   - "examples/**/theory.toml"
   - "examples/**/*.wls"
 ---
+> **SCOPE (2026-09-04): two program-level policies apply on top of everything below.**
+>
+> **1. Wolfram runs at derivation time only.** Nothing symbolic happens at sampling time.
+> This is what the two-stage spectrum architecture (#495) and the symbolic eikonal reduction
+> (#504) both exist to guarantee: run Wolfram once, export a numeric contract, evaluate that
+> per sample. A design that needs a kernel inside a likelihood call is the wrong design.
+>
+> **2. #513 — the new package emits CAMB and PSALTer conventions NATIVELY.** When porting
+> `ExportJSON.wl` or any of this pipeline into `tidalcosmo/`, do **not** faithfully preserve
+> legacy TIDAL notation: discarding it is the point. Legacy has no backward compatibility to
+> protect. Conformal time agrees with `camb.symbolic` already (their `t` = Fortran `tau` =
+> our `eta`) — do not build a conversion layer at that seam. Gauge becomes an explicit named
+> input (covariant / Newtonian / synchronous), applied symbolically in Wolfram, recorded in
+> the spec as first-class metadata, and asserted at the CAMB seam.
+>
+> Consequence: the port gate **cannot be a byte diff** — `tidal inspect OLD --diff NEW` would
+> report every intended change as a failure. Equivalence is semantic, against the frozen
+> oracle (#525), recorded as a written mapping.
 
 # Wolfram/xAct Rules
 

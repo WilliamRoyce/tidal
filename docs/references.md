@@ -184,6 +184,7 @@ scalar-only; no matrix RKWKB solver exists**).
 
 | Reference | Relevance |
 | --- | --- |
+| **Barker & Zell (2025)** — "Consistent particle spectra from ... kinetic-matrix analysis", [arXiv:2506.02111](https://arxiv.org/abs/2506.02111) | **The primary algorithm WS6 implements.** The Schur-complement kinetic-matrix criterion: ghost detection through definiteness of the Schur complement of the kinetic matrix, which **bypasses radicals** — the failure mode that makes residue-based analysis intractable for parity-violating theories. Pole masses and residues are retained as the cross-check, not the primary test. This is PSALTer v2's algorithmic advance over v1 ([arXiv:2406.09500](https://arxiv.org/abs/2406.09500)), and the reason `spectrum_design.md` §5 chooses it. Local: `literature/2506.02111/`. Companion published code: `wevbarker/SupplementalMaterials-2506b`, pinned — it carries `ParticleSpectrographCTEG.mx`, the Tier-1 install-gate oracle (#526). |
 | **Barker et al. (2026)** — "Numerical polology: towards next-generation model-building for cosmology", [arXiv:2606.30785](https://arxiv.org/abs/2606.30785) | The WS6 algorithm source. States the case this program is built on: symbolic spectrum computation (PSALTer, [arXiv:2406.09500](https://arxiv.org/abs/2406.09500)) scales poorly through expression swell, so sampling *arbitrary* Lagrangians requires the numerical route. Minkowski-only is correct and sufficient — the spectrum screens in vacuo. |
 
 ### Cosmic birefringence and polarization (O4)
@@ -198,12 +199,29 @@ scalar-only; no matrix RKWKB solver exists**).
 | **Murai et al. (2022)** — "Isotropic cosmic birefringence from early dark energy", [arXiv:2209.07804](https://arxiv.org/abs/2209.07804) | Where the naive `EB` formula fails: when the rotation is time-dependent it cannot be applied as a post-processing rotation of the final spectra but must sit inside the line-of-sight integral. WS4's rule — post-processing is exact only for constant, isotropic, frequency-independent rotation. |
 | **Cai & Guan (2021)** — "Computing microwave background polarization power spectra from cosmic birefringence" (class_rot), [arXiv:2111.14199](https://arxiv.org/abs/2111.14199) | A public implementation of rotated spectra; WS4's cross-validation target alongside CAMB and nanoCMB. |
 
+### The predecessor this program is framed against (O1)
+
+| Reference | Relevance |
+| --- | --- |
+| **Legner, Handley & Barker (2025)** — TorC, [arXiv:2507.09228](https://arxiv.org/abs/2507.09228) | **The direct predecessor, and the target of rung O1.** A CAMB-based pipeline for a torsion cosmology: it modifies the **background** — feeding an effective dark-energy `(ρ, P)` table into CAMB through a Fortran patch — while *"the perturbation equations remain those of standard ΛCDM"*. That split is exactly what this program lifts, and then goes past: we keep the background standard and put the new physics in the **perturbations** instead. Audited in full by H1 (`docs/cosmology/torc_pipeline_audit.md`), which settled that O1 is a fixed-table **pass-through plumbing gate**, not a posterior reproduction (R1), and that we **re-apply** the patch design cleanly off upstream CAMB `2.0.3` rather than inheriting `slegner/CAMB` (R2). H1 §8 also established a free cross-check the paper does not state: at the paper's own fiducial `(ϖ_r, Ω_Λ) = (0.8, 0.685)` the effective `w(a)` has zero sign changes, so stock CAMB's `set_w_a_table` is an independent route to the same physics there. Local: `literature/2507.09228/`. Chains: Zenodo 10.5281/zenodo.15866507 (`_equal_weights.txt` archived for all seven runs; the sampler configuration is not recoverable). |
+
 ### Spectator methodology
 
 | Reference | Relevance |
 | --- | --- |
 | **Amendola, Ballesteros & Pettorino (2014)** — "Effects of modified gravity on B-mode polarization", [arXiv:1405.7004](https://arxiv.org/abs/1405.7004) | The O2 precedent: modified tensor propagation (friction, mass, speed) carried through the tensor transfer function to B-modes — the same chain O2 builds from a Lagrangian instead of a parametrization. |
 | **Kushwaha & Jain (2025)** — "Constraining circular polarization of high-frequency gravitational waves with CMB", [arXiv:2502.12517](https://arxiv.org/abs/2502.12517) | The V-mode channel: graviton → photon conversion imprinting circular polarization. Supports the H7 argument that distinctive channels (V-modes, `E→B`) can beat the `N_eff` bound where broadband conversion cannot. |
+
+### Stage-1 engineering sources (H8 additions, 2026-09-04)
+
+Live-source reading of the PSALTer release, which corrected three H6 design assumptions.
+Fetch script with pinned SHAs: `scripts/research/psalter_stage1/fetch_reference_sources.sh`.
+
+| Reference | Relevance |
+| --- | --- |
+| **PSALTer v2.0.2**, pinned commit `bb45adb0` | The implementation actually being driven. Three findings: `Method->"Hard"` is **declared but never read** (#521); `ValidateLagrangian.m` defines six messages and throws four — `NonLinearCouplings` and `ParityOdd` never fire, so a **bare numeric coefficient passes silently** (#522); the exporter must read private `$Local*` globals because PSALTer populates only two association keys and writes **no WXF** (#523). Field symmetry classes *are* an enforced enumeration (`Sources/DefField.m:11-24`). |
+| **`wevbarker/SupplementalMaterials-2506b`**, pinned `37c86a5d` | Publishes TorC's input **and** an `.mx` oracle (`ParticleSpectrographCTEG.mx`). Both being published is what makes the Tier-1 install gate sound: a mismatch can only be the install. |
+| **`wevbarker/SupplementalMaterials-2607`**, pinned `b49e9f1d` | Companion materials for arXiv:2606.30785. Single-session linearization is Barker's own proven route. |
 
 ### Cosmological magnetic fields (O3's assumed background)
 

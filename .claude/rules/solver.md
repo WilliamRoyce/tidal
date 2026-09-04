@@ -3,6 +3,20 @@ paths:
   - "tidal/solver/**"
   - "tidal/measurement/**"
 ---
+> **SCOPE (2026-09-04): this file describes the LEGACY solver, `tidal/solver/`.**
+>
+> It is accurate for that code, which still exists and still runs — but the auto-selection
+> ladder below is **not** the architecture going forward. WS3 (#492) replaces it with a
+> different design: two engines over one shared core (an oscillation-resolving mode-equation
+> solver for O2, an eikonal amplitude engine with coherence-patch averaging for O3), chosen
+> by bake-off rather than by a fixed priority list. See `docs/cosmology/solver_design.md`.
+>
+> **Live wrong-answer hazard (#517).** Modal eligibility is checked **only in
+> `can_use_modal`**, not inside the solver. A *library* call that constructs the modal solver
+> directly on a time-dependent spec does not hit that check and will silently freeze the
+> coefficients at `t = 0`. That has been harmless while FRW was out of scope; it stops being
+> harmless the moment time-dependent specs become normal. Do not assume the refusals at
+> `modal.py:371-372` and `:409-413` protect a non-CLI caller.
 
 # Solver Architecture Rules
 

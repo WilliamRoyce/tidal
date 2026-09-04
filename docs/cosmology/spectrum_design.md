@@ -792,7 +792,7 @@ propagates nothing).
 >   `.wxf` files came from separate curation tooling. The exporter's real harvest surface is
 >   those two keys plus eight `xAct`PSALTer`Private`` `$Local*` globals (**#523**) — which
 >   makes the pinned commit a *correctness* input, not merely a reproducibility one.
-> - **"the install settles the missing-coupling failure behaviour"** — already answered:
+> - **"the install settles the missing-coupling failure behavior"** — already answered:
 >   there is none. `NonLinearCouplings` is never thrown (**#522**), so the live probe only
 >   confirms the silence and harvests wording.
 > - **Inkscape is effectively unused** (every `Vectorize` call site is commented out), and

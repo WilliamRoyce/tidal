@@ -1,7 +1,22 @@
 # Next Major Implementation Phases for TIDAL
 
+> **AMENDMENT (2026-09-04): four of the five "recommended order" steps are PARKED.**
+>
+> The project pivoted on 2026-08-29 to the **cosmology program** (umbrella **#488**, record
+> at `docs/COSMOLOGY_PROGRAM.md`). Phases G, H and I below are parked, and the recommended
+> ordering no longer describes what is being worked on.
+>
+> **⚠ Phase I is the one to be careful about.** It proposes `tidal/analysis/dispersion.py`
+> to *"detect tachyonic modes and ghosts"* and *"identify which parameter windows support
+> propagating modes"*, marked `Status: Planned`, `Dependencies: None` — i.e. it reads as
+> ready to pick up. **That is verbatim the job of WS6 (#495)**, now owned by
+> `tidalcosmo/spectrum/` on a settled design: a two-stage architecture with the
+> Schur-complement kinetic-matrix criterion of arXiv:2506.02111 as the primary algorithm
+> (`docs/cosmology/spectrum_design.md`). Building Phase I from this document would be
+> building the wrong thing, twice.
+
 **Created:** February 2026
-**Last Updated:** April 2026
+**Last Updated:** September 2026 (pivot amendment; body content dated April 2026)
 **Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); **Perturbative Reduction v6 complete (v0.33.9, Stage 7 closed 2026-04-20, issue #271 resolved — Euler–Heisenberg + matter-only theories now supported)**; Phases G–I planned
 **Version:** 0.52.0 | **Tests:** 2,651 collected | **Examples:** 19 working (1+1D to 3+1D)
 
@@ -404,8 +419,19 @@ TIDAL currently uses raw numpy memory-mapped arrays for disk-backed storage. Whi
 
 ## Phase I: Eigenvalue / Dispersion Solver
 
+> **⏸️ PARKED — SUPERSEDED IN SUBSTANCE BY WS6 (#495).** The capability described below is
+> being built on a different and settled design: `docs/cosmology/spectrum_design.md`, in
+> `tidalcosmo/spectrum/`, using the Schur-complement kinetic-matrix criterion
+> (arXiv:2506.02111) with pole masses and residues as the cross-check. The `Dependencies:
+> None` line below is what makes this section dangerous — it invites a fresh session to
+> start here. **Do not.** Start from #495.
+>
+> What remains useful here is the *motivation*: identifying which parameter windows support
+> propagating, non-tachyonic, non-ghost modes before committing to expensive time-domain
+> simulation. That motivation is unchanged and is why WS6 exists.
+
 **Priority: MEDIUM — identifies propagating modes without full time-domain simulation**
-**Status:** Planned
+**Status:** ⏸️ Parked — superseded by WS6 / #495
 
 ### What and Why
 
