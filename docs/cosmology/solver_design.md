@@ -41,6 +41,7 @@ final composition is decided by the experimentation matrix, not by reading.
 | `l_free` | photon mean free path `1/Γ_γ` | Mpc | CAMB `x_e(η)` |
 | `ν`, `μ`, `c_T` | tensor friction, mass, speed | —, eV, — | theory couplings |
 | `κ` | `√(16πG)` (TIDAL convention, `docs/tex/gertsenshtein_formula.tex`) | 1/eV | — |
+| — | **`κ` is NOT reused for CAMB's tensor-source coefficient.** CAMB's `derivst` uses `8πG`, a different quantity; §2.1 writes it out explicitly. Coding §2.1 with the `κ` above would be a `√(16πG)`-vs-`8πG` error inside the O2 known-answer gate. (Corrected 2026-09-04; cf. the `P` overload note below.) | | |
 | `γ_LZ` | Landau–Zener adiabaticity parameter | — | crossing analysis |
 | `P` | **conversion probability only** in this doc | — | engines |
 
@@ -136,7 +137,7 @@ experiments decide.
 axion–photon mixing inside a Boltzmann solver** — every CMB-facing conversion paper
 post-processes along the line of sight. (2) The CAMB tensor equation, from the code
 (`derivst`): `σ' = −2ℋσ + kH_T − ρπ/k`, `H_T' = −kσ`, i.e.
-`H_T'' + 2ℋH_T' + k²H_T = κa² Σ_i ρ_i π_i` with `κ = 8πG` and the convention
+`H_T'' + 2ℋH_T' + k²H_T = 8πG·a² Σ_i ρ_i π_i` and the convention
 `h_ij = 2H_T Q_ij` — the source normalization is taken from the code, not from a
 textbook, because the `Q_ij` normalization is code-specific.
 

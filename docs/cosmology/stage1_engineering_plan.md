@@ -413,6 +413,21 @@ and it is the format Stage 2's ingest already speaks. Contents, per H6 §6.1:
   `unitarity_conditions` as a status enum plus expression, per-sector `z_degree`
   (`Exponent` in `k` — cheap symbolically at Stage 1; document the non-generic-point
   failure mode), and `k4_guard`.
+> **Amendment (coherence pass, 2026-09-04).** The `A[0]`-vanishes acceptance gate below is
+> conditional, and the condition was never stated. If every term carries exactly one
+> *sampled* coupling then the coupling-free slot must be zero, and a non-zero `A[0]` is
+> precisely the bare `−¼F²` that PSALTer passes silently (#522) — the gate is then the
+> replacement for the check PSALTer does not perform. **But TorC-class Lagrangians carry
+> terms in `M_p` and `Λ`**, which are theory-fixed constants rather than sampled couplings;
+> if those sit outside the coupling vector they land in `A[0]` *legitimately* and the gate
+> is wrong as written.
+>
+> **Recommendation:** non-sampled constants stay OUT of the coupling vector (they are fixed,
+> not sampled), so `A[0]` is legitimate and the coupling-linearity check becomes *"no sampled
+> coupling appears non-linearly"* — a different test. **Confirm against a real export before
+> relying on either form**; this is the one item the documents alone cannot settle. Matching
+> amendment in `spectrum_design.md` §6.1.
+
 - **An in-kernel reconstruction assertion**: reassemble `A[0] + Σᵢ cᵢ·A[i]` and `SameQ`
   it against the original block after `Together`. An exporter that silently drops a term is
   the failure mode that would poison every downstream verdict.
@@ -437,7 +452,7 @@ comments ("Index 1 = spin-0+"). Four steps, in order:
 4. Reproduce the `A23Theory` fixture's three `J`-blocks of dims 2/4/2
    (`2·1 + 4·3 + 2·5 = 24`) and label the `J=1` block's visible `2+2` split as `1⁺ ⊕ 1⁻`.
 
-**Fixtures.** Commit the two small upstream `.wxf` files under `tests/fixtures/psalter/`
+**Fixtures.** Commit the two small upstream `.wxf` files under `tests_cosmo/fixtures/psalter/`
 with a `PROVENANCE.md` (source repository, pinned revision, file hashes, D6 note, and the
 observation that these are *data outputs*, not GPL sources — flagged on #495 for the
 release-time review regardless). They are answer keys that let the Python reader be tested
@@ -491,7 +506,7 @@ append-only; a handoff report is ephemeral; this needs to be a committed documen
 | oracle T2/T3 | gauge-generator count exact; massive content with dictionary-exact `m²`; massless polarization count; `Reduce`-verified equivalence of unitarity conditions **including the massless one** |
 | reader | `A23` blocks are dims (2,4,2) with `2·1+4·3+2·5 = 24`; `Vector` blocks equal the published expressions exactly (symbolic difference simplifies to zero); placeholder/plural-key/degenerate cases unit-tested |
 | reject rule | a bare-numeric term errors with a hint naming the term; the legacy `theory.toml` Lagrangian is rejected |
-| exporter | in-kernel reconstruction `SameQ`; Python-side numeric agreement ≤ 1e-12 at 5 random rational coupling points; label calibration passes on ≥ 3 single-operator probes; `A[0]` vanishes (coupling-linearity) |
+| exporter | in-kernel reconstruction `SameQ`; Python-side numeric agreement ≤ 1e-12 at 5 random rational coupling points; label calibration passes on ≥ 3 single-operator probes; `A[0]` vanishes **iff non-sampled constants are excluded from the coupling vector** — see the amendment below (coupling-linearity) |
 | emitted script | declares and machine-checks signature and `ε`; standalone; no repo-absolute paths |
 | cost | measured, not guessed, with checkpoints; one explicit go/no-go sentence; `Method` inertness confirmed live |
 

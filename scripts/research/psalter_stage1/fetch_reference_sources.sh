@@ -25,9 +25,15 @@ OUT_DIR="${1:-${REPO_ROOT}/third_party/psalter_reference}"
 
 # Pinned revisions -- verified 2026-09-03. Override via environment if a later
 # revision is wanted, but re-verify the study's claims before trusting them.
+#
+# These MUST stay pinned, not HEAD. SupplementalMaterials-2506b carries
+# ParticleSpectrographCTEG.mx, the Tier-1 install-gate oracle, and that gate's whole
+# justification is "a mismatch can only be the install" -- which fails if the oracle
+# can move underneath it. Resolved and pinned 2026-09-04; bump deliberately, and
+# re-verify the .mx against the new revision when you do.
 PSALTER_COMMIT="${PSALTER_COMMIT:-bb45adb0fa21e467dbd88d4dc36ef21b84abbe6d}"  # v2.0.2
-SM2506B_REF="${SM2506B_REF:-HEAD}"   # TorC / CTEG companion
-SM2607_REF="${SM2607_REF:-HEAD}"     # numerical polology companion
+SM2506B_REF="${SM2506B_REF:-37c86a5d9dff10a53f68c93c29cbb24cf29b6f21}"  # TorC / CTEG companion; carries the Tier-1 oracle
+SM2607_REF="${SM2607_REF:-b49e9f1d5410ac19884cf9837190be975a58927b}"  # numerical polology companion
 
 log() { echo "[fetch-psalter-ref] $*"; }
 

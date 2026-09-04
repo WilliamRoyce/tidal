@@ -529,12 +529,27 @@ positional convention is therefore wrong even for the release's own test theory 
 carries both parities. **Our export carries explicit per-state `J^P` labels; position is never
 a label.** (Parity feeds the Hermitization `diag(1,−1)` and hence every ghost verdict — §4.3.)
 
-**Exported form: coupling-linear coefficient tensors, not symbolic matrices.** PSALTer
-guarantees linearity in the couplings, so each block is `A[n,0] + Σᵢ cᵢ·A[n,i]` with `A`
-numeric — no sympy/lambdify on the per-sample path, exact and free `∂M/∂c`, expression swell
+**Exported form: coupling-linear coefficient tensors, not symbolic matrices.** Each block is
+`A[n,0] + Σᵢ cᵢ·A[n,i]` with `A` numeric — no sympy/lambdify on the per-sample path, exact and free `∂M/∂c`, expression swell
 kept Wolfram-side. The Schur blocks are fixed permutations of the same tensors; one export
 serves both routes. `z_degree` (residue path) is exported as Stage-1 metadata or probed at
 random coupling points, with the non-generic-point failure mode documented.
+
+> **Amendment (coherence pass, 2026-09-04 — #522).** This paragraph previously read
+> *"PSALTer **guarantees** linearity in the couplings, so each block is …"*. It does not.
+> `NonLinearCouplings` is declared but never thrown and `EnsureLinearInCouplings` is an
+> internal null-vector helper, not a validator — a bare `−¼F²` passes silently.
+>
+> The **architecture is unchanged**: linearity of the wave operator in the couplings is a
+> *mathematical consequence* of a Lagrangian linear in them, since `ConstructWaveOperator`
+> is linear in its input. What moved is **who owns the property** — from "guaranteed
+> upstream" to "enforced by us". The enforcement is our config-layer validator
+> (`stage1_engineering_plan.md` §4.1) plus the in-kernel reconstruction `SameQ` (§5).
+>
+> **Consequence for an implementer: that validator is load-bearing for correctness, not a
+> convenience.** A non-linear coupling slipping through does not raise — it yields a wrong
+> `A[n,i]` decomposition and therefore a wrong wave operator, silently. On whether `A[n,0]`
+> may legitimately be non-zero, see the matching amendment in `stage1_engineering_plan.md` §5.
 
 ### 6.2 The massless sector
 
