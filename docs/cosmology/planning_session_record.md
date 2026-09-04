@@ -9,8 +9,11 @@
 > orientation), `docs/cosmology/birefringence_notes.md` (O4), and
 > `docs/cosmology/spectator_route.md` (spectator scope). Known points where this
 > archive is now stale: O1's validation (narrowed by H1 — see #488), the CAMB
-> inherit-vs-reapply question (settled: re-apply, #498), and the `ν⁰`-vs-`ν²`
-> framing (it is per-operator, #499).
+> inherit-vs-reapply question (settled: re-apply, #498), the `ν⁰`-vs-`ν²`
+> framing (it is per-operator, now #503), **"WS6 independent"** (it is not — it gates
+> O2/O3 on the sampling path; H2's dependency graph governs), the single-solver framing
+> (O2 and O3 are different numerical problems — H2 §0.1), and the rung order (settled
+> 2026-09-04: `O0 → O1 → O2 → O4a → O3 → O4b/V`).
 
 # TIDAL → cosmology: perturbations over cosmic history, CMB observables, real inference
 
