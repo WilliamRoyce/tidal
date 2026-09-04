@@ -25,12 +25,10 @@ Usage:
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
 
 import sympy as sp
 from wolframclient.deserializers import binary_deserialize
 from wolframclient.language.expression import WLFunction, WLSymbol
-
 
 DEF_SYMBOL_NAME = "xAct`PSALTer`Def"
 
@@ -64,8 +62,8 @@ class Sector:
 @dataclass
 class Theory:
     theory_name: str
-    couplings: List[sp.Symbol]
-    sectors: List[Sector] = field(default_factory=list)
+    couplings: list[sp.Symbol]
+    sectors: list[Sector] = field(default_factory=list)
 
 
 def _short_symbol_name(wl_name: str) -> str:
@@ -88,11 +86,11 @@ def wl_to_sympy(node):
         head_name = node.head.name if isinstance(node.head, WLSymbol) else None
         ctor = WL_TO_SYMPY_HEAD.get(head_name)
         if ctor is None:
-            raise NotImplementedError(
-                f"Don't know how to translate WLFunction[{head_name}] (n_args={len(node.args)})"
-            )
+            msg = f"Don't know how to translate WLFunction[{head_name}] (n_args={len(node.args)})"
+            raise NotImplementedError(msg)
         return ctor(*[wl_to_sympy(a) for a in node.args])
-    raise NotImplementedError(f"Unhandled node type: {type(node).__name__}")
+    msg = f"Unhandled node type: {type(node).__name__}"
+    raise NotImplementedError(msg)
 
 
 def matrix_from_wl(rows_tuple) -> sp.Matrix:
@@ -106,10 +104,14 @@ def split_def_powers(M: sp.Matrix, def_sym: sp.Symbol):
     Asserts no higher powers exist (PSALTer wave operators are quadratic in
     momentum); raises if that assumption fails.
     """
-    M_poly = sp.expand(M.applyfunc(lambda e: sp.expand(e)))
+    M_poly = sp.expand(M.applyfunc(sp.expand))
     M0 = M_poly.applyfunc(lambda e: sp.Poly(e, def_sym).nth(0) if e.has(def_sym) else e)
-    M1 = M_poly.applyfunc(lambda e: sp.Poly(e, def_sym).nth(1) if e.has(def_sym) else sp.S.Zero)
-    M2 = M_poly.applyfunc(lambda e: sp.Poly(e, def_sym).nth(2) if e.has(def_sym) else sp.S.Zero)
+    M1 = M_poly.applyfunc(
+        lambda e: sp.Poly(e, def_sym).nth(1) if e.has(def_sym) else sp.S.Zero
+    )
+    M2 = M_poly.applyfunc(
+        lambda e: sp.Poly(e, def_sym).nth(2) if e.has(def_sym) else sp.S.Zero
+    )
     # Assert nothing higher than k^2.
     for i in range(M_poly.rows):
         for j in range(M_poly.cols):
@@ -117,15 +119,28 @@ def split_def_powers(M: sp.Matrix, def_sym: sp.Symbol):
             if e.has(def_sym):
                 degree = sp.Poly(e, def_sym).degree()
                 if degree > 2:
-                    raise AssertionError(
-                        f"Matrix entry [{i},{j}] has Def^{degree}; expected <= 2"
-                    )
+                    msg = f"Matrix entry [{i},{j}] has Def^{degree}; expected <= 2"
+                    raise AssertionError(msg)
     return M0, M1, M2
 
 
-# PSALTer convention: sector index 0,1,2,... -> spin J = 0,1,2,...
-# with parity (-1)^J (even J -> "+", odd J -> "-"). Extended past spin-2
-# so rank-3+ fields (S123, A23) don't fall back to f"sector_N" labels.
+# WARNING -- this positional convention is DISPROVEN. Kept only so the decoder
+# reproduces the released JAX package's labelling for comparison; never rely on it.
+#
+# H6 showed, using this very script, that it is wrong even for the release's own
+# test theory: decoding ParticleSpectrographA23Theory.wxf yields three WaveOperator
+# blocks of dims 2/4/2 (2*1 + 4*3 + 2*5 = 24 d.o.f.) which are *J*-blocks containing
+# BOTH parities, with the J=1 block visibly 2+2 block-diagonal. Position is therefore
+# not a label. Parity feeds the diag(1,-1) Hermitization and hence every ghost
+# verdict, so a mislabel is a silent wrong answer, not a crash.
+#
+# Our Stage-1 export carries explicit per-state J^P labels instead:
+# docs/cosmology/spectrum_design.md section 6.1, and the label-calibration steps in
+# docs/cosmology/stage1_engineering_plan.md section 5.
+#
+# Original (disproven) rationale: sector index 0,1,2,... -> spin J = 0,1,2,... with
+# parity (-1)^J, extended past spin-2 so rank-3+ fields (S123, A23) don't fall back
+# to f"sector_N" labels.
 SPIN_LABELS = ["0+", "1-", "2+", "3-", "4+", "5-", "6+", "7-"]
 
 
@@ -137,13 +152,14 @@ def _z_degree(M0: sp.Matrix, M1: sp.Matrix, M2: sp.Matrix) -> int:
     operator is Hermitian for real k, which our pipeline assumes
     throughout (M0, M2 real symmetric and M1 imaginary antisymmetric).
 
-    Returns:
+    Returns
+    -------
         -1 if det M(k) is identically zero (gauge-symmetric, out of scope).
          0 if det is a non-zero constant in k (no propagating mode).
          d if det is a degree-2d polynomial in k (= degree d in z).
     """
     k = sp.Symbol("__k_z_degree_probe__")
-    M_of_k = M0 + k * M1 + (k ** 2) * M2
+    M_of_k = M0 + k * M1 + (k**2) * M2
     det_expr = M_of_k.det()
     if det_expr == 0:
         return -1
@@ -154,12 +170,13 @@ def _z_degree(M0: sp.Matrix, M1: sp.Matrix, M2: sp.Matrix) -> int:
     # Enforce evenness in k.
     for i in range(1, deg_k + 1, 2):
         if poly.nth(i) != 0:
-            raise ValueError(
+            msg = (
                 f"det M(k) has non-zero odd-power coefficient at k^{i}: "
                 f"{poly.nth(i)}. The pipeline assumes M(k) is Hermitian "
                 f"for real k (M0, M2 real symmetric, M1 imaginary antisymmetric), "
                 f"which would make det even in k. Got det = {det_expr}"
             )
+            raise ValueError(msg)
     return deg_k // 2
 
 
@@ -177,7 +194,7 @@ def extract(wxf_path: Path) -> Theory:
     stem = wxf_path.stem
     theory_name = stem.removeprefix("ParticleSpectrograph")
 
-    sectors: List[Sector] = []
+    sectors: list[Sector] = []
     all_couplings: set = set()
 
     for sector_idx, sector_matrix in enumerate(wave_operator_full):
