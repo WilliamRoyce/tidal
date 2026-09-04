@@ -5,6 +5,9 @@
 > (H3 solver, H6 polology) rather than after them. It records why the boundary was drawn here so
 > a later reader can weigh it — **it is expected to be revised or replaced.** Changing it does not
 > require re-litigating H4.
+>
+> **Still genuinely undesigned** — no later handoff has settled this directory's
+> internals. Treat the contents as a sketch.
 
 **Responsibility.** Analysis that runs *after* a chain exists, over Cobaya/anesthetic output.
 

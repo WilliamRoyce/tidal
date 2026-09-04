@@ -5,6 +5,9 @@
 > (H3 solver, H6 polology) rather than after them. It records why the boundary was drawn here so
 > a later reader can weigh it — **it is expected to be revised or replaced.** Changing it does not
 > require re-litigating H4.
+>
+> **Still genuinely undesigned** — no later handoff has settled this directory's
+> internals. Treat the contents as a sketch.
 
 **Responsibility.** Cobaya `Likelihood` components for observables the ecosystem does not already
 cover. Most likelihoods come free from Cobaya (Planck, ACT, SPT, DESI/BAO, supernovae, lensing) —

@@ -1,10 +1,10 @@
 # `tidalcosmo/spectrum/` — numerical polology — a gate on the sampling path
 
-> **Preliminary — planning-stage draft (H4, 2026-08-31).** This directory and its stated
-> responsibility come from a design study written *alongside* the detailed investigations
-> (H3 solver, H6 polology) rather than after them. It records why the boundary was drawn here so
-> a later reader can weigh it — **it is expected to be revised or replaced.** Changing it does not
-> require re-litigating H4.
+> **Directory boundary from H4 (2026-08-31); internals settled by H6 + H8.** The H4 study
+> drew this boundary *alongside* the detailed investigations rather than after them, so the
+> boundary itself may still be revised — that does not require re-litigating H4. **The
+> contents below are not provisional**: they record decisions settled in
+> `docs/cosmology/spectrum_design.md` and `stage1_engineering_plan.md`. Do not reopen them from this file.
 >
 > **H6 landed (2026-09-03): the settled design is `docs/cosmology/spectrum_design.md`** —
 > two-stage architecture, the Schur-complement kinetic-matrix criterion as the primary

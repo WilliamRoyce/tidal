@@ -5,6 +5,9 @@
 > (H3 solver, H6 polology) rather than after them. It records why the boundary was drawn here so
 > a later reader can weigh it — **it is expected to be revised or replaced.** Changing it does not
 > require re-litigating H4.
+>
+> **Still genuinely undesigned** — no later handoff has settled this directory's
+> internals. Treat the contents as a sketch.
 
 **Responsibility.** Holds `SpectatorTheory`, the Cobaya `Theory` class that *is* the extension:
 `get_requirements() -> {"CAMBdata": None}`, `must_provide()`, `calculate()`, `get_*()`. Its

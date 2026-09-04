@@ -1,10 +1,10 @@
 # `tidalcosmo/perturbations/` — assembly of the coupled block
 
-> **Preliminary — planning-stage draft (H4, 2026-08-31).** This directory and its stated
-> responsibility come from a design study written *alongside* the detailed investigations
-> (H3 solver, H6 polology) rather than after them. It records why the boundary was drawn here so
-> a later reader can weigh it — **it is expected to be revised or replaced.** Changing it does not
-> require re-litigating H4.
+> **Directory boundary from H4 (2026-08-31); internals settled by H3.** The H4 study
+> drew this boundary *alongside* the detailed investigations rather than after them, so the
+> boundary itself may still be revised — that does not require re-litigating H4. **The
+> contents below are not provisional**: they record decisions settled in
+> `docs/cosmology/solver_design.md` §4. Do not reopen them from this file.
 
 **Responsibility.** Building `M(η, k)` — the small linear system the solver integrates — from the
 spec plus the background.
