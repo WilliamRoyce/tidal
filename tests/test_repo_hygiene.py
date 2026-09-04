@@ -28,6 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # a point in time.  Rewriting those would falsify the record.
 CHECKED_PREFIXES = (
     "tidal/",
+    "tidalcosmo/",
+    "tests_cosmo/",
     "scripts/",
     "tests/",
     "examples/",

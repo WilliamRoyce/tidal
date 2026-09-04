@@ -6,9 +6,18 @@
 > later reader can weigh it — **they are expected to be revised or replaced.** Changing one does
 > not require re-litigating H4.
 
-**There is no code here yet.** This tree is directories and READMEs only. Deliberately no
-`__init__.py` and no Python: an empty importable package would enter pyright, ruff and coverage
-with nothing in it.
+**There is no code here yet.** This tree is directories and READMEs only, with no
+`__init__.py`.
+
+> **Amendment (coherence pass, 2026-09-04).** The original rationale here — "an empty
+> importable package would enter pyright, ruff and coverage" — was **false for two of the
+> three**: `pyrightconfig.json` included only `["tests", "tidal"]` and coverage's `source`
+> was `["tidal"]`, so this tree was invisible to both. Only ruff saw it. That mattered:
+> `COSMOLOGY_PROGRAM.md`'s WS1 gate ("suite green, no old-code imports, **pyright clean**")
+> would have passed **vacuously** once code landed here. All four gates now cover
+> `tidalcosmo/` and `tests_cosmo/`, and the never-import-legacy rule — previously described
+> here as enforced when nothing checked it — is enforced by
+> `tests_cosmo/test_package_boundary.py`.
 
 **Full design:** [`docs/cosmology/repo_reshape.md`](../docs/cosmology/repo_reshape.md).
 **Program record:** [`docs/COSMOLOGY_PROGRAM.md`](../docs/COSMOLOGY_PROGRAM.md).

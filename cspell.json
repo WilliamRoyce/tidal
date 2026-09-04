@@ -415,6 +415,7 @@
     "ptep",
     "punct",
     "pycache",
+    "pyrightconfig",
     "PYEOF",
     "Pylance",
     "Qorb",

@@ -147,6 +147,43 @@ unfixable = ["T201"]
     "DOC502",
     "E303",
 ]
+"tests_cosmo/**/*" = [
+    "PLR6301",
+    "PLR0914",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D205",
+    "D400",
+    "D401",
+    "SLF001",
+    "PLC0415",
+    "PLC2701",
+    "PLR0904",
+    "PLR0913",
+    "PLR0917",
+    "PLR2004",
+    "FBT001",
+    "FBT002",
+    "N802",
+    "N803",
+    "N806",
+    "RUF001",
+    "RUF003",
+    "RUF012",
+    "S108",
+    "S404",
+    "S603",
+    "ARG001",
+    "ARG002",
+    "ANN001",
+    "ANN201",
+    "ANN202",
+    "DOC501",
+    "DOC502",
+    "E303",
+]
 "examples/**/*" = [
     "INP001", "T201", "E402", "PLR0913", "PLR0917",
     # Analysis/plotting scripts: relax complexity, naming, annotation rules
@@ -345,7 +382,7 @@ allow-dunder-method-names = [
 convention = "numpy"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "tests_cosmo"]
 markers = [
     "slow: integration test with non-trivial compute (simulate, derive, etc.); runs in default lane but can be skipped with `-m 'not slow'`.",
     "publication: tests of the App C publication pipeline (manifest, canonical data, table/figure scripts); skipped by default, run with `-m publication tests/publication/`.",
@@ -353,8 +390,8 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["tidal"]
-omit = ["*/tests/*", "*/__pycache__/*"]
+source = ["tidal", "tidalcosmo"]
+omit = ["*/tests/*", "*/tests_cosmo/*", "*/__pycache__/*"]
 
 [tool.coverage.report]
 exclude_lines = [

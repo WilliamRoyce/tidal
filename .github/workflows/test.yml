@@ -35,7 +35,7 @@ jobs:
         run: uv run pyright
 
       - name: Run tests with coverage
-        run: uv run pytest --cov=tidal --cov-report=term-missing --cov-report=xml
+        run: uv run pytest --cov=tidal --cov=tidalcosmo --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage to Codecov
         if: always()
