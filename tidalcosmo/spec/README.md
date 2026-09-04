@@ -24,9 +24,17 @@ the tactic that decided it. `json_loader.py` is *re-implemented informed-by*: ke
 (operator vocabulary, kinetic handling, `implicit_dynamical_sector`, `dependency_closure`), not
 the schema.
 
-**Open question.** PSALTer ingests **WXF** (`psalter/_extract/wxf.py`), not JSON. Whether we emit
-WXF alongside JSON, or adopt a schema `psalter.extract` can consume directly, is unresolved and
-matters for `spectrum/`.
+**Settled — was an open question, twice over.**
+
+> **Amendment (coherence pass, 2026-09-04):** this read *"Whether we emit WXF alongside JSON … is unresolved."* It is resolved in both
+> directions. H6 §3.2 superseded the alignment item: the WXF as it exists is *insufficient* —
+> unlabeled `J`-blocks mixing parities, placeholder slots — so we emit the richer Stage-1
+> contract of `spectrum_design.md` §6.1 instead. And #523 goes further: **PSALTer writes no
+> WXF at all** and populates only two association keys; the committed `.wxf` files were
+> produced by separate curation tooling. WXF is something we *produce*, not an interchange we
+> receive. The premise "PSALTer ingests WXF" also conflated the released **JAX** package's
+> `extract` (which reads WXF) with the **Wolfram** `ParticleSpectrum` (which ingests a
+> Lagrangian in-session).
 
 ---
 

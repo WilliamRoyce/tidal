@@ -17,8 +17,8 @@
 **Responsibility.** Deciding whether a coupling point is a *healthy* theory — free of ghosts and
 tachyons — by screening the particle spectrum in vacuo.
 
-**This is not an isolated corner.** The program document calls WS6 "independent"; it is not, and
-`repo_reshape.md` §6 contradicts that deliberately. The spectrum answers exactly the question the
+**This is not an isolated corner.** WS6 is **not** independent — the programme document was
+corrected on 2026-08-31 and now says so. The spectrum answers exactly the question the
 sampler needs answered *before* spending a forward solve: H2's dependency graph draws it as
 `WS6 -.gates.-> O2` and `-.gates.-> O3`, and PSALTer's own `_extract/likelihood.py` treats the
 spectrum as a likelihood ingredient. So this feeds `validity/` and the Cobaya prior surface, and
@@ -29,10 +29,32 @@ screens in vacuo, and TorC used the same split) and in its **build order** (any 
 
 **Workstream.** WS6 (#495). **Filled at.** M∥, wired into `validity/` before the first rung runs.
 
-**Basis.** Barker's numerical polology (`psalter.tar.gz`, local; arXiv:2606.30785). D6 grants
-explicit permission to copy — provenance in docstrings, attribution settled at publication. Not
-clean-room. Start from the #360 plan, noting its Minkowski-first *project-wide* scope decision is
-superseded.
+**Basis.** `docs/cosmology/spectrum_design.md` (H6) is the authority; it **supersedes the #360
+plan wholesale** as the starting point — #360 targets `tidal/inference/_psalter_bridge.py`, a
+module retired at M1, and its description of the released PSALTer API is wrong. Stage-1
+engineering route: `docs/cosmology/stage1_engineering_plan.md` (H8).
+
+Sources: Barker's numerical polology (`psalter.tar.gz` local, plus
+`wevbarker/SupplementalMaterials-2607`; arXiv:2606.30785) and the parity-violating upgrade
+(arXiv:2506.02111). D6 grants explicit permission to copy — provenance in docstrings,
+attribution settled at publication. Not clean-room.
+
+**The primary algorithm is the Schur-complement kinetic-matrix criterion of arXiv:2506.02111** —
+published with worked oracles, **implemented nowhere**, built for our massive–massless
+kinetic-mixing case, and it carries parity-odd support. The released residue route is kept as a
+permanent cross-check, not as the primary.
+
+**Two stages.** Symbolic PSALTer runs **once per Lagrangian structure** (gauge ranks,
+massive/massless partition, constraint matrix, closed-form conditions); a JAX evaluator then
+returns per-sample verdicts in order-milliseconds.
+
+**Three findings that correct the obvious approach** (H8, against PSALTer v2.0.2 `bb45adb0`):
+`Method→"Hard"` is a **dead option** — declared, never read (**#521**); PSALTer does **not**
+enforce coupling-linearity, so that rejection is entirely our validator's job and is
+load-bearing for correctness (**#522**); and PSALTer **writes no WXF**, populating only two
+association keys — the exporter's real input is those plus eight private `$Local*` globals
+(**#523**). The export must carry **explicit per-state `J^P` labels**: the released positional
+convention is disproven even for its own test theory.
 
 **Design consequences.** Fast enough to run per sample (a performance requirement, per D5); a
 verdict with a reason, not a boolean; rejection through the shared flagged-rejection mechanism.

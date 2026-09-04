@@ -26,3 +26,9 @@ naming, formats, gauge conventions and interchange of the tools it interoperates
 and PSALTer** — from the start. Legacy TIDAL notation has no claim here: there is no backward
 compatibility to preserve, and no conversion layer to build. See
 `docs/cosmology/repo_reshape.md` §2.8.
+
+> **Amendment (coherence pass, 2026-09-04):** H3 measured that **coefficient assembly — not the matrix exponential — is the binding
+> cost** of the solver: `expm` is 0.4% of the legacy 82.6 ms per call. η-grid *segmented*
+> assembly is therefore the shared prerequisite for **both** solver front-ends (**#518**),
+> not a supporting detail. Read this directory as the performance-critical path, not a
+> low-risk port. `docs/cosmology/solver_design.md` §12 sets the implementation order.

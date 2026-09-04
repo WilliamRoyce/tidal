@@ -28,3 +28,9 @@ naming, formats, gauge conventions and interchange of the tools it interoperates
 and PSALTer** — from the start. Legacy TIDAL notation has no claim here: there is no backward
 compatibility to preserve, and no conversion layer to build. See
 `docs/cosmology/repo_reshape.md` §2.8.
+
+> **Amendment (coherence pass, 2026-09-04):** the open question above — *"H3's architecture decides the shape here"* — is **answered**
+> (`docs/cosmology/solver_design.md`, 2026-08-31). H3 chose a clean design with **nothing
+> ported** from legacy `modal.py`: steppers consume **node-sampled arrays**, never evaluator
+> objects, and the state layout follows from the segmented-assembly contract (**#518**) rather
+> than from `solver/{state,fields}.py`.

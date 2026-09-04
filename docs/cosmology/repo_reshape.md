@@ -482,10 +482,15 @@ sample(theory, tiles, parallelism=..., ns=..., hyperparameters=...)
 with `Theory`, `Sector`, `EvalResult`, `NestedSamplingResult` as its data types and `couplings`
 as the parameter vector. Three concrete alignment items:
 
-1. **Interchange format.** PSALTer ingests **WXF** (Wolfram Exchange Format —
-   `psalter/_extract/wxf.py`), emitted by the Wolfram PSALTer. We emit JSON. Our exporter should
-   either emit WXF alongside JSON, or adopt a schema PSALTer's `extract` can consume, so that
-   `spectrum/` **interoperates instead of translating**.
+1. ~~**Interchange format.**~~ **SUPERSEDED.**
+   > **Amendment (coherence pass, 2026-09-04):** this asked whether to emit WXF alongside JSON, on the premise that WXF is *"emitted by
+   the Wolfram PSALTer"*. **It is not** — #523 found no WXF writer in the package at all, and
+   only two association keys populated; the committed `.wxf` files came from separate curation
+   tooling. H6 §3.2 had already superseded the item on other grounds: the WXF as it exists is
+   insufficient (unlabeled `J`-blocks mixing parities, placeholder slots), so we emit the
+   richer Stage-1 contract of `spectrum_design.md` §6.1. The rest of §2.8 stands and is
+   re-confirmed by H6 with a harder reason — the residue's parity factor is *defined by* the
+   signature.
 2. **Vocabulary.** `Theory`, `Sector`, `couplings`, `tiles`. Adopt these names wherever they mean
    the same thing. This is not cosmetic: the cubed-sphere lineage of our legacy
    `RadialAngularPrior` is literally `psalter/_tile/geometry.py`, which is why that module's
@@ -505,11 +510,19 @@ PSALTer is *verb*-shaped (`psalter/<verb>.py` plus a private `_<verb>/` subpacka
 **must** be component-shaped, because Cobaya requires `<ClassName>.yaml` beside the class, while
 the engine may be verb-shaped.
 
-### 2.9 Not decided here: the integration target
+### 2.9 The integration target — SETTLED by H3
 
-**H3 owns the choice** between patching CAMB's Fortran, using DISCO-EB, and our own coupled-block
-solver chained to unmodified CAMB. It is an open WS0 decision, named in H3's prompt, and this
-document does not preempt it.
+> **Amendment (coherence pass, 2026-09-04):** this section previously read *"Not decided here … an open WS0 decision"*. H3 settled it
+> on 2026-08-31: **option (iii), our own solver chained to unmodified CAMB, for BOTH engines
+> over one shared core** (`solver_design.md` §6; `COSMOLOGY_PROGRAM.md`). The deciding
+> argument is structural rather than comparative — **no Boltzmann code has per-frequency
+> photon propagation**, so O3 is only possible this way, which settles the architecture
+> regardless of how O2 alone would have gone. #516 closed with it: learn from DISCO-EB
+> freely and cite it, never copy its code (GPL-3.0 against our MIT).
+
+H3 chose between patching CAMB's Fortran, building on DISCO-EB, and our own coupled-block
+solver chained to unmodified CAMB. The design below is built to survive any of the three, so
+nothing here needed changing when the choice landed.
 
 What this design *does* is make the tree survive either answer: the engine reaches a background
 only through `background/protocol.py`, and receives `M(η, k)` from `perturbations/`. Swapping
@@ -525,7 +538,7 @@ therefore accommodates **two front-ends over a shared core**; H3 decides the int
 
 | Code | Role for us | License | What we may do |
 | --- | --- | --- | --- |
-| `ohahn/DISCO-EB` | a candidate backend (H3's decision) and the **structural template for our engine-layer module naming** — `background`, `perturbations`, `thermodynamics`, `ode_integrators` | **GPL-3.0** | **Layout and naming inspiration is taken deliberately, and cited** — module organization is not copyrightable expression. Copying its *code* would impose GPL on our package; that stays a conscious decision routed to H3, never something that happens by accident |
+| `ohahn/DISCO-EB` | a **rejected** backend (H3 chose option (iii), 2026-08-31) but retained as the **structural template for our engine-layer module naming** — `background`, `perturbations`, `thermodynamics`, `ode_integrators` | **GPL-3.0** | **Layout and naming inspiration is taken deliberately, and cited** — module organization is not copyrightable expression. Copying its *code* would impose GPL on our package; **decided (#516, closed): learn from it freely and cite it, never copy its code** — so the GPL question never arises by accident |
 | `adammoss/nanoCMB` | the **validation reference** — full LOS projection in ~1400 readable lines at sub-percent agreement with CAMB over `2 ≤ ℓ ≤ 2500`, which is exactly the program's stated O0 tolerance — and a readable implementation of the projection we must own for mechanism 3 | **MIT** | permissive; we may adapt code with attribution. Preferred use remains read-and-reimplement, with the source credited in the docstring |
 | `psalter.tar.gz` (Barker) | WS6's basis, and the conventions source of §2.8 | supervisor's own; permission explicit under D6 | copy freely, provenance in docstrings, attribution settled with the supervisor at publication |
 
@@ -795,7 +808,7 @@ as ceilings, not estimates.
 
 `solver/modal.py` (5,525 lines) is **not ported and is not assumed to be an oracle.** It solves
 `expm(M·t)` for constant `M` on a flat periodic grid; the cosmology problem is `M(η)` per `k`, in
-two distinct regimes (§2.9). **H3 owns what replaces it.** This document reserves the `solver/`
+two distinct regimes (§2.9). **H3 decided what replaces it** (2026-08-31): two front-ends over one shared core, steppers consuming node-sampled arrays, nothing ported from `modal.py` — `solver_design.md` §7, §12. This document reserves the `solver/`
 directory and its seam — consume `M(η, k)` from `perturbations/`, return a transfer function —
 and leaves the internals to H3.
 
@@ -964,9 +977,10 @@ Two, both deliberate, both for the orchestrator to fold in:
 1. **WS6 is not independent** (§6). It gates O2 and O3 on the sampling path, per H2's own
    dependency graph and PSALTer's own structure. "Independent" is true only of its derivation and
    its build order.
-2. **The integration target remains H3's open decision** (§2.9) — CAMB-Fortran versus DISCO-EB
-   versus our own coupled-block solver. This design is built to survive any of the three; it does
-   not preempt the choice.
+2. ~~**The integration target remains H3's open decision**~~ — **RESOLVED.**
+   **Amendment (coherence pass, 2026-09-04):** H3 settled it 2026-08-31: **option (iii), own solver + unmodified CAMB, both engines
+   on one shared core** (`solver_design.md` §6, and §2.9 above). This design did survive all
+   three, as intended, so nothing downstream changed.
 
 And one addition worth propagating: **§2.8's convention-adoption goal** should appear in the
 program document, because it constrains WS2's output format and it invalidates the obvious

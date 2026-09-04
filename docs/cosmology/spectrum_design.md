@@ -777,7 +777,28 @@ Plus, from §8.1: the deformed → symmetric Maxwell limit reproduces the paper'
 (Proca branch: two of three polarizations survive; transverse branch at `Θ₃ = Θ₁ = 0`
 propagates nothing).
 
-## 13. Proposed follow-up handoff — Stage 1 is its own workstream (H8)
+## 13. Stage 1 as its own workstream — EXECUTED by H8 (2026-09-04)
+
+
+> **Amendment (H8 execution, 2026-09-04 — verified against PSALTer v2.0.2 @ `bb45adb0`).**
+> **§13 has been executed** — H8 studied it and produced `docs/cosmology/stage1_engineering_plan.md`.
+> Five statements in this section are corrected by that study:
+>
+> - **`Method→"Hard"` is a dead option** — declared in `Options`, never read anywhere in the
+>   package (**#521**). Its cost is not a go/no-go for anything; the measurement to make is
+>   plain `ParticleSpectrum` wall time.
+> - **"the WXF slots come from PSALTer itself" is inverted** — PSALTer **writes no WXF** and
+>   populates only two association keys (`WaveOperator`, `PseudoDeterminant`). The committed
+>   `.wxf` files came from separate curation tooling. The exporter's real harvest surface is
+>   those two keys plus eight `xAct`PSALTer`Private`` `$Local*` globals (**#523**) — which
+>   makes the pinned commit a *correctness* input, not merely a reproducibility one.
+> - **"the install settles the missing-coupling failure behaviour"** — already answered:
+>   there is none. `NonLinearCouplings` is never thrown (**#522**), so the live probe only
+>   confirms the silence and harvests wording.
+> - **Inkscape is effectively unused** (every `Vectorize` call site is commented out), and
+>   **Wolfram 14.3 + xAct are installed and activated** — only PSALTer itself is not.
+> - **Single-session substitution-rule linearization is Barker's own proven pattern**
+>   (`PoincareGaugeTheory.m` + `Linearise.m`), replacing the two-session route assumed here.
 
 This document specifies the Stage-1 → Stage-2 **contract**: labeled `J^P` blocks as
 coupling-linear coefficient tensors; gauge ranks and the massive/massless partition; the
@@ -794,7 +815,8 @@ own session:
   §4.5), with the enumerated-symmetry validation and the coupling-per-operator contract.
 - **Our own Wolfram-side exporter** reaching into PSALTer's result objects to emit the
   contract above. The published `JuliaExport.m` shows the pattern but emits `.jl` source; the
-  WXF slots come from PSALTer itself; the coefficient-tensor and explicit-label export exists
+  WXF slots do **not** come from PSALTer itself (see the §13 amendment above — #523); the
+  coefficient-tensor and explicit-label export exists
   nowhere and must be written.
 
 **We do not modify PSALTer** — integration means generating its input and harvesting its

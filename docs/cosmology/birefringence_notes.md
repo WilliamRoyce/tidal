@@ -1,9 +1,18 @@
 # O4 foundation: cosmic birefringence from parity-odd torsion–EM couplings
 
 **Status:** research notes from the 2026-08-29 planning session, preserved here because they
-were otherwise held only in a session plan file outside version control. O4 is the last rung
+were otherwise held only in a session plan file outside version control. O4 is a rung
 of the observable ladder (`docs/COSMOLOGY_PROGRAM.md`); these notes are its physics
 foundation and its literature map. The open derivation work is **GH #499**.
+
+> **Amendment (coherence pass, 2026-09-04):** this said "O4 is **the last** rung". The rung order was settled on 2026-09-04 as
+> **`O0 → O1 → O2 → O4a → O3 → O4b/V-modes`** — O4a (isotropic `β`, post-processing rotation)
+> comes **second among the science rungs**, because it is the cheapest (the CS sector is
+> conformally invariant, so `a(η)` drops out and no FRW photon solver is needed) and the only
+> rung targeting a *positive* 4.8σ signal rather than an upper limit. **Precondition:** that
+> holds only if the chosen operator is `n = 0` **and** `β` is effectively constant over
+> recombination; otherwise it is O4b, which is much more expensive — see §3 and §6, and
+> **#503** decides which.
 
 > **Nothing here is a result.** It is a scoping map with the traps marked. Where a claim was
 > reasoned rather than read out of a source, it says so.
