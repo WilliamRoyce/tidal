@@ -8,6 +8,8 @@ the PSALTer sources contradicts an assumption H6 made from the papers alone (§0
 **Tracking:** #495 (WS6), #360 (superseded PSALTer tracker), umbrella #488, decision D6.
 **Findings filed:** #521 (`Method` inert), #522 (validator coverage), #523 (private-symbol
 harvest surface) — each records the action it implies for the implementing session.
+**Design amended 2026-09-04:** `spectrum_design.md` carries inline amendment notes at §4.1,
+§4.5, §6.1 and §14, pinned to PSALTer v2.0.2 @ `bb45adb0` (§11 decision 1).
 **Evidence:** PSALTer v2.0.2 at commit `bb45adb0`, and the four
 `wevbarker/SupplementalMaterials-*` companions, read on 2026-09-03/04. Re-fetch with
 `scripts/research/psalter_stage1/fetch_reference_sources.sh` (pins the same revisions).
@@ -63,10 +65,13 @@ for the implementing session, in this order:
 2. Confirm the inertness on the live install — run one small theory both ways and check the
    results and timings are identical. A static read can miss a `Method` consumed through
    `xAct`xPlain`` or an option-inheritance path.
-3. Report the measurement as "`ParticleSpectrum` wall time, PSALTer v2.0.2, `Method` inert"
-   and file an issue recording the discrepancy against the design's phrasing. If the WIP
-   `psalter.tar.gz` snapshot or a newer upstream commit implements `Method`, that is a
-   finding worth carrying back to the author (D6 relationship).
+3. Report the measurement as "`ParticleSpectrum` wall time, PSALTer v2.0.2, `Method` inert",
+   never as an Easy-vs-Hard figure. The discrepancy against the design's phrasing is filed
+   (#521) and **the design is amended at the point of instruction** — `spectrum_design.md`
+   §4.5 and §14.1, pinned to `bb45adb0` (§11 decision 1). If the WIP `psalter.tar.gz`
+   snapshot or a newer upstream commit implements `Method`, that is a finding worth carrying
+   back to the author (D6 relationship), and the pinning is what keeps the amendment honest
+   when it happens.
 
 `MaxLaurentDepth` by contrast **is** consumed (validated at `ParticleSpectrum.m:29`, passed
 into `ConstructMassiveAnalysis`/`ConstructMasslessAnalysis`), as is `MasslessSpectrum`,
@@ -244,6 +249,14 @@ TorC because one of its three conditions is a **massless residue** condition, so
 whose massless analysis is broken cannot pass quietly. Preserve that property in every
 tier.
 
+**Tier 1 is the install gate** (settled 2026-09-04). The reason is what makes the choice
+non-arbitrary rather than merely cheapest-first: *an install gate must fail unambiguously.*
+Tier 1's input and its expected result are both the author's, so a mismatch can only be the
+install. Tier 2 mixes install correctness with our own authoring, so a Tier-2 failure does
+not localize — the same "never conflate two hypotheses in one test" principle that makes the
+frozen legacy specs usable as physics oracles. **Tier 2 is therefore the physics gate, not
+the install gate**, and Tier 3 substitutes for Tier 2 when TorC's ECT authoring is deferred.
+
 **Tier 1 — replay the published input (cheapest, strongest).** Run
 `ParticleSpectrographCTEG.m` unmodified (fetched, not committed), then load the
 repository's committed `ParticleSpectrographCTEG.mx` and diff the two associations
@@ -292,6 +305,16 @@ must pass.
   structure, scope guards. Frozen dataclasses, per H4 §2.8's PSALTer-derived idiom. Mark
   every docstring **provisional pending WS1/M0** — this is a minimal stand-in for a typed
   config layer that WS1 owns, deliberately built now so H8 does not block on M0.
+
+  **Build it, but mark it disposable** (settled 2026-09-04). WS1 is next in dependency order
+  and not dispatched, so "imminent" is not knowable and waiting could stall indefinitely. The
+  risk worth naming out loud is the one that actually happens to provisional layers: they
+  become the de facto config **by accretion**, one convenience field at a time, until
+  replacing them is a migration. So the requirement is explicit and testable — **WS1's config
+  surface replaces this module; it does not extend it.** Keep it minimal enough that
+  replacement is deletion: no field that Stage 1 does not need, no downstream module importing
+  it except the spectrum branch, and the marker in every docstring so a later reader cannot
+  mistake it for the design.
 - **`tidalcosmo/derive/`** — the generator, the `wolframscript` driver, and the committed
   `.wl` exporter package.
 - **`tidalcosmo/spectrum/`** — the Python side of the contract: the WXF reader and the
@@ -526,17 +549,27 @@ The three findings that were actionable at study time are already filed — #521
 further issues as they appear, and add the `.wxf`-fixture license note to #495 when the
 fixtures are committed. Report the branch to the orchestrator; do not merge.
 
-## 11. Open questions for the orchestrator
+## 11. Decisions (settled by the user, 2026-09-04)
 
-1. **Does the `Method` finding change the design's Stage-1 instruction?** H6 §4.5 and §14.1
-   both name `Method→"Hard"`. The measurement still happens and the option is still passed;
-   the question is whether the design document should be amended to say the option is inert
-   on v2.0.2, or whether that lives only in the measurements record.
-2. **Tier-1 versus Tier-2 as the install gate.** Tier 1 is stronger evidence about the
-   *install* (author's input, author's committed result) but is the PGT formulation; Tier 2
-   is our formulation and the design's named primary oracle but is authored by us, so a
-   failure is ambiguous between install and authoring. Recommendation: gate on Tier 1, and
-   treat Tier 2 as the physics gate — but this is worth an explicit call.
-3. **Provisional config layer versus waiting for M0.** §4.1 builds a minimal input model in
-   `tidalcosmo/config/` so H8 does not block. If WS1 is imminent, the implementing session
-   should instead land the generator against WS1's real config surface.
+The study closed with three open questions. All three are answered; the reasoning is recorded
+because in each case it generalizes past this handoff.
+
+1. **Amend the design, pinned to the version.** The `Method` finding lives in
+   `spectrum_design.md` §4.5/§14.1 — not only in the measurements record. *An observation can
+   live in a record; a finding that invalidates a stated instruction has to live where the
+   instruction is*, because §4.5 is what an implementer reads. Pinned to `bb45adb0` because a
+   later PSALTer release could implement the option, and a bare "it's dead" would then be
+   wrong in the other direction. Applied 2026-09-04: six inline amendment notes covering
+   §4.1 (#522), §4.5 (#521), §6.1 (#523) and §14.1/§14.2. The same principle promoted the
+   other two findings from "recorded" to "amended" — each of them also invalidated an
+   instruction, not merely a background claim.
+2. **Tier 1 is the install gate** (§3). An install gate must fail unambiguously; Tier 1's
+   input and result are both the author's, so a mismatch can only be the install, while a
+   Tier-2 failure is ambiguous between install and authoring. Tier 2 is the physics gate.
+3. **Build the provisional config layer, and mark it disposable** (§4.1). WS1 is not
+   dispatched, so blocking on it could stall indefinitely; the named risk is a provisional
+   layer becoming the de facto config by accretion, and the guard is that WS1's surface
+   **replaces** it rather than extending it.
+
+Two program-level decisions remain with the user and are unaffected by this study: the rung
+order after O1, and when to start the `tidalcosmo` version line.

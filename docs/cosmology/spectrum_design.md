@@ -2,6 +2,14 @@
 
 **Status:** design settled 2026-09-03 (H6). Tracking: #495 (WS6), #360 (canonical PSALTer
 tracker), umbrella #488, decision D6.
+**Amended 2026-09-04 (H8).** H8 read the PSALTer sources live and found four places where
+this document's *instructions* rest on assumptions the release contradicts. Those points
+carry an inline **Amendment (H8, …)** note rather than a silent rewrite: the design record
+stays readable, and an implementer reading the instruction reads the correction with it.
+Every amendment is **pinned to PSALTer v2.0.2 @ `bb45adb0`** — a later release may restore
+the assumed behavior, and an unqualified "this is dead" would then be wrong in the other
+direction. Route and rationale: `docs/cosmology/stage1_engineering_plan.md`; issues #521,
+#522, #523.
 **Scope:** design only — no code in this document's commit. Module implementation is WS6
 proper; the Wolfram-side Stage-1 engineering is proposed as its own handoff (§13).
 
@@ -217,6 +225,17 @@ definition of the theory space the method operates on. Contract rules:
   `EnsureLinearInCouplings.m` — and the paper leaves even `α = ½` free "because PSALTer
   requires that all terms … be linearly parameterised"); confirm the exact failure behavior on
   a live install (§13).
+
+  > **Amendment (H8, 2026-09-04 — verified against PSALTer v2.0.2 @ `bb45adb0`):** the failure behavior is
+  > **silence**, and the rule is ours alone to enforce (#522). `ValidateLagrangian.m` defines
+  > `ParticleSpectrum::NonLinearCouplings` but **never throws it**; it throws only `Zero`,
+  > `UnknownCoupling`, `UnknownField` and `NonQuadraticFields`. A bare numeric coefficient is
+  > not a `Variable`, so nothing rejects it. `EnsureLinearInCouplings.m` exists, but under
+  > `ConstructSourceConstraints/ConjectureNullSpace/`, clearing denominators in a null vector
+  > — it is not a Lagrangian validator. The live check is still worth running, to confirm the
+  > silence and to capture the `UnknownCoupling` wording (which *is* thrown, for a genuinely
+  > undeclared symbol) for our own hint. Enforcement moves entirely to our config layer,
+  > which makes this contract rule more load-bearing, not less.
 - **Fields**: real tensors, rank ≤ 3, from the enumerated symmetry list (identical in v1 and
   v2): scalar; vector; rank-2 general/`[μν]`/`(μν)`; rank-3 general plus eight symmetrizations
   including `ζ_{μ[νσ]}`. **Torsion `T^λ{}_{[μν]}` is exactly that class** (PSALTer's
@@ -352,6 +371,23 @@ linear in the fields; (5) emit a **standalone** `.wls` running `ParticleSpectrum
 emitted script on the published `WolframLanguage/ParticleSpectroscopy/{FieldKinematics.m,
 Models/*.m}`.
 
+> **Amendment (H8, 2026-09-04 — verified against PSALTer v2.0.2 @ `bb45adb0`):** `Method` is **declared but never
+> read** — `Options@ParticleSpectrum` sets `Method->"Easy"` (`Sources/ParticleSpectrum.m:116`)
+> and `OptionValue@Method` appears nowhere in the package (#521). Keep passing
+> `Method→"Hard"`: it is harmless and correct if a later release wires it up. But nothing
+> downstream may describe the resulting cost as an Easy-vs-Hard figure — see the §14.1
+> amendment. `MaxLaurentDepth` by contrast **is** consumed (`ParticleSpectrum.m:29`), and
+> `MasslessSpectrum` gates the whole massless analysis (`ConstructMasslessAnalysis.m:16`), so
+> it must stay at its `True` default given §6.2.
+>
+> Step (2)'s route also has a cheaper published precedent than the two-session
+> "prepare in xAct, copy into PSALTer" reading: Barker linearizes **inside** the PSALTer
+> session, defining the nonlinear objects as tensors on PSALTer's own `M4` with `MakeRule`
+> definitions and `Series`-expanding in a bookkeeping parameter
+> (`SupplementalMaterials-2506b` `PoincareGaugeTheory.m` + `Linearise.m`). Both routes are
+> documented in the PSALTer README; the single-session one has a working PGT precedent and is
+> what the Stage-1 plan recommends.
+
 ## 5. The algorithm choice: Schur-complement kinetic matrix, residues as cross-check
 
 arXiv:2506.02111 §MassiveSpectrum proposes a no-ghost criterion that "does not involve any
@@ -454,6 +490,21 @@ particles** (gauge redundancies) — a counting check for §6.
 
 The committed `ParticleSpectrograph<Name>.wxf` files (decoded 2026-09-03 with a minimal WXF
 reader) show what PSALTer can emit and what our own exporter must add:
+
+> **Amendment (H8, 2026-09-04 — verified against PSALTer v2.0.2 @ `bb45adb0`):** PSALTer emits **none** of it —
+> there is no WXF writer in the package (#523). `ParticleSpectrum.m:87-101` writes exactly two
+> association keys, `WaveOperator` and `PseudoDeterminant`, and `DumpSave`s the association to
+> `ParticleSpectrograph<Name>.mx`. The richer keys below therefore come from an uncommitted
+> curation step in the polology work — which is also why key names vary between exports
+> (§6.1's own observation): they were assembled by hand, not by one writer. The real in-kernel
+> harvest surface is those two keys plus eight `xAct`PSALTer`Private`` globals
+> (`$LocalSourceConstraints`, `$LocalMasslessSpectrum`, `$LocalSpectrum`,
+> `$LocalUnresolvedPoles`, `$LocalOverallUnitarity`, `$LocalSummaryOfTheory`,
+> `$LocalWaveOperator`, `$LocalPropagator`; `ParticleSpectrum.m:74-81`). Reading private
+> symbols makes the installed revision a correctness input: pin the commit, record it in every
+> export, and let the fixture tests fail loudly if a name moves. Free consequence: the `.mx`
+> dump is a second serialization of every run, and the committed
+> `ParticleSpectrographCTEG.mx` in `SupplementalMaterials-2506b` is a ready-made oracle.
 
 - `…TDiffTheory.wxf` (gauge theory) has **populated**: `WaveOperator` (the sector blocks);
   `PseudoDeterminant`; **`UnitarityConditions`** in closed form
@@ -740,11 +791,18 @@ this document.
 
 ## 14. Open items and risks
 
-1. **`Method→"Hard"` wall time on PGT+EM** — unmeasured; TorC's spectrographs prove
-   feasibility. (→ H8.)
+1. **`ParticleSpectrum` wall time on PGT+EM** — unmeasured; TorC's spectrographs prove
+   feasibility. (→ H8.) ***Amendment (H8, 2026-09-04 — verified against PSALTer v2.0.2 @ `bb45adb0`):*** the risk stands,
+   but **not as a `Method` comparison** — the option is inert at that revision (#521, §4.5
+   amendment). The number to report is the wall time of the call itself, with per-stage
+   checkpoints; protocol in `stage1_engineering_plan.md` §6.
 2. **Exact `WaveOperator` labeling metadata** — the `J`-block structure is established
    (§6.1), but the per-state ordering convention should be confirmed against a live PSALTer
-   and the field-kinematics tables before the exporter hardcodes it. (→ H8.)
+   and the field-kinematics tables before the exporter hardcodes it. (→ H8.) ***Amendment (H8, 2026-09-04 — verified against PSALTer v2.0.2 @ `bb45adb0`):***
+   the harvest surface is now identified (§6.1 amendment) and the labels are read from the
+   SPO/field-kinematics tables; the open part is narrowed to **calibrating** the convention
+   against single-operator theories of known block occupancy, per
+   `stage1_engineering_plan.md` §5.
 3. **Chequer-Hermitian sign conventions** — pinned only up to the `i`-vs-skew-symmetric
    freedom noted in `app:PGT_comparison`; must be fixed against the `K₀` oracle before the
    definiteness test ships. (→ WS6, validation (g).)
