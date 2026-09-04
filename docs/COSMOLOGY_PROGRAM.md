@@ -161,6 +161,49 @@ The patch itself is small: one optional `P` output on `BackgroundDensityAndPress
 pressure comes from a spline instead of being rebuilt as `w·ρ`; the rest of the fork's
 file count is signature churn from that one argument.
 
+## Decisions register
+
+Every decision settled anywhere in the program, in one place. Today "what has been decided?"
+otherwise means reading ~6,500 lines across eleven documents — nothing is wrong with any of
+them, there was simply no index.
+
+| Ref | What was settled | By / when | Detail |
+|---|---|---|---|
+| **D1–D9** | Program-level direction — see the table below | user, 2026-08-29 | this document |
+| **Rung order** | `O0 → O1 → O2 → O4a → O3 → O4b/V-modes`. Technically neutral, so a pure scientific-priority call. **Gated on #503**: O4a is only cheap if the operator is `n = 0` and `β` is constant over recombination | user, 2026-09-04 (H2 recommended) | §Rung order, `observable_ladder.md` §5 |
+| **Integration target** | **Option (iii)** — our own coupled-block solver chained to **unmodified** CAMB. Patching CAMB's Fortran and building on DISCO-EB both rejected; learn from DISCO-EB, never copy its code (#516 closed) | H3, 2026-08-31 | `solver_design.md` §6 |
+| **Two solver kinds** | O2 needs an oscillation-resolving mode-equation solver (`~1–10³` oscillations); O3 needs an eikonal amplitude engine with coherence-patch averaging (**`~10²⁶`** — not steppable). **Two engines, one shared core** | H2 → H3, 2026-08-30/31 | `observable_ladder.md` §0.1, `solver_design.md` §7 |
+| **Binding cost** | `η`-grid **assembly**, not the matrix exponential (#518). Optimize there first | H3, 2026-08-31 | `solver_design.md` §1 |
+| **Stepper choice** | By **bake-off**, not a priori — every candidate implemented and trialed against the §10 protocol | H3, 2026-08-31 | `solver_design.md` §11 |
+| **R1 — O1 scope** | O1 is a **fixed-table pass-through plumbing gate**, not a TorC reproduction. Full posterior reproduction (O1b) rejected for now — a nested-sampling campaign for a plumbing check, with the nonlinear TorC background inside the fast block | H1, 2026-08-30 | `torc_pipeline_audit.md` §R1 |
+| **R2 — CAMB patch** | **Re-apply cleanly** off upstream `2.0.3`, own fork. Never inherit `slegner/CAMB` (180 commits behind, breaks a public signature); upstream's own `set_w_a_table` is the pole-prone route the paper abandoned | H1, 2026-08-30 | `torc_pipeline_audit.md` §7 |
+| **O1 gate** | Constant table `P = −ρ` → ΛCDM `C_ℓ` to machine precision; `TorC_rhopa.py` table → reference `H(a)`/`C_ℓ`; plus the free `set_w_a_table` cross-check at `ϖ_r = 0.8` | H1, 2026-08-30 | #494 |
+| **#513 — conventions** | The new package emits **CAMB and PSALTer conventions natively** — no translation layer. Conformal time already agrees with `camb.symbolic`. Gauge is an explicit named input, applied symbolically, carried as spec metadata, asserted at the CAMB seam | H4, 2026-08-31 | `repo_reshape.md` §2.8 |
+| **`derive` port gate** | **Not a byte diff** — a consequence of #513. The frozen legacy spec is the oracle *for the physics*; equivalence is semantic, recorded as a written mapping | H4, 2026-08-31 | `repo_reshape.md` §5.2, #525 |
+| **Namespace** | Fresh top-level **`tidalcosmo`**, in this repo, renaming to `tidal` after legacy deletion (M7) | user, 2026-08-31 | `repo_reshape.md` §1.3, #490 |
+| **Migration shape** | Strangler fig: new code **never imports legacy**; capabilities *ported*, never adapted; two suites; oracle frozen as committed **data** at M0.5 *before* porting, which is what makes early deletion safe | H4, 2026-08-31 | `repo_reshape.md` §7–8, #525 |
+| **WS6 algorithm** | **Schur-complement kinetic-matrix criterion** (arXiv:2506.02111) as primary, pole masses/residues as cross-check. Bypasses the radicals that make residue analysis intractable for parity-violating theories | H6, 2026-09-03 | `spectrum_design.md` §5 |
+| **WS6 architecture** | **Two stages**: Wolfram/PSALTer once at derivation time exporting a coupling-linear tensor contract; numeric evaluation per sample, no Wolfram in any hot path | H6, 2026-09-03 | `spectrum_design.md` §1 |
+| **WS6 scope** | **Minkowski-only is correct and sufficient** — the spectrum screens *in vacuo*; the same split TorC uses | H6, 2026-09-03 | `spectrum_design.md` §2 |
+| **`J^P` labels** | Exported **explicitly**. The positional convention is disproven — A23Theory yields J-blocks mixing parities | H8, 2026-09-04 | `pub_wxf.py` warning |
+| **Tier-1 vs Tier-2 gate** | Gate the **install** on Tier 1 (author's own input *and* committed `.mx` oracle, so a mismatch can only be the install); Tier 2 mixes install-correctness with our authoring and does not localize. **Requires pinned SHAs** — they default to `HEAD` no longer | H8 + orchestrator, 2026-09-04 | `stage1_engineering_plan.md`, #526 |
+| **Term-roster exclusion** | Excluded from the Stage-1 contract | H6/H8, 2026-09-04 | `spectrum_design.md` §6.1 |
+| **Config layer** | Build it provisionally, **mark it disposable** — WS1's real surface must *replace* it, not extend it. The failure mode is a provisional layer becoming the de facto config by accretion | orchestrator, 2026-09-04 | #527 |
+| **`Method→"Hard"`** | A **dead option** on v2.0.2 — declared, never read. It never gated anything; the cost to measure is plain `ParticleSpectrum` wall time | H8, 2026-09-04 | #521 |
+| **Linearity enforcement** | **Ours, not PSALTer's** — `NonLinearCouplings` is never thrown and a bare numeric coefficient passes silently. Our validator is load-bearing for correctness | H8, 2026-09-04 | #522, #527 |
+| **WXF** | Something we **produce**, not an interchange we receive: PSALTer writes no WXF and populates two association keys; the exporter reads private `$Local*` globals | H8, 2026-09-04 | #523 |
+| **WS6 dependency** | **Not** independent — contradicting an earlier claim in this document; H2's dependency graph governs | H4 correction, 2026-08-31 | `observable_ladder.md` |
+| **Verification gates** | Made **able to fail** — `tidalcosmo/` had been outside pyright, coverage, `testpaths` and CI, and the never-import-legacy rule had no test | coherence pass, 2026-09-04 | `8b54fe6e`, #524 |
+
+### Still open, deliberately
+
+| | |
+|---|---|
+| **When to start the `tidalcosmo` version line** | Natural trigger: M0, or O0 first passing. No cost to deferring |
+| **GPL/MIT on the Barker-derived code (#495)** | A **release** gate, not an implementation one. Implementation proceeds; distribution does not |
+| **Whether non-sampled constants enter the coupling vector** | Decides whether `A[0]` is legitimate (recommended: yes, they stay out, so the linearity check becomes "no *sampled* coupling appears non-linearly"). **Documents cannot settle this — it needs a real export** (#522) |
+| **O4a's precondition** | Whether the chosen operator is `n = 0` with `β` constant over recombination. Determines whether the settled rung order's cheap rung exists (#503) |
+
 ## Decisions (user, 2026-08-29)
 
 | # | Decision |
@@ -209,34 +252,37 @@ conversion are typically weaker than `N_eff` unless the signal is spectrally nar
 structurally distinctive — V-modes and birefringence are exactly that, justifying the
 polarization emphasis on physics grounds.
 
-### ⚠ Rung order after O1 — OPEN DECISION (user's call)
+### Rung order after O1 — SETTLED (user, 2026-09-04)
 
-The numbering O1→O2→O3→O4 is **capability order, not the recommended execution order**.
-H2 (`observable_ladder.md` §5) recommends **O2 → O4a → O3 → O4b/V-modes**, and flags the
-choice as *"a scientific-priority call, not a technical one"* — so it is yours, not the
-orchestrator's. Both options, faithfully:
+**`O0 → O1 → O2 → O4a → O3 → O4b/V-modes`.** H2's recommendation
+(`observable_ladder.md` §5), adopted. The numbering O1→O2→O3→O4 is **capability order**;
+this is the execution order.
 
-**H2's recommendation — O4a before O3.** O4a (isotropic `β`, post-processing rotation) is
-the **cheapest new observable in the ladder**: the CS/photon sector is conformally
-invariant, so `a(η)` drops out and `β` is a dispersion relation integrated against a
-zero-mode — **no FRW photon solver at all**, and the observable is an array rotation of
-CAMB's `C_ℓ` (Tier 3a, against O2/O3's Tier 3b). It reuses O1's wiring, it is the only
-rung targeting a **positive 4.8σ signal** rather than an upper limit, and its derivation
-work (#499) sits on the thesis's parity-odd critical path regardless.
-*Precondition:* the chosen operator is `n = 0` **and** `β` is effectively constant over
-recombination — otherwise it is O4b, which is much more expensive.
+The choice was a pure scientific-priority call, because it is **technically neutral**: the
+coherence audit confirmed H3's implementation order and H4's migration order both survive
+either ordering, since O4a needs no solver at all. O2 is first either way and builds the
+spine both routes reuse.
 
-**The alternative — O3 before O4a.** Puts the thesis's own Gertsenshtein couplings on FRW
-sooner, which has real scientific pull and matches the user's stated framing that O3 is a
-core goal. The cost: the eikonal engine (§0.1) and the magnetic-field modeling decisions
-(worth `10⁴` in the answer) land before any positive-signal observable exists, and before
-the validity machinery has been exercised on a cheaper rung. O3 also carries the most
-unknowns of any rung — a second solver kind, a mandatory PMF model, an amplitude-based
-measurement to replace the energy-ratio one, and a GR signal unobservable by 11+ orders,
-so its result is a torsion-*enhancement bound* whose interpretation leans on the very
-background-consistency and spectator flags O2/O4a would have exercised first.
+**Why O4a before O3.** O4a (isotropic `β`, post-processing rotation) is the cheapest new
+observable in the ladder: the CS/photon sector is conformally invariant, so `a(η)` drops out
+and `β` is a dispersion relation integrated against a zero-mode — **no FRW photon solver at
+all**, and the observable is an array rotation of CAMB's `C_ℓ` (Tier 3a, against O2/O3's
+Tier 3b). It reuses O1's wiring, it is the only rung targeting a **positive 4.8σ signal**
+rather than an upper limit, and its derivation work (#503) sits on the thesis's parity-odd
+critical path regardless. It also exercises the validity machinery on a cheap rung before
+O3 needs it.
 
-O2 is first either way, and builds the spine both routes reuse.
+> **⚠ Precondition to carry forward.** O4a stays cheap **only if** the chosen operator is
+> `n = 0` **and** `β` is effectively constant over recombination. Otherwise it is O4b, which
+> is much more expensive, and the ordering advantage disappears. **#503's per-operator
+> derivation is what determines whether the cheap route exists** — so #503 is not merely a
+> prerequisite of O4a, it is the gate on this ordering.
+
+O3 remains the core scientific goal and is unchanged in importance by being third; it
+carries the most unknowns of any rung (a second solver kind, a mandatory PMF model, an
+amplitude-based measurement, and a GR signal unobservable by 11+ orders, so its result is a
+torsion-*enhancement bound* whose interpretation leans on exactly the background-consistency
+and spectator flags O2 and O4a exercise first).
 
 ## The niche (H7 investigation, 2026-08-29)
 
@@ -354,8 +400,9 @@ stays useful *within* the new package for unintended drift between re-derivation
    **replaces** it rather than extending it. The failure mode to avoid is a provisional layer
    quietly becoming the de facto config by accretion.
 
-Stage-1
-  Wolfram engineering split out as handoff **H8** — **done as a study** (`docs/cosmology/stage1_engineering_plan.md`); the engineering itself is not yet dispatched.
+Stage-1 Wolfram engineering was split out as handoff **H8** — **done as a study**
+(`docs/cosmology/stage1_engineering_plan.md`); the engineering itself is not yet dispatched.
+Its sole blocker is the PSALTer install (#526), which also gates #521, #522 and #523.
 
 ## Parked
 
@@ -369,6 +416,12 @@ the issue. Also parked: Phase E (T6/T8 rescue), Phase A-γ, NEXT_PHASES G/H/I, W
 Prompt files in `docs/cosmology/handoffs/` — self-contained, dispatched by the user to
 separate sessions; **this orchestrator session does not launch them**. H7 was executed
 during planning; its findings are in `docs/cosmology/spectator_route.md`.
+
+**All eight are complete.** Each prompt file carries a status header giving its date,
+artifact and outcome. They are kept, not deleted: a prompt records *what was asked*, which
+is what lets a reader judge whether the deliverable answered it. **None is an open
+assignment** — H2.md in particular opens "if it does not exist yet, ask before proceeding",
+which was live instruction text for a task finished five days earlier.
 
 | ID | Task | Artifact |
 |---|---|---|
@@ -385,6 +438,27 @@ Dispatch order: **H1–H8 all ✅ done.** Stage-1 *engineering* is not yet dispa
 post-dispatch scope extension — both solver kinds designed — plus the 2026-08-31 user
 directions: Wolfram-at-derivation-only symbolic policy, experimentation-over-reading
 bake-off, uniform+stochastic B̄ modes, soft classifier.)
+
+## What to implement next
+
+The program is **design-complete** and entering implementation. In dependency order:
+
+1. **#524 (M0)** — packaging: second console script, extras, YAML package-data, the CI lane.
+   The verification gates themselves are already live (`8b54fe6e`).
+2. **#525 (M0.5)** — freeze the legacy oracle as committed data, **before any porting
+   begins**. This is what decouples port order from deletion order and makes retiring
+   `tidal/inference/` at M1 safe.
+3. **#491 / M1 → O0** — `config/`, `background/camb_seam.py`, `spectator/` pass-through,
+   `validity/flags.py`. Gate: sub-percent agreement with CAMB over `2 ≤ ℓ ≤ 2500`, and a
+   standard ΛCDM posterior.
+4. **#498 / M2 → O1** — the CAMB fork first (re-apply off `2.0.3`), then `TabulatedBackground`.
+
+**In parallel, unblocked by the above:** **#526** — install PSALTer and pass the Tier-1 gate.
+It is the single blocker behind #521, #522 and #523, so it converts three stalled issues into
+one afternoon. WS6 (#495) is buildable any time after M0.
+
+**Also parallel, and it gates the settled rung order:** **#503** — the per-operator photon
+dispersion relations. Whether O4a is the cheap rung depends on its answer.
 
 ## Verification gates
 

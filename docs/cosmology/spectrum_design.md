@@ -1,15 +1,32 @@
 # Spectrum module design — numerical polology for the cosmology program (H6 / WS6)
 
-**Status:** design settled 2026-09-03 (H6). Tracking: #495 (WS6), #360 (canonical PSALTer
-tracker), umbrella #488, decision D6.
-**Amended 2026-09-04 (H8).** H8 read the PSALTer sources live and found four places where
-this document's *instructions* rest on assumptions the release contradicts. Those points
-carry an inline **Amendment (H8, …)** note rather than a silent rewrite: the design record
-stays readable, and an implementer reading the instruction reads the correction with it.
-Every amendment is **pinned to PSALTer v2.0.2 @ `bb45adb0`** — a later release may restore
-the assumed behavior, and an unqualified "this is dead" would then be wrong in the other
-direction. Route and rationale: `docs/cosmology/stage1_engineering_plan.md`; issues #521,
-#522, #523.
+**Status:** design settled 2026-09-03 (H6). **This document is the authority for WS6.**
+Tracking: #495 (WS6), umbrella #488, decision D6. (#360 was the earlier PSALTer tracker; it
+is **closed as superseded** by this design — its per-sample architecture and its target
+module, `tidal/inference/_psalter_bridge.py`, are both retired.)
+
+**Amendment ledger.** Seven inline corrections, each pinned to **PSALTer v2.0.2 @
+`bb45adb0`** — a later release may restore assumed behavior, and an unqualified "this is
+dead" would then be wrong in the other direction. Corrections are inline rather than a
+silent rewrite, so an implementer reading an instruction reads its correction with it.
+
+| § | line | Source | What changed |
+|---|---|---|---|
+| §4.1 | 229 | H8 | Missing-coupling failure behavior is **silence** — `NonLinearCouplings` is never thrown (#522) |
+| §4.5 | 374 | H8 | `Method` is declared but **never read** (#521) |
+| §6.1 | 494 | H8 | PSALTer emits **none** of the assumed contract; two association keys plus private `$Local*` globals (#523) |
+| §5 | 538 | coherence pass | "PSALTer **guarantees** linearity" was the justification under the whole per-sample performance argument. It does not; enforcement is ours (#522) |
+| §13 | 783 | coherence pass | The third `Method→"Hard"` site, which the first amendment pass **missed**; §13 retitled EXECUTED by H8 |
+| §14.1 | 832 | H8 | The cost risk stands, but the number to report is plain `ParticleSpectrum` wall time |
+| §14.2 | 838 | H8 | The harvest surface is identified; labels are read, not assumed |
+
+H8 read the PSALTer sources live and found **four** instruction sites resting on assumptions
+the release contradicts; the coherence pass added three more (§5, §13, and the count in this
+paragraph, which previously said "four" and had stopped being true). That the ledger itself
+drifted is the point of keeping one: it is the mechanism meant to catch exactly the gap that
+left §13 un-amended for a day.
+
+Route and rationale: `docs/cosmology/stage1_engineering_plan.md`; issues #521, #522, #523.
 **Scope:** design only — no code in this document's commit. Module implementation is WS6
 proper; the Wolfram-side Stage-1 engineering is proposed as its own handoff (§13).
 
