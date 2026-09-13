@@ -554,6 +554,21 @@ rules → the **flaw protocol** → the report-back format.
   the same knowledge, and the difference between an afternoon and a week when a hypothesis
   needs a dozen tests. This extends `feedback_minimal_tests` from choosing test theories to
   bisecting bugs.
+- **An argument for why something cannot be checked is not evidence about how the check comes
+  out.** The two travel together and must be separated. Answering I-ONB's xPerm question the
+  orchestrator wrote both: *"this cannot be verified without running it"* — correct, and worth
+  saying — and *"the wrapper solves a runtime loader problem that switching to `mcc` would not
+  remove"* — a mechanism claim, offered with the same confidence, for a code path that **had
+  never executed once**. The merge rehearsal ran it: `mcc`'s output needs no wrapper. The
+  unverifiability was real and bought nothing; the reasoning smuggled in beside it was the part
+  that misled. When you say a thing cannot be settled here, stop there — do not also say how it
+  would come out.
+- **A caveat that is a scope limit hides better than a doubt.** "I can't test this in my
+  environment" feels discharged the moment you name who can, so it reaches the report and the PR
+  body and stops there — while the *artifact* states the untested thing flatly. That is how
+  `build-xperm.sh` became step 4b of the onboarding path instead of a fallback (I-ONB's own
+  diagnosis, 2026-09-12). The test is the same as for any caveat: it must survive into the thing
+  the next person follows, not into the thing you hand back.
 - **Read the tool's own known-issues before hypothesizing.** PSALTer's README lists "gauge
   symmetries not identified" as known bug #1 — the symptom class #543 spent a wave attributing
   to the engine. I-REM found it by reading; nobody had.
@@ -910,25 +925,30 @@ items it prints red; prose had failed three times.
 The program is **design-complete**, has passed the pre-implementation scientific review
 (`docs/cosmology/scientific_review.md`), and is in implementation.
 
-> **State, 2026-09-11. Wave 0 and its completion wave are COMPLETE.** All six prompts merged:
-> #524 M0 packaging (`654b627a`), #525 M0.5 with 185 frozen fixtures (`e310e125`, now **197
-> fixtures over 49 pairs** since #547 derived three of the four excluded theories), #526
-> PSALTer installed (`c8c57251`), then I-REM instruction sites and the oracle CI gate
-> (`32d21a3b`), I-533 retiring the drop rows (`df206443`), and I-543 resolving the Tier-1
-> gate (`7286ae94`).
+> **State, 2026-09-12. Wave 0, its completion wave and the hardening pass are COMPLETE, and
+> nothing is open in either.** Seven prompts merged: #524 M0 packaging (`654b627a`), #525 M0.5
+> with 185 frozen fixtures (`e310e125`, now **197 fixtures over 49 pairs** since #547 derived
+> three of the four excluded theories), #526 PSALTer installed (`c8c57251`), I-REM instruction
+> sites and the oracle CI gate (`32d21a3b`), I-533 retiring the drop rows (`df206443`), I-543
+> resolving the Tier-1 gate (`7286ae94`), and I-ONB one onboarding path (`91e300af`). Trunk is
+> **v0.54.2**, `CI 34714779268` and `CI 34714779285` both success on `456c1c15`.
 >
-> **The PSALTer install is certified**: Wolfram 14.3.0 × PSALTer `bb45adb0` × local
-> registration of two Function Repository resources the package depends on but never declares.
-> `VERDICT: MATCH` on the author's own published input, re-run from scratch by the orchestrator
-> on 2026-09-11 with provenance asserted. **Nothing in Wave 1 is blocked.** What is still open in
-> the completion wave is **nothing**: I-ONB merged 2026-09-12 (#564). Closed on 2026-09-12:
-> **#559** (one onboarding path), **#547** (three of the four excluded theories derived, the
-> fourth measured un-derivable) and **#554** (the oracle's drift classes and the `--staleness`
-> detector). Carried forward with owners: **#558** (β over
-> recombination — the second half of O4a's precondition; with the #503 session), **#548** (two
-> specs without a TOML; M3), and two defects #547 uncovered by execution — **#561** (`derive`
-> reported success for an aborted derivation; fixed, `bf9361c5`) and **#560** (the #394
-> volume-element check rejects every FRW measure; WS2 needs it before trusting `de_sitter`).
+> **The PSALTer install is certified and rebuild-proof**: Wolfram 14.3.0 × xAct 1.3.0 × PSALTer
+> `bb45adb0` × local registration of two Function Repository resources the package depends on
+> but never declares, under fixed UUIDs. `VERDICT: MATCH`, re-run from scratch from an **empty**
+> registry with provenance asserted, independent of any cloud login. **Nothing in Wave 1 is
+> blocked, and nothing in Wave 0 is left over.**
+>
+> Closed 2026-09-12: **#559** (one onboarding path), **#547** (three of the four excluded
+> theories derived, the fourth measured un-derivable), **#554** (the oracle's drift classes and
+> the `--staleness` detector). Carried forward with owners, none a Wave-1 dependency:
+> **#558** (β over recombination — the second half of O4a's precondition; goes with the #503
+> session), **#548** (two specs without a TOML, M3), **#560** (the #394 volume-element check
+> rejects every FRW measure — **WS2 needs this before trusting `de_sitter` as its oracle**),
+> **#561** (`derive` reported success for an aborted derivation — fixed, `bf9361c5`),
+> **#562** (Wolfram call forms in `sign_algebra`, M3), **#563** (the undeclared `xPerm.m` patch
+> in the reference userbase, M0.5), **#565** (the image's second, cloud-only `wolframscript`,
+> M-parallel).
 >
 > **Wave 1 is planned by a fresh planning session, which the user initiates** — this
 > orchestrator never starts it. Composition is settled and recorded so that session begins
