@@ -559,8 +559,8 @@ rules → the **flaw protocol** → the report-back format.
   orchestrator wrote both: *"this cannot be verified without running it"* — correct, and worth
   saying — and *"the wrapper solves a runtime loader problem that switching to `mcc` would not
   remove"* — a mechanism claim, offered with the same confidence, for a code path that **had
-  never executed once**. The merge rehearsal ran it: `mcc`'s output needs no wrapper. The
-  unverifiability was real and bought nothing; the reasoning smuggled in beside it was the part
+  never executed once**. The merge rehearsal ran it: `mcc`'s output needs no wrapper. Being
+  unable to settle it was real and bought nothing; the reasoning smuggled in beside it was the part
   that misled. When you say a thing cannot be settled here, stop there — do not also say how it
   would come out.
 - **A caveat that is a scope limit hides better than a doubt.** "I can't test this in my
