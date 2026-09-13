@@ -20,6 +20,15 @@ what is merged, dispatched or planned; this file only maps prompts to their outp
   yet).
 - **I-series — implementation.** Dispatched per issue under the delegation protocol. Each
   carries a uniform header table: issue, wave, **Wolfram lane**, dependencies, owned paths.
+- **R-series — wave research** (from Wave 1). Research memos dispatched *inside* a wave under
+  the same protocol and header table as the I-series, because the builds behind them are held
+  on their decisions. `R-1` decides D-A/D-B; `R-C` decides D-C.
+
+**Statuses, from Wave 1 on** (dispatch-cadence rule, 2026-09-13): every prompt of a wave is
+written at approval. `> **STATUS: HELD — depends on …**` means written, waiting on a decision
+named in its dependency table — **do not dispatch**. `> **STATUS: READY**` means every
+dependency is recorded and the text updated — the user dispatches. Wave-2 outlines are held
+prompts with named gaps, rewritten in full at Wave-2 planning.
 
 **H7 has no prompt file.** It was executed inside the orchestrator's own planning session
 rather than dispatched, so only its output was committed. That is why this directory holds
@@ -49,12 +58,20 @@ seven `H*.md` files while the programme document speaks of eight handoffs.
 | `I-533.md` | #533 | 0-completion | no | **merged** 2026-09-11 (#552) | retire the M0 drop rows (`sweep`, `sample`, `analyze`, `plot`) |
 | `I-543.md` | #543 (+#542, #549) | 0-completion | **yes** | **merged** 2026-09-11 (#557) — **gate passes, install certified** | resolve the Tier-1 gate — pass it, or locate the mechanism |
 | `I-ONB.md` | #559 (#488, #543 hardening) | 0-completion | no | **merged** 2026-09-12 (#564) | one onboarding path: a fresh user with their own Wolfram ID lands in the certified configuration; fixes the fresh-host container failure |
+| `R-1.md` | #566 (M1a; decides for #532, #527) | 1 | **yes** (≤ 30 min) | **READY** 2026-09-13 — the user dispatches | `../interfaces_decision.md`: D-A (how Python drives Wolfram), D-B (what a user writes; artifact handoff), the convention-carriage rule; three Wolfram prototypes, a Cobaya refusal prototype |
+| `R-C.md` | #567 (M3; informs #500, #501, #504) | 1 | **yes** (≤ 2 days) | **HELD** — D-A (R-1) | `../perturbation_tooling.md`: the FRW equation set as a checklist, the literature's methods, every tool with scope/uses/torsion probe, xPand hands-on, a per-requirement recommendation (D-C) |
+| `I-532.md` | #532 (M1a) | 1 | no | **HELD** — D-B, convention findings (R-1) | `tidalcosmo/{background,spectator,validity}/`: protocol, CAMB seam, pass-through, flag schema, `../veto_placement.md` (group practice first), reference oracles + convention record, `camb` core |
+| `I-S1A.md` | #527 (M-parallel; #522, #523) | 1 | no | **HELD** — D-A, D-B, carriage rule (R-1); I-532's flag type | `tidalcosmo/{config,derive,spectrum}/` Python only: disposable config + validator, `wolfram_driver.py`, WXF reader + Stage-2 dataclasses; `A[0]` as a named unknown |
+| `I-S1B.md` | #495 (M-parallel) | 2 | **yes** | **HELD (outline)** — D-A, D-B, D-C, I-S1A-core | Stage-1 Wolfram interface in D-A's shape, exporter, cost run, the `A[0]` answer, Tier 2, #561's Wolfram-side `Exit[1]` |
+| `M1b.md` | #494, #515 (M1b) | 2 | no | **HELD (outline)** — D-B, I-532, I-S1A-core | `SpectatorTheory(Theory)`, the `__init__` re-export, veto wiring per I-532's memo, ΛCDM identity gate, #515, replacement of the provisional config layer (#490) |
 
 ## The Wolfram lane
 
 **One `wolframscript` machine-wide**, so at most one lane-flagged session may run at a time —
 the orchestrator included. Only a prompt whose header says **Wolfram lane: yes** may start a
-kernel. Two prompts hold it in the table above; the rest must not.
+kernel; the rest must not, and from Wave 1 each no-lane prompt carries the *complete list* of
+commands that would start one (a fence that names a tool cannot see a wrapper script that runs
+it, #555). Lane occupancy in Wave 1 is sequential by construction: R-1 briefly, then R-C.
 
 ## Conventions worth knowing before reading one
 

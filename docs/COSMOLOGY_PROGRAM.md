@@ -173,7 +173,7 @@ them, there was simply no index.
 | Ref | What was settled | By / when | Detail |
 |---|---|---|---|
 | **D1–D9** | Program-level direction — see the table below | user, 2026-08-29 | this document |
-| **Rung order** | `O0 → O1 → O2 → O4a → O3 → O4b/V-modes`. Technically neutral, so a pure scientific-priority call. **Gated on #503**: O4a is only cheap if the operator is `n = 0` and `β` is constant over recombination | user, 2026-09-04 (H2 recommended) | §Rung order, `observable_ladder.md` §5 |
+| **Rung order** | `O0 → O1 → O2 → O4a → O3 → O4b/V-modes`. Technically neutral, so a pure scientific-priority call. **Gated on #503**: O4a is only cheap if the operator is `n = 0` and `β` is constant over recombination. *Dated note, 2026-09-13: **O1 is parked** (#498, milestone Parked — replaced by the self-validation ladder, row below) and **O4a is conditional on what #503 finds at M3**; the order is kept, not rewritten, until that answer exists* | user, 2026-09-04 (H2 recommended); note 2026-09-13 | §Rung order, `observable_ladder.md` §5 |
 | **Integration target** | **Option (iii)** — our own coupled-block solver chained to **unmodified** CAMB. Patching CAMB's Fortran and building on DISCO-EB both rejected; learn from DISCO-EB, never copy its code (#516 closed) | H3, 2026-08-31 | `solver_design.md` §6 |
 | **Two solver kinds** | O2 needs an oscillation-resolving mode-equation solver (`~1–10³` oscillations); O3 needs an eikonal amplitude engine with coherence-patch averaging (**`~10²⁹`** — not steppable). **Two engines, one shared core** | H2 → H3, 2026-08-30/31 | `observable_ladder.md` §0.1, `solver_design.md` §7 |
 | **Binding cost** | `η`-grid **assembly**, not the matrix exponential (#518). Optimize there first | H3, 2026-08-31 | `solver_design.md` §1 |
@@ -207,6 +207,16 @@ them, there was simply no index.
 | **`theory_radial` stays excluded, not retired** | Three of M0.5's four excluded theories derive in under a minute (9 s / 45 s / 49 s) and are now pairs; `theory_radial` aborts in `ParseMultiFieldRHS` with `a_0`'s equation arriving as literal `0`, measured twice. #547's own plan said retire it — **overruled**: retiring legacy is milestone work (§7's M5/M6/M7 schedule), so it is recorded as un-derivable with the measurement in the manifest instead. A generic exclusion reason became a *false* one the moment the lane was held, so reasons are now per-theory | orchestrator, 2026-09-12 | #547, `scripts/oracles/freeze_legacy_oracle.py` `MEASURED_EXCLUSIONS` |
 | **Exit 0 is not evidence a derivation ran** | An uncaught `Throw` stops a `wolframscript` script and still returns status 0 (probed, `-code` and `-file`), and the Wolfram pipeline signals its own errors by throwing — so `derive` verifies the **artifact**: the output JSON must exist and its mtime must have advanced. The Wolfram-side fix (`Catch` + `Exit[1]`) is deferred to #513's own script emission, because it would change every generated script and so every `derivation_hash` | orchestrator, 2026-09-12 | #561, `tidal/cli/_derive.py` |
 | **The engine test is a file, never `command -v wolframscript`** | The dev container image ships a **second**, cloud-only `wolframscript` at `/usr/bin` (#565), so `command -v` succeeds with no engine installed and every later call evaluates in the cloud — an installer reported "already installed" on a bare machine, a verifier passed against the cloud, a registration step burned `timeout 600` before failing. The test is `[ -x "$HOME/.local/wolfram/engine/<series>/Executables/WolframKernel" ]`. Enumerated and fixed at **nine** sites rather than the one that bit | orchestrator + I-ONB, 2026-09-12 | #559, #565, `0078b3c9`, `fdbfdcdc` and `dc664076` |
+| **O1/TorC parked; the self-validation ladder replaces it** | #498 validates a modified-background capability the spectator route never uses (`repo_reshape.md:354-357,399-400` — "optional, off by default", "not on the critical path"), so it is **parked**: filed as a resumption, milestone *Parked*, the free `set_w_a_table` cross-check lapsing with it. Replaced by the **self-validation ladder** — rung 1 re-evolves a sector CAMB already solves, with CAMB's own equations, in our solver, and compares: a **tensor leg** (benchmark A8, `solver_design.md:702,745-746`) and a **photon leg** (defined with WS3/WS4); rung 2 is the full chain from a Maxwell/GR Lagrangian through our own derivation (needs #500; an M3 gate). Sequenced so a rung-2 failure is known to be the derivation, not the stepper | user + orchestrator, 2026-09-13 (Wave-1 planning) | #498, §Carried-forward register |
+| **Birefringence route is perturbation-level** | Default = parity-odd couplings among perturbations (O4-aniso, O4-mix, `observable_ladder.md` §0.2 — no background of any kind). O4-iso *requires* `T̄ ≠ 0` (`spectator_route.md:118-120`), outside the admissible-theories fence, so it is a **user-theory question under the background-EOM residual gate (#501)**, not a planned rung; **#558 is not a blocker**. Published results are recreated as validation where the setup matches — Minkowski torsion–photon papers against the vacuum (spectrum) branch, FRW references against the FRW branch — never required, never a gate, never an imposed condition | user, 2026-09-13 | `observable_ladder.md` §0.2, #558 |
+| **#503 deferred to M3** | It was written as a literature write-up; the project's premise is derive-from-the-theory. It runs on the new package's FRW tooling, derives from the supplied theory, prescribes no output form and takes no paper as a gate; its shape is decided at M3 planning. The thesis-era operator catalogue (`research/lagrangian_enumeration/`) has machine-readable sector outputs but no per-term join to coupling symbols — a detail for that prompt | user, 2026-09-13 | #503, the rung-order row's dated note |
+| **Two derivations, one convention-free toolbox** | The spectrum branch (Minkowski, PSALTer) and the solver branch (FRW) are **two derivations from one input**: shared is everything convention-free (input model, field declarations, coupling roster, term structure); duplicated is the convention-laden symbolic work; cache per `(theory, background)`; **no shared symbolic results**. Already the design (`spectrum_design.md:346-366`) — recorded so nobody "optimizes" it | user + orchestrator, 2026-09-13 | `spectrum_design.md` §5 |
+| **Convention carriage is a pipeline rule, not a user input** | PSALTer's and CAMB's Minkowski signatures are each a **fixed constant**, different from each other, both determined from source by R-1. The user writes the Lagrangian in **one documented convention** (R-1 recommends which; the sign-sensitive spectrum branch makes PSALTer's the natural candidate); the pipeline maps deterministically into each backend's; every derived artifact records the convention it is in (`conventions.signature`, `epsilon0123`) and every consumer asserts it. A slip changes a ghost verdict (`spectrum_design.md:204-207`), so R-1 designs the check | user, 2026-09-13 (rounds 5–6) | R-1 (#566), `handoffs/I-S1A.md` |
+| **Validity mechanism follows group practice** | Where a per-sample veto is raised in Cobaya, hard or soft, and how a rejected point is reported is **inherited, not invented**: I-532's memo establishes it from TorC's and the polology codes' *code* first, and **v1 matches that practice**. The flag schema supports both severities so the group's choice is representable (one evaluator, never two code paths — #454); `tidalcosmo/validity/README.md:28-30` is amended to whatever that practice implies; M1b implements | user, 2026-09-13 (round 6) | #532, `docs/cosmology/veto_placement.md` (I-532) |
+| **I-S1A split** | The Python side minus the Wolfram interface (validator, driver, WXF reader, Stage-2 dataclasses) builds in Wave 1 after D-B as **I-S1A-core**; the interface builds with the exporter and the cost run in **I-S1B** (Wave 2) after D-A, so the session that writes the interface also runs it on the lane | user, 2026-09-13 (round 1) | `handoffs/I-S1A.md`, `handoffs/I-S1B.md` |
+| **Dispatch cadence** | A protocol rule: **all of a wave's prompts are written at approval** and committed `HELD`, each with a **decision-dependency table** (open decision → sections affected → what changes under each option). Research prompts go first, one at a time; each memo returns to the orchestrator, who records the decision, **updates every held prompt it touches**, and marks the next `READY`. **The user dispatches only READY prompts.** Two in parallel only when owned paths are provably disjoint and no decision flows between them. Replaces Wave 0's parallel sessions coordinating through prompt updates | user, 2026-09-13 (rounds 4 and 6) | §The loop, the wave board |
+| **Carried-forward register** | Everything parked for a later wave is a row in §"What to implement next" with *what it needs* and *when*, and — for prompts — a held prompt file, so the next planning session starts from a list, not a memory | user, 2026-09-13 (round 6) | §Carried-forward register |
+| **`pyproject.toml` has one owner per wave** | Wave 1: I-532 (the `camb` core promotion). Any other prompt needing a dependency change reports it and the orchestrator applies it between prompts. Every driver honors the file-based engine test (row above) | orchestrator, 2026-09-13 | `handoffs/I-532.md`, `handoffs/I-S1A.md` |
 | **Reduce before you bisect** | A protocol rule, not advice: find the smallest input that still shows the defect and iterate there. #543 reproduces on one scalar field in ~30 s where the CTEG gate takes 7 min | I-543 + orchestrator, 2026-09-09 | delegation protocol, `scripts/psalter/repro_543.wl` |
 | **Verification gates** | Made **able to fail** — `tidalcosmo/` had been outside pyright, coverage, `testpaths` and CI, and the never-import-legacy rule had no test | coherence pass, 2026-09-04 | `8b54fe6e`, #524 |
 
@@ -468,7 +478,11 @@ context should be able to read it and the queue, and know what to do next.
    file (the `I-` series; `H-` was the research series, all complete). Every "the orchestrator
    will…" commitment inside a prompt is copied onto the wave-boundary checklist as a named item
    **in the same commit as the prompt** — at dispatch, not at the boundary, which is where two
-   of Wave 0's were lost.
+   of Wave 0's were lost. **All of a wave's prompts are written at approval** (dispatch-cadence
+   row, 2026-09-13): each is committed with a `STATUS` header — `READY`, or `HELD — depends
+   on …` with a decision-dependency table naming which sections change under each option.
+   Research memos (the `R-` series) go first, one at a time; as each returns the orchestrator
+   records the decision, updates every held prompt it touches, and marks the next `READY`.
 2. **The user dispatches** each prompt to a separate session. *This orchestrator session
    never launches them.*
 3. A delegate works in **its own git worktree** off `feat/cosmology-program`
@@ -692,7 +706,7 @@ are **launch-and-collect** — a detached script, collected by a later session.
 
 ### Wave board
 
-Status: `drafted → dispatched → reported → merged`.
+Status: `held → ready → dispatched → reported → merged`. **`held`**: written and committed, waiting on a decision named in its dependency table — do not dispatch. **`ready`**: every dependency recorded and the text updated — the user dispatches. Only one prompt is `ready` at a time unless the dispatch-cadence row's parallel condition is met.
 
 | Wave | Prompt | Issue | Lane | Owned paths | Branch | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -703,12 +717,14 @@ Status: `drafted → dispatched → reported → merged`.
 | 0c | I-533 — retire the M0 drop rows | #533 | — | `tidal/`, `tests/`, `examples/**/run.sh`, legacy `scripts/`, `docs/tex/` | `cosmo/i533-retire-drop-rows` (#552) | **merged** ✅ CI 34401167660 + 34401167568 success on `f8d4001a`. `sweep`/`sample`/`analyze`/`plot` gone with their in-package plotting, +1182/−26727; each name exits 2 naming a `git show v0.53.0:` recovery path, handler probed. **`measure` deliberately kept** — a `drop` verdict is not a retire milestone; it is drop **+ M5**, amended at the site. Orphan inventory #553, spec drift #554 |
 | 0c | I-543 — resolve the Tier-1 gate | #543 #542 #556 #551 | **yes** | `scripts/psalter/`, `docs/cosmology/psalter_543_*.md`, `evidence/tier1-20260911-pass/` | `cosmo/i543-psalter-gate` (#557) | **merged** ✅ CI 34619683909 success on `4a2c38fd`. **GATE PASSES — `VERDICT: MATCH`**, both keys identical. Cause: two undocumented PSALTer Function Repository dependencies, **not** the engine (14.2.1 behaves identically). Certified: 14.3.0 × `bb45adb0` × local registration. Upstream issue drafted, not filed |
 | 0d | I-ONB — one onboarding path, fresh-host container, registry volume | #559 | — | `.devcontainer/**`, root `README.md` setup, `scripts/README.md`, `scripts/{install-wolfram-engine,install-xact-xcoba,activate-wolfram}.sh` | `cosmo/onb-one-path` (#564) | **merged** ✅ CI 34712322686 success on `1158235f`. +911/−1784 over 21 files: one six-step path in `WOLFRAM_GUIDE.md`, `initializeCommand` + the `wolfram-objects` volume, the 25-step chain's Wolfram wiring extracted to `setup-wolfram-links.sh` (always exits 0), two installers deleted and two redirected, `tests/test_devcontainer_creation.py`. Found a **second** fresh-host abort my audit missed (`install-lsp-wl.sh:17`), which had been silently skipping the Claude memory restore and session reindex |
-| 1 | I-532 — CAMB seam, background protocol, flag schema | #532 | — | `tidalcosmo/{background,spectator,validity}/` | — | planned |
-| 1 | I-503 — per-operator dispersion + zero-mode scope | #503 | — | `research/lagrangian_enumeration/`, `docs/` | — | planned |
-| 1 | I-S1A — Stage-1 Python side | #527 | — | `tidalcosmo/{config,derive}/` (Python only), `tidalcosmo/spectrum/` | — | planned |
-| 2 | I-S1B — Stage-1 Wolfram side + cost run | #495 | **yes** | `tidalcosmo/derive/wolfram/` | — | outline |
-| 2 | M1b — Cobaya Theory + ΛCDM posterior | — | — | `tidalcosmo/{spectator,presets,likelihoods}/` | — | outline |
-| 2 | M2/O1 — CAMB fork re-apply | #498 | — | fork repo + `tidalcosmo/background/` | — | outline |
+| 1 | R-1 — the interfaces: user input → derivation → artifact → Cobaya (decides D-A, D-B, convention carriage) | #566 | **yes** (≤ 30 min) | `docs/cosmology/interfaces_decision.md`, `scripts/research/interfaces/` | `cosmo/r1-interfaces` | **ready** — the user dispatches |
+| 1 | R-C — cosmological perturbations: requirements, methods, tools (decides D-C) | #567 | **yes** (≤ 2 days) | `docs/cosmology/perturbation_tooling.md`, `scripts/research/perturbations/`, additive `Applications/xAct/xPand/` | `cosmo/rc-perturbation-tooling` | held — D-A (R-1) |
+| 1 | I-532 — CAMB seam, background protocol, flag schema, veto placement | #532 | — | `tidalcosmo/{background,spectator,validity}/`, `tests_cosmo/data/camb_oracles/`, `docs/cosmology/veto_placement.md`, `pyproject.toml` (camb line only) | `cosmo/i532-camb-seam` | held — D-B + convention findings (R-1) |
+| 1 | I-S1A-core — Stage-1 Python side minus the Wolfram interface | #527 | — | `tidalcosmo/{config,derive,spectrum}/` (Python only) | `cosmo/is1a-stage1-python` | held — D-A, D-B, carriage rule (R-1); I-532's flag type |
+| 2 | I-S1B — Stage-1 Wolfram interface, exporter, cost run, `A[0]` | #495 | **yes** | `tidalcosmo/derive/wolfram/` | `cosmo/is1b-stage1-wolfram` | held (outline) — D-A, D-B, D-C, I-S1A-core |
+| 2 | M1b — Cobaya Theory, veto wiring, ΛCDM identity, #515 | #494 #515 | — | `tidalcosmo/spectator/theory.py`, `tidalcosmo/__init__.py`, `tidalcosmo/config/` (replacing) | `cosmo/m1b-cobaya-theory` | held (outline) — D-B, I-532, I-S1A-core |
+| — | I-503 — per-operator dispersion, derived from the theory | #503 | — | — | — | deferred to M3 planning (register row *#503 deferred to M3*) |
+| — | M2/O1 — CAMB fork re-apply, `TabulatedBackground` | #498 | — | — | — | **parked** (milestone Parked; register row *O1/TorC parked*) |
 
 ### Decision on #543 — the Tier-1 mismatch (orchestrator, 2026-09-07)
 
@@ -919,13 +935,31 @@ items it prints red; prose had failed three times.
 7. Update memory (`project_cosmology_program.md`, the MEMORY.md status line) and back up.
 8. *Then* plan the next wave, in detail; the one after it in outline; nothing beyond.
    **The user initiates that planning session; the orchestrator never starts it on its own.**
+9. **Wave 1 orchestrator commitments** — copied from the six prompts at dispatch
+   (2026-09-13), per item 6. *R-1 (#566):* put the memo's options to the user; record D-A,
+   D-B and the carriage rule in the register; update R-C, I-532, I-S1A-core and I-S1B; mark
+   R-C READY; after merge re-run `verify --require-psalter` and the three Wolfram prototypes
+   from scratch. *R-C (#567):* after merge re-run `verify --require-psalter` from scratch and
+   confirm only `Applications/xAct/xPand/` was added; record D-C in a new register row "FRW
+   derivation tooling"; update I-S1B and the M3 outline; mark I-532 READY. *I-532 (#532):*
+   pre-dispatch — #498 re-milestoned Parked and the board row amended (done 2026-09-13); at
+   merge re-run the identity test against a **fresh** CAMB run, not the committed oracle; fetch
+   `CI <id>: <conclusion>` with `camb` core; update I-S1A-core with the flag type's import
+   path and mark it READY; copy the A8 API-reachability note into the carried-forward
+   register. *I-S1A-core (#527):* pre-dispatch — add `wolframclient` to `pyproject.toml` if
+   D-A chose it and it is absent; at merge run the private-globals guard test on the lane
+   machine (reads a file, no kernel) and verify from the artifact that the `A[0]` unknown is
+   named in a docstring; update the held I-S1B and M1b with everything the wave decided.
+   *Boundary:* `validity/README.md:28-30` and `derive/README.md:12` amended; `git grep
+   EXPIRES-WITH` shows `#490` and the PSALTer pin; the carried-forward register current; one
+   bump, tagged.
 
 ## What to implement next
 
 The program is **design-complete**, has passed the pre-implementation scientific review
 (`docs/cosmology/scientific_review.md`), and is in implementation.
 
-> **State, 2026-09-12. Wave 0, its completion wave and the hardening pass are COMPLETE, and
+> **State, 2026-09-13. Wave 1 is PLANNED and its first prompt is READY. Wave 0, its completion wave and the hardening pass are COMPLETE, and
 > nothing is open in either.** Seven prompts merged: #524 M0 packaging (`654b627a`), #525 M0.5
 > with 185 frozen fixtures (`e310e125`, now **197 fixtures over 49 pairs** since #547 derived
 > three of the four excluded theories), #526 PSALTer installed (`c8c57251`), I-REM instruction
@@ -950,11 +984,20 @@ The program is **design-complete**, has passed the pre-implementation scientific
 > in the reference userbase, M0.5), **#565** (the image's second, cloud-only `wolframscript`,
 > M-parallel).
 >
-> **Wave 1 is planned by a fresh planning session, which the user initiates** — this
-> orchestrator never starts it. Composition is settled and recorded so that session begins
-> from committed state: **#532 (M1a) ∥ #503 ∥ I-S1A (#527)**. **No Wave-1 prompt exists yet;
-> writing them is that session's first task.** Read the wave board above, then the
-> wave-boundary checklist, then plan.
+> **Wave 1 — planned 2026-09-13 over six rounds with the user; the plan's decisions are the
+> ten register rows dated 2026-09-13.** Research first, then build, **sequentially**, under the
+> dispatch-cadence rule: all six prompt files are committed, and only one is dispatchable.
+> **`R-1` (#566) is READY — the user dispatches it.** Held behind it, in order: `R-C` (#567,
+> on D-A) → `I-532` (on D-B and the convention findings) → `I-S1A-core` (on D-A, D-B, the
+> carriage rule, I-532's flag type). Held for Wave 2 as outlines: `I-S1B`, `M1b`. The
+> recorded composition `#532 ∥ #503 ∥ I-S1A` was overturned: #503 is deferred to M3 (it was a
+> literature write-up; the premise is derive-from-the-theory), and two design questions sit
+> upstream of both builds — **D-A** (how Python drives Wolfram) and **D-B** (what a user
+> writes, and how the artifact reaches the Theory) — which R-1 decides from installed-and-run
+> comparables; **D-C** (FRW perturbation tooling) is R-C's. O1/TorC (#498) is parked in the
+> new *Parked* milestone. What waits for a later wave is the carried-forward register below.
+> At each memo's return the orchestrator records the decision, updates every held prompt it
+> touches, and marks the next READY — the user dispatches nothing marked `held`.
 >
 > **What Wave 1 inherits that the original outline did not:**
 >
@@ -976,8 +1019,26 @@ The program is **design-complete**, has passed the pre-implementation scientific
 >   #534 (port manifest at M3), #535/#536 (M3 `inspect`/`validate` requirements), #537 (M7),
 >   #529 (WS3 O2 contract, blocks the O2 handoff not Wave 1), #530 (survey tags at WS3),
 >   #548 (two specs without a TOML, M3), #558 (β over recombination, with #503),
->   #559 (onboarding, I-ONB, no lane), #560 (the FRW volume-element check, WS2 reads
+>   #560 (the FRW volume-element check, WS2 reads
 >   `de_sitter` through it), #561's deferred half (Wolfram-side `Exit[1]` on abort, with #513).
+
+### Carried-forward register
+
+Kept current at every merge (register row *Carried-forward register*, 2026-09-13). What is
+parked for a later wave, with what it needs and when — so the next planning session starts
+from a list, not a memory.
+
+| item | needs | when | record |
+|---|---|---|---|
+| **I-S1B** — Stage-1 Wolfram interface, exporter, cost run, `A[0]` | D-A, D-B, D-C, I-S1A-core | Wave 2 | `handoffs/I-S1B.md`, held, updated at every decision |
+| **M1b** — Cobaya Theory, veto wiring, ΛCDM identity, #515 | D-B, I-532, I-S1A-core | Wave 2 | `handoffs/M1b.md`, held |
+| **#503** — per-operator dispersion, derived from the theory | M3's FRW derivation mode (#500); the operator catalogue made machine-readable (a per-term join to coupling symbols) | M3 planning | #503 + register row *#503 deferred to M3* |
+| **Self-validation ladder, tensor leg (A8)** | a stepper (#518/#492); the API-reachability note from I-532 (does CAMB's Python API expose tensor `h(k,η)` and the standard tensor source?) | WS3's first handoff (M4) | `solver_design.md:702,745-746`; I-532's protocol notes |
+| **Self-validation ladder, photon leg** | WS3/WS4 design | WS3/WS4 planning | register row *O1/TorC parked; the self-validation ladder replaces it* |
+| **#498 / O1 TorC** — CAMB fork, `TabulatedBackground` | a modified-background use case | parked | #498, milestone *Parked* |
+| **#558** — `β` constant over recombination | #500/#501; a user theory with a background torsion mode | M3+, if ever | #558; register row *Birefringence route is perturbation-level* |
+| **R-C's verdict (D-C)** | R-C merged | M3 planning | register row "FRW derivation tooling" (written when R-C returns) |
+| **Wolfram-side `Exit[1]` on abort** (#561's deferred half) | D-A (where it lives depends on the interface shape) | I-S1B | #561, `handoffs/I-S1B.md` outline item 6 |
 
 ## Verification gates
 
