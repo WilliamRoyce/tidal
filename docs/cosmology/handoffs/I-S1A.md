@@ -128,7 +128,10 @@ Four pieces, none of which starts a kernel:
    `tidalcosmo/derive/` (the prototype's check, `run_gate_cases.py`, is the model).
 
 3. **`tidalcosmo/derive/launcher.py` — runs the fixed driver.** Serializes the loaded theory plus
-   fingerprint to `theory.wxf` with `wolframclient`'s **kernel-free** serializer; launches
+   fingerprint to `theory.wxf` with `wolframclient`'s **kernel-free** serializer
+   (`wolframclient.serializers`, and in deliverable 4 `wolframclient.deserializers` — **imported
+   lazily inside functions**, under the `wolfram` extra; register row *`wolframclient` is core at
+   M1b*); launches
    `wolframscript -file <driver.wls> <theory.wxf> <workdir> [--validate-only]` as one subprocess
    (the argv, sentinel lines `STAGE1 PASSED` / `STAGE1_ERROR=<tag>: <message>` and exit codes
    0/1/2 are the prototype's contract, `scripts/research/interfaces/wolfram/driver.wls`; I-S1B

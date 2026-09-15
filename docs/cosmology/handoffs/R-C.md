@@ -1,7 +1,7 @@
 # R-C — Cosmological perturbations: the equations we must produce, the methods, and the tools
 
-> **STATUS: READY — 2026-09-15.** R-1 merged (#568); D-A is recorded, and the sections that
-> depended on it are updated below. Written 2026-09-13 at Wave-1 approval. The user dispatches.
+> **STATUS: DISPATCHED — 2026-09-15.** R-1 merged (#568); D-A is recorded, and the sections that
+> depended on it are updated below. Written 2026-09-13 at Wave-1 approval.
 
 | | |
 |---|---|

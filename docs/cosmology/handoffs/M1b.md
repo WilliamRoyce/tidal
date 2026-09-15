@@ -13,7 +13,7 @@
 | **Wave** | 2 |
 | **Wolfram lane** | **NO.** Never start a kernel — a Cobaya run must never be able to (R-1's never-derive mechanism is what this class enforces). The complete list of things that would start one is in `I-532.md`'s header. |
 | **Depends on** | D-B ✅ (R-1, 2026-09-15); I-532 merged (protocol, seam, flags, the veto-placement memo); I-S1A-core merged (the permanent loader and the spectra store this class builds on) |
-| **Owned paths** | `tidalcosmo/spectator/theory.py` (the `SpectatorTheory(Theory)` class) and `SpectatorTheory.yaml` · `tidalcosmo/__init__.py` (the re-export) · `tests_cosmo/test_theory*.py` · `pyproject.toml` — the `cobaya` core promotion only (`:66-71`) · `benchmarks/` for #515 |
+| **Owned paths** | `tidalcosmo/spectator/theory.py` (the `SpectatorTheory(Theory)` class) and `SpectatorTheory.yaml` · `tidalcosmo/__init__.py` (the re-export) · `tests_cosmo/test_theory*.py` · `pyproject.toml` — the `cobaya` and `wolframclient` core promotions only (`:66-71`) · `benchmarks/` for #515 |
 | **NOT owned** | `tidalcosmo/background/` (I-532's seam — call it, do not change it) · `tidalcosmo/validity/flags.py` beyond adding sites · `tidalcosmo/{config,derive,spectrum}/` (I-S1A-core's permanent loader and store — build on them; a needed change is reported) · `docs/cosmology/veto_placement.md` (a decision record; a departure from it is a report, not an edit) |
 
 ### Decision dependencies (the orchestrator updates these before the Wave-2 rewrite)
@@ -31,7 +31,10 @@
    pass-through mode, and the artifact handoff per D-B — refusing at `initialize()` on a
    missing artifact or a content-hash mismatch, **never deriving**.
 2. **The `tidalcosmo/__init__.py` re-export** — the cobaya-core trigger — with `cobaya`
-   promoted from extra to core and the trigger comment at `pyproject.toml:66-71` updated.
+   promoted from extra to core and the trigger comment at `pyproject.toml:66-71` updated;
+   **`wolframclient` promoted to core in the same change**, pinned `<2`, with a test that the
+   sampling path never loads `wolframclient.evaluation`, `zmq` or `pkg_resources` (register row
+   *`wolframclient` is core at M1b*, 2026-09-15).
 3. **The veto wiring** exactly as `veto_placement.md` recommends, using I-532's flag type
    and policy object; one evaluator, never two code paths (#454).
 4. **The ΛCDM-posterior identity gate** (`repo_reshape.md` §2.5): with the new sector off, a
