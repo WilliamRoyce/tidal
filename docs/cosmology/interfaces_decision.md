@@ -6,7 +6,7 @@
 > reference: `conventions.md`. Prototypes and their reproduction commands:
 > `scripts/research/interfaces/`.
 
-<!-- cspell:words etak hdot mochi SUSY cymetric WSTP sympify covmat venvs MDMSM gravitymodel UFOs hiclass FlexibleSUSY yamls pexpect reweights platformdirs uₐuᵃ lmax ipynb DEVEL -->
+<!-- cspell:words etak hdot mochi SUSY cymetric WSTP sympify covmat venvs MDMSM gravitymodel UFOs hiclass FlexibleSUSY yamls pexpect reweights platformdirs uₐuᵃ lmax ipynb DEVEL inds symm GenSet Karananas MuLambda MPlanck kLambda Linearise TetradPerturbation SpinConnection BField -->
 
 ## 0. Summary
 
@@ -376,6 +376,60 @@ inside Cobaya.** Filed as #573.
 - **M1b (the Cobaya Theory):** `get_modified_defaults` coupling registration;
   `ComponentNotInstalledError` refusal; fingerprint as `get_version`; no `is_installed`/`install`.
 - **I-532:** the per-sample hook question of §3.5, with its evidence.
+
+### 3.8 Schema stability (orchestrator follow-up, 2026-09-15; read-only, no kernel)
+
+Question: is A′ stable enough beyond the Vector theory for a **permanent** I-S1A-core loader?
+PSALTer paths are `Sources/…` at `bb45adb0`; `2607` / `2506b` are `SupplementalMaterials-2607@b49e9f1d` / `-2506b@37c86a5d`.
+
+**Fields above rank 1 — an additive key, not a reshape.** `DefField[field[inds], symm, …]`; `Type=Head@symm`, slot pair from its index list (`DefField.m:33-35, 47-49`); 14 classes (`:11-24`), dispatched at `:58-88`, anything else `UnstudiedKinetics` (`:88`); no `symm` means `GenSet[]` (`:32, :104`).
+
+| field | PSALTer's own declaration | A′ needs |
+| --- | --- | --- |
+| symmetric rank 2 | `DefField[TensorField[-a,-b], Symmetric[{-a,-b}], …]` (`2607` `FieldKinematics.m:6`) | `indices: [-a,-b]`, `symmetry: {symmetric: [-a,-b]}` |
+| rank 3, antisymmetric in 2–3 | `DefField[A23Field[-a,-b,-c], Antisymmetric[{-b,-c}], …]` (`FieldKinematics.m:18`); operators `Theta1*A23Field[-a,-b,-c]*A23Field[a,b,c] + …` (`A23Theory.m:17-19`) | `symmetry: {antisymmetric: [-b,-c]}` |
+| PGT variant | `SpinConnection[-a,-b,-c], Antisymmetric[{-a,-b}]` + general `TetradPerturbation[-a,-b]` (`2506b` `PoincareGaugeTheory.m:10, 15`) | same key (class A12; general = key absent) |
+
+Verdict: one optional per-field `symmetry` key, validated against the closed 14-class enum; `fields` stays a mapping keyed by name.
+
+**Curvature/torsion operators — the mapping holds; expansion input is missing.**
+
+| question | evidence | verdict |
+| --- | --- | --- |
+| `{coupling: operator}` for R/T invariants? | CTEG's nonlinear Lagrangian is written `-(4/9)*MPlanck2*T[…]*T[…] - (1/6)*MuLambda*T[…]*(…) - (1/6)*Mu*(…R…R…) + 2*Nu*R[…]*(…)` — one composite operator per coupling (`2506b` `LagrangianKarananasCouplings.m:139-147`) | **holds** |
+| forms grouped by invariant | `(kR4+kR5)*R…R`, `(kLambda/4+kT1/3+kT2/12)*T…T` (`…Couplings.m:85-96`); the expanded file has monomials `(-3*Mu+Nu)*CD[…]…` (`ParticleSpectrographCTEG.m:9`) | expressible only regrouped by coupling (always possible: linear, `PSALTer.m:80`) |
+| products of couplings | `DefConstantSymbol[MuLambda, PrintAs->"(μλ)"]` (`…Couplings.m:78`), forced by `B3==-A6*Lambda/2` (`:119`) | the product is its own coupling key; the relation goes in Cobaya `params:` |
+| what the expansion step needs | `H`, `BField`, `R`, `T` as `DefTensor` + `MakeRule` in the fields (`PoincareGaugeTheory.m:20-38`); measure `(1-f^z_z)`, ε-ordering, `Series` to 2 (`Linearise.m:8-21`); our formulation uses fields `h, T, a` + `ChangeCurvature` + contortion (`stage1_engineering_plan.md:421-424, 510-518`); derived `F = dA` (`:518`; legacy `theory.toml:90-96`) | **new keys**: which geometry supplies R/T from which fields, and derived-field definitions — not in A′, not run here |
+
+**FRW branch (M3) — a separate solver-only block, outside the spectrum fingerprint.**
+
+| need | source | in A′? | belongs in |
+| --- | --- | --- | --- |
+| background fields (e.g. `B`) | "separate solver-only config block" (`spectrum_design.md:351, 368-371`); `Abar` components (legacy `theory.toml:99-102`) | no | solver `background` block |
+| field → background + perturbation map | legacy `[linearization]` (`theory.toml:120-128`) | no | solver block |
+| gauge choice, recorded in spec | `repo_reshape.md:458-460, 464-465` | no | solver derivation option |
+| field declarations, symmetry classes, coupling roster, term structure, gauge-symmetry declarations | shared, convention-free (`spectrum_design.md:360-363`) | partly (no `symmetry`, no gauge-symmetry declarations) | shared theory file |
+
+**Schema evolution (prototype mechanics).**
+
+| question | evidence | answer |
+| --- | --- | --- |
+| does adding a key force re-derivation? | fingerprint = sha256 of `{"schema": SCHEMA, **theory}` (`theory_store.py:102-110`); derivation defaults are **merged into** the hashed form (`:39, :75-76`) | a new *merged default* changes every fingerprint; a key **omitted when absent** changes none; bumping `SCHEMA` (`:32`) changes all |
+| should absent-by-default keep old fingerprints? | field specs are hashed as given (`:76`); absent `symmetry` means exactly `GenSet[]` (`DefField.m:32`) | **yes, only when absence reproduces the old derivation exactly**; otherwise bump `SCHEMA`. Canonical form must drop defaulted keys (fix `:75`); solver-only keys need a separate fingerprint |
+
+**Recommendation: permanent, schema-versioned, with named gaps.** Every gap found is additive (optional keys, a solver-only block); none reshapes an existing key. The loader keeps rejecting unknown keys (`theory_store.py:58`; `Stage1Proto.wl:112`), so a theory needing a gap is refused, never mis-derived.
+
+| key | status | basis |
+| --- | --- | --- |
+| `lagrangian: {coupling: operator}`; products as their own coupling | **settled** | CTEG (`…Couplings.m:78, 119, 139-147`), `A23Theory.m:17-19`, Vector run |
+| `fields.<name>.indices`, `print_as`, `print_source_as` | **settled** | `DefField.m:29, 33` |
+| `fields.<name>.symmetry` | **settled shape, add now** | `DefField.m:11-24, 58-88`; `FieldKinematics.m:6, 15, 18` |
+| `derivation.max_laurent_depth` | **settled** | `PSALTer.m:82` |
+| operator whitelist (`CD`, declared fields, a–z) | rests on Vector alone | `Stage1Proto.wl:93` |
+| geometry for the expansion step (PGT tetrad/spin connection vs `h, T`) | **gap — I-S1B** | `PoincareGaugeTheory.m:20-38`; `stage1_engineering_plan.md:421-424` |
+| derived fields (`F = dA`) | **gap — I-S1B** | `stage1_engineering_plan.md:518` |
+| gauge-symmetry declarations | **gap** | `spectrum_design.md:362` |
+| solver `background` / `linearization` / `gauge` | **gap — M3, solver-only block** | `spectrum_design.md:351, 368-371`; `repo_reshape.md:458-465` |
 
 ## 4. Convention carriage
 
