@@ -15,7 +15,7 @@
 > `tests/test_repo_hygiene.py` rejects, so that phrase is reworded as in `handoffs/R-1.md:186`.
 > "You" in the text addresses the user who dispatched R-1.
 
-<!-- cspell:words hdot Scal dgrho dgpi Challinor sympify mochi upvalues SUSY cymetric yamls hexic platformdirs cdef reweights venvs ayprime clxcdot birefring bispectrum shdw WSTP MDMSM hiclassy covmat Theo uₐuᵃ dxⁱdxʲ -->
+<!-- cspell:words hdot Scal dgrho dgpi Challinor sympify mochi upvalues SUSY cymetric yamls hexic platformdirs cdef reweights venvs ayprime clxcdot birefring bispectrum shdw WSTP MDMSM hiclassy covmat Theo uₐuᵃ dxⁱdxʲ ipynb DEVEL -->
 
 ---
 

@@ -6,7 +6,7 @@
 > reference: `conventions.md`. Prototypes and their reproduction commands:
 > `scripts/research/interfaces/`.
 
-<!-- cspell:words etak hdot mochi SUSY cymetric WSTP sympify covmat venvs MDMSM gravitymodel UFOs hiclass FlexibleSUSY yamls pexpect reweights platformdirs uₐuᵃ lmax -->
+<!-- cspell:words etak hdot mochi SUSY cymetric WSTP sympify covmat venvs MDMSM gravitymodel UFOs hiclass FlexibleSUSY yamls pexpect reweights platformdirs uₐuᵃ lmax ipynb DEVEL -->
 
 ## 0. Summary
 

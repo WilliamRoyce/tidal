@@ -6,7 +6,7 @@
 > disagree about CAMB, this file is the corrected reading (§2). The reasoning trail is in
 > `r1_planning_record.md`; the decision memo is `interfaces_decision.md`.
 
-<!-- cspell:words etak dgrho dgpi gpres Scal adotoa clxcdot hdot epsilonG uₐuᵃ Challinor Lasenby dxⁱdxʲ ayprime hexic -->
+<!-- cspell:words etak dgrho dgpi gpres Scal adotoa clxcdot hdot epsilonG uₐuᵃ Challinor Lasenby dxⁱdxʲ ayprime hexic ipynb DEVEL -->
 
 **Pinned versions.** PSALTer v2.0.2 at `bb45adb0` (installed under Wolfram's
 `$UserBaseDirectory/Applications/xAct/PSALTer`; paths below are relative to it). CAMB 2.0.4:
