@@ -1,0 +1,11 @@
+# Massive vector with independent kinetic operators — the R-1 prototype theory.
+# The physics is SupplementalMaterials-2607 Models/VectorTheory.m (Barker); this file is
+# its restatement in the recommended Option A' theory-file schema.
+# Conventions: signature (+,-,-,-), epsilon_0123 = +1 (PSALTer's).
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:                   # S = ∫ Σᵢ θᵢ Oᵢ — key = coupling, value = its operator
+  Theta1: '-(1/2)*CD[-a]@VectorField[-b]*CD[a]@VectorField[b]'
+  Theta2: '(1/2)*CD[-a]@VectorField[a]*CD[-b]@VectorField[b]'
+  Theta3: '-(1/2)*VectorField[-a]*VectorField[a]'
+derivation: {max_laurent_depth: 1}

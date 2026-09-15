@@ -1,35 +1,37 @@
 # I-S1B — Stage-1 Wolfram interface, exporter, cost run, and the `A[0]` answer
 
-> **STATUS: HELD (outline) — Wave 2. Depends on D-A, D-B, D-C and I-S1A-core.** Written
-> 2026-09-13 at Wave-1 approval so nothing decided in Wave 1 is forgotten; the orchestrator
-> updates the marked sections at each decision. **Not dispatched in Wave 1.** It becomes a
+> **STATUS: HELD (outline) — Wave 2. Depends on D-C and I-S1A-core** (D-A, D-B and the
+> conventions rule recorded 2026-09-15 and written in below). Written 2026-09-13 at Wave-1
+> approval so nothing decided in Wave 1 is forgotten; the orchestrator updates the marked
+> sections at each decision. **Not dispatched in Wave 1.** It becomes a
 > full prompt, then READY, at Wave-2 planning.
 
 | | |
 |---|---|
-| **Issue** | **#495** (WS6 umbrella) · #527 (I-S1A, the half that waited) · #522, #523 · #561 (the Wolfram-side `Exit[1]` deferred there) · #488 |
+| **Issue** | **#495** (WS6 umbrella) · #527 (I-S1A, the half that waited) · #522, #523 · #561 (the Wolfram-side `Exit[1]` deferred there) · #572 (PSALTer's bare `Quit[]`) · #566 (R-1) · #488 |
 | **Milestone** | M-parallel |
 | **Wave** | 2 |
 | **Wolfram lane** | **Yes — the cost run and Tier 2.** One `wolframscript` at a time, machine-wide; `ensure_registered.sh` and `verify --require-psalter` exit 0 before and after. |
-| **Depends on** | D-A, D-B (R-1); D-C (R-C); I-S1A-core merged (dataclasses, driver, validator) |
-| **Owned paths** | `tidalcosmo/derive/wolfram/` (the interface and the exporter, in whatever shape D-A chose) · `tests/wolfram/` additions for it · `tests_cosmo/test_derive_wolfram*.py` · the cost-run record under `docs/cosmology/` |
+| **Depends on** | D-A, D-B ✅ (R-1, 2026-09-15); D-C (R-C); I-S1A-core merged (loader, store, launcher, dataclasses) |
+| **Owned paths** | `tidalcosmo/derive/wolfram/` (the committed package, its exporter and the fixed `driver.wls`) · `tidalcosmo/cli/` — the `tidalcosmo derive` subcommand only · `tests/wolfram/` additions for it · `tests_cosmo/test_derive_wolfram*.py` · the cost-run record under `docs/cosmology/` |
 | **NOT owned** | `tidalcosmo/{config,spectrum}/` beyond what the interface must call (I-S1A-core's; amend at the instruction site and report) · `tidalcosmo/{background,spectator,validity}/` · `pyproject.toml` |
 
 ### Decision dependencies (the orchestrator updates these before the Wave-2 rewrite)
 
 | open decision | sections affected | what changes |
 |---|---|---|
-| **D-A** (R-1) | the interface's shape; the exporter's packaging; where #561's Wolfram-side `Catch` + `Exit[1]` lives; how `derivation_hash` is computed | Generated `.wls` → a templater in Python with golden-text tests and the exporter as a committed `.wl` the script `Get`s; a data-taking package → the exporter *is* the package entry, `tests/wolfram/` unit tests, a three-line data-loading stub; a `wolframclient` session → the package plus session-lifecycle code in the driver, and error signalling through the session rather than exit status. *(To be filled: which, and R-1's prototype tables.)* |
-| **D-B** (R-1) | the input model the interface consumes | The interface reads I-S1A-core's dataclasses, which load D-B's format; nothing here reads a user file directly. *(To be filled: any derivation-only fields.)* |
+| **D-A** (R-1) — **recorded 2026-09-15: one committed package + a fixed driver** | the interface; the exporter; `Catch` + `Exit[1]`; the derivation's identity | The exporter is a **function in the committed package**, called by the **fixed `driver.wls`** (argv `<theory.wxf> <outDir> [--validate-only]`; sentinels `STAGE1 PASSED` / `STAGE1_ERROR=<tag>: <message>`; exit 0/1/2). Start from the R-1 prototype `scripts/research/interfaces/wolfram/{Stage1Proto.wl,driver.wls}` (it reproduced `vector_smoke.wls`'s wave operator `SameQ`, `interfaces_decision.md` §2.3). User text is parsed held and whitelisted before PSALTer runs (§2.4 — keep all eleven failure fixtures as `tests/wolfram/` cases); field and coupling symbols are created in `Global` (PSALTer derives contexts from `ToString`); the theory name is fingerprint-derived; `Catch` + `Exit[1]` lives once in the driver (#561, #572). The derivation's identity is the loader's **fingerprint** — there is no script to hash. |
+| **D-B** (R-1) — **recorded: Option A′** | the input the package consumes; the CLI | The package receives the loader's canonical theory as WXF; nothing here reads a user file. **`tidalcosmo derive <run-or-theory>.yaml`** wires I-S1A-core's loader, launcher and store with `--test` (never starts a kernel; mirrors `cobaya-install --test`), `--force`, `--dry-run`, `--timeout` (default none) and `--validate-only`, as run in R-1's `derive_proto.py` (§3.3). **Schema gaps this prompt owns** (§3.8, each added under the schema-evolution rule): expansion geometry (which formulation supplies R and T from which fields), derived fields (`F = dA`), gauge-symmetry declarations (provisional), and widening the operator whitelist beyond the Vector theory's `CD`, fields and indices. |
 | **D-C** (R-C) | what the shared convention-free toolbox must carry for the FRW branch | If R-C recommends building on an xAct-family package, the toolbox's field declarations and term structure must be emittable in that package's form as well as PSALTer's; if build-own, the toolbox stays PSALTer-shaped and the FRW branch adds its own emitter at M3. *(To be filled.)* |
-| **Carriage rule** (R-1) | the exporter's `conventions` block; the mapping applied before PSALTer sees the Lagrangian | *(To be filled: the user-facing convention, PSALTer's signature and `ε₀₁₂₃` from source, the mapping's test.)* |
+| **Conventions** (R-1) — **recorded: `conventions.md` canonical** | the exporter's `conventions` block | The user writes in PSALTer's convention, so **nothing is mapped**: the spectrum records `{"signature": [1,-1,-1,-1], "epsilon0123": 1}` (`PSALTer.m:101`, `DefGeometry.m:69-72`), the manifest repeats it and every reader refuses others. The spectrum-side check is a reference theory with a published healthy/ghost verdict run through the whole pipeline (`conventions.md` §5). |
 | **I-S1A-core** | everything that consumes the dataclasses, the driver and the validator | Import paths from I-S1A-core's report. *(To be filled.)* |
 
 ## Outline — what this prompt will ask for
 
-1. **The Stage-1 Wolfram interface in D-A's shape**, driven by I-S1A-core's
-   `wolfram_driver.py`; the never-judge-by-exit-status rule and the file-based engine test
-   are already in the driver — do not duplicate them.
+1. **The committed Stage-1 package and the fixed `driver.wls`** (D-A), launched by I-S1A-core's
+   `tidalcosmo/derive/launcher.py`; the artifact verdict, the lane self-guard and the file-based
+   engine test are already in the launcher — do not duplicate them. Plus the **`tidalcosmo derive`
+   CLI** (D-B).
 2. **The exporter** (`stage1_engineering_plan.md:565-570`, its packaging per D-A): emits the
    Stage-2 contract the I-S1A-core dataclasses read — schema version, theory, PSALTer commit,
    `conventions`, ordered couplings, `J^P` labels, `A[(n+1) × 3 × dim × dim]`, gauge rank,
@@ -44,8 +46,12 @@
    configuration's fingerprint; the number the sampling-time budget stands on.
 5. **Tier 2** of the PSALTer gate on the interface's own output — the same fixtures I-S1A-core
    asserts against, produced by this path, byte-compared.
-6. **#561's Wolfram-side half**: `Catch` at the top level with `Exit[1]` on an uncaught
-   `Throw`, placed where D-A's shape puts it; a test that watches it fail first.
+6. **#561's Wolfram-side half**: `Catch` at the top level of `driver.wls` with `Exit[1]` on an
+   uncaught `Throw`; PSALTer's bare `Quit[]` (#572) is caught by the launcher's artifact check; a
+   test that watches each fail first.
+7. **The schema gaps named in the D-B row**, each added as an optional key under the
+   schema-evolution rule (register row *Theory loader is permanent*), with a torsion theory run
+   through the package end to end.
 
 ## Success criteria — to be finalized at the Wave-2 rewrite
 

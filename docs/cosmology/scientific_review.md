@@ -150,7 +150,7 @@ risk ranking accordingly.
 | 25 | `repo_reshape.md` §7 | M∥ vs M0.5 "before any porting" and vs M3's ownership of `derive/` | A | `7b6f7a17` — resolved, both directions stated |
 | 26 | `solver_design.md` §8/§12, #519 | WKB contingent on a bake-off | B | `237c33e5` — planned rung; bake-off decides composition |
 | 27 | — | O2 has no WS2→WS3 contract | C | New issue, companion to #504 (§3.1) |
-| 28 | `solver_design.md` §2.1 | CAMB `derivst` convention unverifiable in-repo (no CAMB installed; scratchpad anchor) | C | Pinned inside the A8 gate: read installed source, commit the mapping + a test |
+| 28 | `solver_design.md` §2.1 | CAMB `derivst` convention unverifiable in-repo (no CAMB installed; scratchpad anchor) | C | Pinned inside the A8 gate: read installed source, commit the mapping + a test. *Stale premise, 2026-09-15: CAMB 2.0.4 is installed and R-1 pinned its variable definitions from source (`conventions.md` §3); the mapping test is I-532's* |
 | 29 | `solver_design.md` §9 | `[survey]`-tagged LJL bounds — the only quantitative accuracy claim for the WKB rung — unverified, no tracker | C | New tracker issue; verify on first use |
 | 30 | `magnetic_field_background.md` §3 | PMF anisotropic-stress bound engaged by one paper and set aside on a disputed criticism; §1's rebuttal is an *energy-density* argument that does not answer it | C | #506 — must-adjudicate-before-O3 |
 | 31 | `solver_design.md` §11 | `rk-adaptive`, the declared bake-off baseline, was never measured | C | Mandatory first row of the WS3 bake-off |

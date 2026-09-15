@@ -1,9 +1,7 @@
 # R-C — Cosmological perturbations: the equations we must produce, the methods, and the tools
 
-> **STATUS: HELD — depends on D-A (from R-1) for part 4's interface implications.** Written
-> 2026-09-13 at Wave-1 approval so nothing is forgotten; the orchestrator updates the marked
-> sections when R-1's decisions are recorded, then marks this READY. **Do not dispatch while
-> HELD.**
+> **STATUS: READY — 2026-09-15.** R-1 merged (#568); D-A is recorded, and the sections that
+> depended on it are updated below. Written 2026-09-13 at Wave-1 approval. The user dispatches.
 
 | | |
 |---|---|
@@ -11,7 +9,7 @@
 | **Milestone** | M3 (it feeds WS2's design, not a Wave-1 build) |
 | **Wave** | 1 — research, second of two memos; **second lane occupant, after R-1 has merged and its gate has been re-run** |
 | **Wolfram lane** | **Yes — up to two days.** One `wolframscript` at a time, machine-wide. `ensure_registered.sh` and `verify --require-psalter` exit 0 **before** you start and **after** you finish; both outputs attached. |
-| **Depends on** | R-1 merged (D-A recorded — see the dependency table) |
+| **Depends on** | R-1 merged ✅ 2026-09-15 (D-A recorded). The lane is free: the orchestrator's re-run of R-1's evidence finished 2026-09-15 with no kernel left running |
 | **Owned paths** | `docs/cosmology/perturbation_tooling.md` (the memo) · `scripts/research/perturbations/` (install script, probes, reproductions) · **one additive install** into the real userbase: `~/.local/wolfram/userbase/Applications/xAct/xPand/` and nothing else there |
 | **NOT owned** | anything under `tidalcosmo/` · `scripts/install-*.sh` · `scripts/psalter/**` · any existing package under `Applications/xAct/` (xTensor, xPerm, xCore, xCoba, xPert, PSALTer — read-only) · the design docs (report contradictions; do not edit) |
 
@@ -19,8 +17,8 @@
 
 | open decision | sections affected | what changes |
 |---|---|---|
-| **D-A** (R-1): generated `.wls` / package taking data / `wolframclient` session | Part 4, "Recommendation" — the *interface* each tooling choice implies | Under a data-taking package or a session, a tool is judged on whether it exposes callable functions; under generated scripts, on whether its API can be emitted. The requirements checklist (part 1) and the tool survey (part 3) do not change. |
-| **D-B** (R-1): input format | none directly | — |
+| **D-A** (R-1) — **recorded 2026-09-15: one committed Wolfram package run by a fixed driver**, theory passed as WXF data; no generated code; a `wolframclient` session was measured and cannot derive (`DefField` never returns inside one) | Part 4, "Recommendation" | Judge each tool on **whether it exposes callable functions that a committed package can call with data** (xPand and xPert do, per R-1 §2.6) — not on whether its API can be emitted as text, and not on session use. The requirements checklist (part 1) and the tool survey (part 3) do not change. |
+| **D-B** (R-1) — **recorded: Option A′** | Part 1 (what the FRW derivation's *input* looks like) | The theory file is shared by both branches; the FRW branch will need a **separate solver-only block** (background fields, field → perturbation map, gauge choice) with **its own fingerprint** (`interfaces_decision.md` §3.8). Part 1 lists what that block must carry; do not design it. |
 
 ## Why this exists
 
@@ -66,6 +64,14 @@ Two physics facts that constrain the survey:
 6. `docs/cosmology/interfaces_decision.md` — R-1's memo (exists once this is READY).
 7. `tidal/wolfram/ComponentDecompose.wl` and `docs/tex/background_fields.tex` (what legacy
    already does, to compare against — not to build on).
+7a. **`docs/cosmology/conventions.md` (canonical since 2026-09-15)** — our FRW equations use
+   PSALTer's `(+,−,−,−)`, `ε₀₁₂₃ = +1` and **CAMB's perturbation-variable definitions**
+   (§3: `etak = kη_s = −kη/2`, `ḣ_s = 6ḣ`, φ is the Weyl potential). **Ma & Bertschinger is
+   `(−,+,+,+)`**: every sign difference in your reproductions must be attributed to convention or
+   physics (§6), never left as "matches up to sign".
+7b. `docs/cosmology/interfaces_decision.md` §2.6 (what D-A implies for tools), §3.8 (the
+   solver-only block), §5.1 (R-1's pinned read of **SymBoltz.jl** at `3d1f20a3` — handed to you:
+   its equations-in approach belongs in parts 2–3).
 8. `literature/astro-ph_9506072/` (Ma & Bertschinger — your scalar reproduction target).
 
 ## What you produce
@@ -121,8 +127,9 @@ Scripts committed under `scripts/research/perturbations/`; symbolic equality, no
 ### Part 4 — Recommendation
 
 Build-on / borrow-pieces / build-own, **per requirement in part 1**, with the cost of each,
-and the interface each choice implies for D-A *(section updated by the orchestrator when D-A
-is recorded)*.
+and the interface each choice implies **under D-A as recorded**: our FRW derivation will be a
+function in a committed Wolfram package, run by a fixed driver on WXF data — so say, per tool,
+which of its functions that package would call, with what data, and what it would return.
 
 ## Success criteria — verified from artifacts
 

@@ -1,0 +1,5 @@
+# R-1 failure fixture: an underscore coupling name parses as a Mathematica pattern
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  m_phi: '-(1/2)*VectorField[-a]*VectorField[a]'

@@ -25,7 +25,8 @@ repos:
       - id: check-merge-conflict
       # Check YAML files for parseable syntax
       - id: check-yaml
-        exclude: ^\.github/workflows/
+        # Cobaya input files use Cobaya's own !defaults tag, which a generic loader rejects (R-1 #566)
+        exclude: ^(\.github/workflows/|scripts/research/interfaces/(theories|runs)/)
       # Check TOML files for parseable syntax
       - id: check-toml
       # Ensure files end in a newline

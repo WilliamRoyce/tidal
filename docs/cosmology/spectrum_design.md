@@ -295,10 +295,20 @@ native applies to field conventions too.
 
 ### 4.3 Signature: two ecosystems, opposite conventions, one answer per branch
 
+> **⚠ Corrected 2026-09-15 (R-1, #566; #569) — this section's premise is wrong about CAMB.** CAMB
+> **declares `(+,−,−,−)`** (`camb/symbolic.py:460`, `docs/source/variables_guide.rst:223` at tag
+> `2.0.4`), and its Fortran equations are signature-agnostic; the `(−,+,+,+)` row below is
+> Ma–Bertschinger's, which CAMB cites but does not adopt. So there is **one answer, PSALTer's
+> `(+,−,−,−)` with `ε₀₁₂₃ = +1`, for both branches**; the solver branch takes CAMB's
+> perturbation-variable *definitions* at the seam. The canonical rule, with every pin, is
+> **`docs/cosmology/conventions.md`** (adopted by the user 2026-09-15). The conversion-layer
+> prohibition below stands unchanged.
+
 | | signature | `ε` | source |
 | --- | --- | --- | --- |
 | Barker ecosystem (PSALTer v1/v2, polology) | `(+,−,−,−)` | `ε₀₁₂₃ = +1` | 2606.30785:364 ("the particle physics signature"); 2506.02111:100; 2406.09500 ¶Conventions |
-| CAMB/CLASS ecosystem (Ma–Bertschinger) | `(−,+,+,+)` | — | `literature/astro-ph_9506072/9506072.tex:295`: `ds² = a²(τ){−dτ² + (δᵢⱼ + hᵢⱼ)dx^i dx^j}` |
+| CAMB (declared; Fortran signature-agnostic) — *row added 2026-09-15, #569* | `(+,−,−,−)` | none | `camb/symbolic.py:460`; `docs/source/variables_guide.rst:223` (tag `2.0.4`) |
+| Ma–Bertschinger / CLASS — *was mislabeled "CAMB/CLASS" until 2026-09-15* | `(−,+,+,+)` | — | `literature/astro-ph_9506072/9506072.tex:295`: `ds² = a²(τ){−dτ² + (δᵢⱼ + hᵢⱼ)dx^i dx^j}` |
 | legacy TIDAL | `(−,+,+,+)` | `ε₀₁₂… = −1` | `tidal/wolfram/CommonUtilities.wl:31-33` |
 
 "Adopt the other package's standard" therefore has two different answers, and that is fine:
@@ -310,7 +320,9 @@ converted anywhere.
 Where the signature actually enters the spectrum branch (the content of "native"): the branch
 never evaluates components — PSALTer does its own SPO decomposition — but three things are
 signature-tied even at abstract-index level: (1) the `ε·ε` contraction identities (they carry
-the sign of `det g`), so parity-odd terms expand differently; (2) the sign conventions of the
+the sign of `det g`) *(corrected 2026-09-15, #569: `det g = −1` in both signatures, so that is
+not the mechanism — each inverse metric flips under `g → −g`, `conventions.md` §6)*, so
+parity-odd terms expand differently; (2) the sign conventions of the
 curvature/torsion definitions and of the EH-type operator; (3) any
 `ToCanonical`/`ContractMetric` simplification, which uses the session's declared metric. Being
 native costs nothing: the emitted script is standalone and PSALTer pre-defines its own
@@ -351,7 +363,7 @@ published spectrograph is the primary oracle (§12c).
 | background fields | absent from its input (separate solver-only config block) | kept and central (the `B` field is the physics) |
 | product | quadratic **Lagrangian** | linearized **EOM** |
 | representation | abstract index, never evaluated to components | components |
-| conventions | Barker `(+,−,−,−)`, `ε₀₁₂₃ = +1` | CAMB `(−,+,+,+)`, conformal `τ` |
+| conventions | Barker `(+,−,−,−)`, `ε₀₁₂₃ = +1` | the same signature and `ε` (CAMB declares `(+,−,−,−)`; *corrected 2026-09-15, #569*), CAMB's perturbation-variable definitions (`conventions.md` §3), conformal `τ` |
 
 They differ in every row: **two derivations from one input**. The solver branch does not
 detour through the PSALTer-shaped quadratic Lagrangian — it goes straight to the EOM, which is
@@ -393,6 +405,15 @@ linear in the fields; (5) emit a **standalone** `.wls` running `ParticleSpectrum
 `tidal/cli/_derive.py::{_wls_fields,_wls_lagrangian}` + `tidal/cli/_wls_helpers.py`; model the
 emitted script on the published `WolframLanguage/ParticleSpectroscopy/{FieldKinematics.m,
 Models/*.m}`.
+
+> **⚠ Amendment (orchestrator, 2026-09-15 — D-A, adopted by the user from R-1 #566): there is no
+> generator.** Steps (4)–(5) are functions of **one committed Wolfram package**, run by a **fixed
+> driver** as one `wolframscript` subprocess per derivation, with the theory passed as **WXF data**
+> loaded from the Option A′ theory YAML; Python never writes Wolfram code. Model it on the R-1
+> prototype (`scripts/research/interfaces/wolfram/{Stage1Proto.wl,driver.wls}`, which reproduced
+> `vector_smoke.wls`'s wave operator `SameQ`) and on PSALTer's published models — **not** on
+> legacy's generator, which this paragraph inherited without argument. Evidence:
+> `interfaces_decision.md` §2.
 
 > **Amendment (H8, 2026-09-04 — verified against PSALTer v2.0.2 @ `bb45adb0`):** `Method` is **declared but never
 > read** — `Options@ParticleSpectrum` sets `Method->"Easy"` (`Sources/ParticleSpectrum.m:116`)

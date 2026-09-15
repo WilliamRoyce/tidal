@@ -1,0 +1,7 @@
+# R-1 failure fixture: a literal block whose second line starts a new expression
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: |
+    -(1/2)*VectorField[-a]*VectorField[a]
+    + VectorField[-a]*VectorField[a]

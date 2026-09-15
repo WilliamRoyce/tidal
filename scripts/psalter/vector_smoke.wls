@@ -22,6 +22,11 @@
 
    Run from a throwaway directory: PSALTer writes into the current one.
 
+   EXPIRED 2026-09-15 (R-1 #566, re-run by the orchestrator): the association now carries the
+   mass term -- its first WaveOperator element is (Def^2*(-Theta1 + Theta2) - Theta3)/2. The
+   discrepancy recorded below was #543 (two unregistered Function Repository resources,
+   resolved 2026-09-11), not a PSALTer defect. Kept as the record of what was seen.
+
    DELIBERATELY NOT ASSERTED HERE: agreement with the published block values.
    On this install the association's WaveOperator and PseudoDeterminant both come
    back as -Def^2*Theta1/2 in each sector, while the rendered spectrograph shows

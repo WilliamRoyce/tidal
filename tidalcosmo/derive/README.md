@@ -12,6 +12,14 @@
 **Responsibility.** TOML → `.wls` generation, the `wolframscript` driver, and the ported Wolfram
 modules. All symbolic processing stays in Wolfram — **never post-process equations in Python.**
 
+> **⚠ Amended 2026-09-15 (D-A, D-B — adopted by the user from R-1 #566).** There is no TOML and no
+> `.wls` generation. The user writes an **Option A′ theory YAML** (`fields`, `lagrangian` as
+> coupling → operator in PSALTer notation, `derivation`), included into Cobaya run files with
+> `!defaults`; `tidalcosmo derive run.yaml` loads it, passes it as **WXF data** to **one committed
+> Wolfram package** run by a **fixed driver**, and stores the derived spectrum content-addressed.
+> The TOML sentence above was inherited from legacy and argued for nowhere.
+> `docs/cosmology/interfaces_decision.md` §2–§3.
+
 **This is a port *and* a substantial extension, not a lift-and-shift.** The `.wl` modules (5,982
 lines) are the asset and are largely CLI-independent. `tidal/cli/_derive.py` (6,718 lines, the
 largest file in the codebase) is where TOML→`.wls` generation is *fused to `argparse`*; porting

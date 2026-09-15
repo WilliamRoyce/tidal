@@ -501,6 +501,15 @@ Validate at load with `error_with_hint`:
 
 ### 4.3 The emitted script
 
+> **⚠ Amendment (orchestrator, 2026-09-15 — D-A, adopted from R-1 #566): nothing is emitted.**
+> The six steps below remain the order of work, but they are performed by **one committed
+> Wolfram package** (`RunStage1`) run by a **fixed `driver.wls`**, receiving the theory as WXF
+> data. Names, the symbol whitelist and coupling-linearity are checked **in the package, on a
+> held parse, before PSALTer runs** (`interfaces_decision.md` §2.4 — eleven malformed and
+> injected inputs refused). Step 5's signature/`ε` assertion becomes the spectrum manifest's
+> `conventions` record, asserted by every consumer (`conventions.md` §5). Read "emit" below as
+> "the package performs".
+
 Single session (§0.5), standalone, in Barker-native conventions from its first line —
 signature `(+,−,−,−)`, `ε₀₁₂₃ = +1` — which cost nothing because PSALTer establishes that
 geometry itself. Emit, in order:
@@ -530,6 +539,14 @@ The gauge-unfixed Lagrangian is handed over deliberately: finding the gauge symm
 imposing source constraints is PSALTer's job (H6 §4.5).
 
 ### 4.4 The driver
+
+> **⚠ Amendment (orchestrator, 2026-09-15 — D-A).** The driver launches the fixed
+> `driver.wls <theory.wxf> <outDir>`, never a generated script. `Catch` + `Exit[1]` lives once in
+> `driver.wls` (#561, #572: PSALTer throws uncaught and has a bare `Quit[]`), and the verdict is
+> the artifact plus its sentinel line, never the exit status. It self-guards the lane with
+> `pgrep` (the lane hook cannot see a Python-launched kernel) and tests the engine as a file
+> (#565). A `wolframclient` session was measured and rejected: `DefField` never returns inside
+> one (`interfaces_decision.md` §2.5, reproduced by the orchestrator 2026-09-15).
 
 `tidalcosmo/derive/wolfram_driver.py`: engine-idle guard before every launch
 (`pgrep -f -i 'wolframscript|WolframKernel|MathKernel'` — the single-license rule is
@@ -760,7 +777,7 @@ append-only; a handoff report is ephemeral; this needs to be a committed documen
 | reader | `A23` blocks are dims (2,4,2) with `2·1+4·3+2·5 = 24`; `Vector` blocks equal the **published** expressions and the **committed upstream `.wxf`** exactly (symbolic difference simplifies to zero) — published values and the `.wxf` remain the *reference*; the 2026-09-09 prohibition on this install's own output is **lifted since certification** (2026-09-11, see the amendment below), and one open question survives: which artifact carries the published values — the association keys, or the `ConstructSpectrograph` render (§8, handed to I-S1A); placeholder/plural-key/degenerate cases unit-tested |
 | reject rule | a bare-numeric term errors with a hint naming the term; the legacy `theory.toml` Lagrangian is rejected |
 | exporter | in-kernel reconstruction `SameQ`; Python-side numeric agreement ≤ 1e-12 at 5 random rational coupling points; label calibration passes on ≥ 3 single-operator probes; `A[0]` vanishes **iff non-sampled constants are excluded from the coupling vector** — see the amendment below (coupling-linearity) |
-| emitted script | declares and machine-checks signature and `ε`; standalone; no repo-absolute paths |
+| package + driver *(was "emitted script"; D-A, 2026-09-15)* | the manifest records signature and `ε` and every consumer refuses any other; the driver is fixed, never generated; no repo-absolute paths |
 | cost | measured, not guessed, with checkpoints; one explicit go/no-go sentence; `Method` inertness confirmed live |
 
 **Where tests live.** `scripts/run_wolfram_tests.sh` auto-discovers `tests/wolfram/test_*.wls`
@@ -801,7 +818,8 @@ The critical path is Wolfram-serial; Python work fills the gaps.
 2. **Tier-1 oracle** (§3), backgrounded. While it runs: **fixtures + WXF reader + contract
    dataclasses + pytest** (§5) → commits `test(spectrum): …` and `feat(spectrum): …`.
 3. **Tier-2 oracle** authored and run. While it runs: **input model + validator + generator
-   + driver**, text-emission only, with golden-text tests (§4) → commit
+   + driver**, text-emission only, with golden-text tests (§4) *(amended 2026-09-15, D-A: no
+   generator and no golden-text tests — the package is unit-tested under `tests/wolfram/`)* → commit
    `feat(config,derive): …`.
 4. **Exporter** developed against Vector-scale theories, serial short runs (§5) → commit
    `feat(derive): …` with the Wolfram test suite entry.

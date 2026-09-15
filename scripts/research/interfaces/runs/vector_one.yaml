@@ -1,0 +1,14 @@
+# R-1 prototype run file: standard Cobaya input that includes the theory file.
+# The unit likelihood keeps this CAMB-free; the point is the interface, not a posterior.
+theory:
+  spectator_gate.SpectatorGate:
+    python_path: ../proto
+    model: !defaults ../theories/VectorTheory     # Cobaya's own include
+params:
+  Theta1: {prior: {min: 0, max: 2}, ref: 1.0, proposal: 0.05, latex: \theta_1}
+  Theta2: {prior: {min: 0, max: 2}, latex: \theta_2}
+  Theta3: 0.5
+likelihood:
+  one:
+sampler:
+  evaluate:
