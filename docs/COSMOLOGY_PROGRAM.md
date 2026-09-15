@@ -946,7 +946,10 @@ items it prints red; prose had failed three times.
    and M1b updated; R-C marked READY; lane evidence re-run from the committed bytes **before**
    merge (stricter than "after"): `verify` exit 0 before and after, both derivation routes and
    the session route, the perturbed control, all failure fixtures and gate cases. *R-C (#567):* after merge re-run `verify --require-psalter` from scratch and
-   confirm only `Applications/xAct/xPand/` was added; record D-C in a new register row "FRW
+   confirm, against R-C's before/after manifest and a fresh listing, that only the six approved
+   directories were added (`Applications/xAct/{xPand,xMAG,xBrauer,TraceFree}/`,
+   `Applications/{SymmetricFunctions,BrauerAlgebra}/`); copy R-C's fetched `literature/`
+   directories into the main checkout and regenerate `literature/README.md` there; record D-C in a new register row "FRW
    derivation tooling"; update I-S1B and the M3 outline; mark I-532 READY. *I-532 (#532):*
    pre-dispatch — #498 re-milestoned Parked and the board row amended (done 2026-09-13); at
    merge re-run the identity test against a **fresh** CAMB run, not the committed oracle; fetch
