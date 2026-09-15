@@ -1,0 +1,5 @@
+# R-1 failure fixture: a lagrangian key that is not a coupling name
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  '2': '-(1/2)*VectorField[-a]*VectorField[a]'

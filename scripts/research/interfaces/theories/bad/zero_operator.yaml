@@ -1,0 +1,5 @@
+# R-1 failure fixture: an operator that is identically zero
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: '0'

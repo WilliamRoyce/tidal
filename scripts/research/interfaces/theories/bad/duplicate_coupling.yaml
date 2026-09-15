@@ -1,0 +1,6 @@
+# R-1 failure fixture: the same coupling twice (Cobaya's loader rejects duplicate keys)
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: '-(1/2)*VectorField[-a]*VectorField[a]'
+  Theta1: 'VectorField[-a]*VectorField[a]'

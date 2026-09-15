@@ -1,0 +1,5 @@
+# R-1 failure fixture: a Quit[] smuggled into an operator must not end the kernel
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: 'Quit[]'

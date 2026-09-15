@@ -1,0 +1,5 @@
+# R-1 failure fixture: code smuggled into an operator must never run
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: 'Print["INJECTED"]; VectorField[-a]*VectorField[a]'

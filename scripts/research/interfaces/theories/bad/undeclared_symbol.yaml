@@ -1,0 +1,5 @@
+# R-1 failure fixture: the operator uses a field that was never declared
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: '-(1/2)*BField[-a]*VectorField[a]'

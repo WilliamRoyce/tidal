@@ -1,0 +1,5 @@
+# R-1 failure fixture: a coupling name PSALTer already owns (its metric G)
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  G: '-(1/2)*VectorField[-a]*VectorField[a]'

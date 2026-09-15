@@ -1,0 +1,5 @@
+# R-1 failure fixture: a floating-point coefficient instead of an exact rational
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: '0.5*VectorField[-a]*VectorField[a]'

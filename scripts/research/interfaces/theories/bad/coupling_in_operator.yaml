@@ -1,0 +1,6 @@
+# R-1 failure fixture: a coupling inside an operator (the action is no longer linear in the couplings)
+fields:
+  VectorField: {indices: [-a], print_as: A, print_source_as: j}
+lagrangian:
+  Theta1: 'Theta2*VectorField[-a]*VectorField[a]'
+  Theta2: '-(1/2)*VectorField[-a]*VectorField[a]'
