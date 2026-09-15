@@ -1,6 +1,6 @@
 # `interfaces/` — research artifacts behind the R-1 interfaces decision
 
-**Status: prototypes run 2026-09-15; results in `docs/cosmology/interfaces_decision.md`.**
+**Status: prototypes run 2026-09-15; results in `docs/cosmology/interfaces_decision.md`.** Note: every `theories/`/`runs/` YAML here is Cobaya input — `runs/*.yaml` use Cobaya's `!defaults` tag and `theories/bad/duplicate_coupling.yaml` is invalid on purpose — so a generic YAML linter (the repo's pre-commit `check-yaml`) rejects them.
 
 Supporting material for `docs/cosmology/interfaces_decision.md` (R-1, #566), which recommends
 how Python drives the Wolfram derivation (D-A), what a user writes and how the derived
@@ -26,6 +26,7 @@ than re-deriving it. **Research code, not production code.**
 | `proto/spectator_gate.py` | the Cobaya Theory that refuses at construction without a matching derived spectrum | ours |
 | `proto/run_gate_cases.py` | twelve refusal/pass cases for the gate, plus the static no-kernel import check | ours |
 | `proto/session_probe.py` | the `wolframclient` session measurement (package through a session; timeout; `Quit[]`) | ours |
+| `proto/session_probe_steps.py` | the isolated follow-up: timeout and `Quit[]` in a bare session; the Stage-1 steps one at a time | ours |
 
 ## How to reproduce
 
@@ -42,6 +43,8 @@ S=../../../third_party/interfaces_runs
 python proto/derive_proto.py runs/vector_one.yaml --store $S/store --log-dir $S/logs/derive_good
 for f in theories/bad/*.yaml; do python proto/derive_proto.py $f --store $S/failures/store; done
 python proto/session_probe.py theories/VectorTheory.yaml $S/session
+python proto/session_probe_steps.py bare $S/session_bare
+python proto/session_probe_steps.py steps theories/VectorTheory.yaml $S/session_steps
 QT_QPA_PLATFORM=offscreen wolframscript -file wolfram/compare_waveoperators.wls \
   reference=$S/reference/ParticleSpectrographVectorTheory.mx \
   package=$S/store/vr1-proto-1/57/<fingerprint>/spectrum.wxf
