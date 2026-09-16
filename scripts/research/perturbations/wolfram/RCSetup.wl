@@ -76,7 +76,19 @@ RCNormalize[expr_, target_, cands_List: {1, -1, 2, -2, 1/2, -1/2, 4, -4, 1/4, -1
   Module[{hits},
     hits = Select[cands, StringStartsQ[RCVerdict[expr, # target, 60], "identical" | "proved-equal"] &];
     If[hits === {}, {None, "proved-different (no candidate normalization)"},
-       {First[hits], "proved-equal up to c=" <> ToString[First[hits]]}]];
+       {First[hits], "proved-equal up to c=" <> ToString[First[hits], InputForm]}]];
+
+
+(* RCTry: run one call with its messages VISIBLE, turning a Throw or a message into $Failed
+   (Check alone does not catch xPand's Throw@Message idiom, xPand.m:1789). *)
+SetAttributes[RCTry, HoldAll];
+RCTry[expr_] := Catch[Check[Quiet[expr, {ToCanonical::noident, General::stop}], $Failed]];
+(* ToCanonical::noident fires whenever the perturbation parameter epsilon is still in the
+   expression; it is benign and would otherwise make Check report a failure. *)
+(* RCSort: xPand's own commutation of the flat induced derivatives (private helper used by
+   SplitPerturbations, xPand.m:2922) so that transversality and traceless rules can fire;
+   needed after VarD, which returns derivatives in an arbitrary order. *)
+RCSort[x_] := RCCanon[Block[{Print}, xAct`xPand`Private`CommuteCDSafe[NoScalar[x], cd]]];
 
 RCReport[name_String, expr_, target_, control_: None] := Module[{v, vc = "n/a", assoc},
   v = RCVerdict[expr, target];

@@ -70,7 +70,8 @@ case "$MODE" in
             echo "MANIFEST_LAYER1=DIFFERENT (FINDING)"; diff "$OUT/before.layer1.sha256" "$OUT/after.layer1.sha256" | head -50
         fi
         echo "MANIFEST_LAYER2_CHANGED_FILES=$(diff "$OUT/before.layer2.sha256" "$OUT/after.layer2.sha256" | grep -c '^[<>]' || true)"
-        diff "$OUT/before.layer2.sha256" "$OUT/after.layer2.sha256" | grep '^[<>]' | sed 's/^\([<>]\) [0-9a-f]*  \.\//\1 /' | sort -u -k2 | head -80
+        # diff exits 1 when the files differ; under pipefail that would abort the script here
+        { diff "$OUT/before.layer2.sha256" "$OUT/after.layer2.sha256" || true; } | grep '^[<>]' | sed 's/^\([<>]\) [0-9a-f]*  \.\//\1 /' | sort -u -k2 | head -80 || true
         echo "MANIFEST_NEW_BEFORE_FILES=$(wc -l < "$OUT/before.new.sha256")"
         echo "MANIFEST_NEW_AFTER_FILES=$(wc -l < "$OUT/after.new.sha256")"
         for d in "${NEW_DIRS[@]}"; do
