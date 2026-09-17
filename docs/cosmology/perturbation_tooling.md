@@ -180,7 +180,7 @@ compatibility (14.3.0 × xAct 1.3.0 × xPert 1.0.6) · Part-1 lines covered · t
 | hi_class / CLASS / EFTCAMB | hand-coded Boltzmann codes | — | none stated / cite-CLASS-II / CAMB's | — | — | — | *documented only* |
 | CppTransport / PyTransport | model → generated numerics | inflation | GPL-2+ / GPL-3+ | 2018.1 / 2.0 | — | — | *documented only* |
 | Cadabra2 2.5.14 | generic CAS | — | GPL-3 | 2025-07-31 | — | — | *documented only* |
-| legacy `tidal/wolfram/ComponentDecompose.wl` | plain coordinate components, rank ≥ 3, `(−,+,+,+)` hard-wired, literal metric | legacy examples | MIT | v0.53 | — | — | no SVT, no Fourier, no `a(η)`; and its rewrite is wrong (#582); comparison only |
+| legacy `tidal/wolfram/ComponentDecompose.wl` | plain coordinate components, rank ≥ 3, `(−,+,+,+)` hard-wired, literal metric | legacy examples | MIT | v0.53 | — | — | no SVT, no Fourier, no `a(η)`; it does declare a torsionful connection (`uv run pytest tests/test_cli.py -k torsion_covd_dry_run` passes, 1 test, no kernel), but its `R̃` rewrite is wrong (#582), so it is a comparison only and not an oracle for torsion terms |
 
 ### 3.1 The xPand facts M3 will rely on (from the source and the runs)
 
