@@ -1173,3 +1173,40 @@ E; A1 is measured per 5.6, not extended into D/E time).
   accepts a background rule for `T̄` and whether the Euler–Lagrange step after the split works.
 - The Wayback snapshot URL (created at execution).
 - The userbase manifest before/after (a kernel run is needed to see the caches move).
+
+## Appendix D — the two post-merge passes, and what each was asked to settle
+
+This record is the archive of R-C's own planning. Two passes ran after it, both from plans the
+user reviewed; their plans are archived here in summary so the trail is complete.
+
+**Pass 1, the follow-up (2026-09-17, merged with the lane).** Asked for after the user
+challenged the xMAG findings on the PSALTer #543 precedent: *be certain the failures were not
+our setup*. Outcome: the xMAG verdict was overturned by a Tier-1 replay of the author's own
+notebook cells (13 `identical`, 2 `proved-equal`); four of six reported negatives were our
+calling forms; the "opposite sign" was xMAG's silent load-time `$RiemannSign = -1`; both
+session hazards were separated and located; the project's curvature conventions were adopted
+and recorded with kernel evidence (memo §7); four defects in our own harness were found and
+fixed, with the third-party protocol written to prevent a repeat.
+
+**Pass 2, the closing pass (2026-09-17, PR #588).** Asked for after the user required that the
+deferred items stay visible in documentation and issue comments, and that the five remaining
+recommendations be resolved. Five items, and what the runs did to each:
+
+| item | outcome |
+| --- | --- |
+| the slice epsilon had no stated orientation | it was never ours to choose: PSALTer's own code carries the dictionary (`DefGeometry.m:60-63`). Adopted and tested in both signatures; the kernel proves neither sign, which is stated plainly |
+| the family-A import map was asserted, not run | run, with the counting established block by block and a Lagrangian odd in the torsion as the control that must flip |
+| the lost simplification was attributed to xMAG | measured to be **xBrauer's**, in one kernel in three states, with xMAG exonerated and two rival mechanisms excluded |
+| two documentation gaps | §7.4 (what one `Needs` changes, per package) written; `RCSplitGuarded` moved into the harness and `f2` re-run from the committed bytes |
+| one filed claim was broader than its evidence | #582's comment corrected to the exact 20 theory files |
+
+**Two things the closing pass added that were not in its plan**, both because a run said so: a
+new xPand defect (#589, the hard-coded slice determinant sign, which only shows up in the
+project's own signature), and the finding that a multi-line definition without an outer bracket
+had silently truncated the lane's own parametrization — amended at the instruction site in
+`CLAUDE.md` and added to the third-party protocol.
+
+**One thing it could not settle**, recorded rather than glossed: the import map with a
+non-vanishing background torsion. Supplying a background rule for `Tor` alongside the
+perturbation rule makes every order-1 piece vanish for each invariant tried, so the
+half-applied map was never exercised. Memo §1.2 carries it with an owner.
