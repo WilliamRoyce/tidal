@@ -234,6 +234,7 @@ git push && git push --tags
 | `activate-wolfram.sh`       | Helps with license activation                     |
 | `install-xact-xcoba.sh`     | Installs xAct/xCoba with GLIBC compatibility      |
 | `install-psalter.sh`        | Installs PSALTer at a pinned commit               |
+| `install-xpand.sh`          | Installs xPand 0.4.4, the FRW derivation engine (D-C) |
 | `verify-wolfram-setup.sh`   | Comprehensive verification of all components      |
 | `xact_smoke.wl`             | Wolfram Language smoke test for xAct/xCoba        |
 | `psalter_smoke.wl`          | PSALTer smoke test, incl. headless PDF export     |

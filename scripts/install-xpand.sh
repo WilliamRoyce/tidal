@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # cspell:words HDRS tolower
 # ==============================================================================
-# install_xpand.sh -- additive install of xPand 0.4.4 into the Wolfram userbase
+# install-xpand.sh -- additive install of xPand 0.4.4 into the Wolfram userbase
 # ==============================================================================
-# R-C (#567). Places ONLY Applications/xAct/xPand/ under the userbase and writes
-# an INSTALLED_VERSION stamp inside it. Refuses if the directory exists; never
-# touches any other package (the certified xAct tree is read-only for this lane).
+# Part of the certified configuration since D-C (O1', 2026-09-17): the FRW
+# derivation is built on xPand, so verify-wolfram-setup.sh checks its version and
+# reports DEGRADED when it is absent or different. Written by research lane R-C
+# (#567) as scripts/research/perturbations/install_xpand.sh and promoted here.
+#
+# Places ONLY Applications/xAct/xPand/ under the userbase and writes an
+# INSTALLED_VERSION stamp inside it. A matching install is a no-op; a different
+# one is refused rather than overwritten; no other package is ever touched.
 # Precedent: scripts/install-psalter.sh (stamp), scripts/research/interfaces/
 # (route not payload). No kernel is started unless the userbase cannot be found.
 #
@@ -14,7 +19,7 @@
 # which is stripped on extraction.
 #
 # Usage:
-#   install_xpand.sh [--tarball FILE] [--dest DIR] [--wayback] [--print-removal]
+#   scripts/install-xpand.sh [--tarball FILE] [--dest DIR] [--wayback] [--print-removal]
 #   --tarball FILE    use a local copy instead of downloading
 #   --dest DIR        the Applications/xAct directory to install into
 #                     (default: resolved userbase; used for mock rehearsals)
@@ -22,13 +27,13 @@
 #                     record it (outward-facing; asked for in review round 1)
 #   --print-removal   print (never run) the command that would remove the install
 #   --help
-# Exit: 0 installed and additivity proven; 1 any failure; 3 kernel live.
+# Exit: 0 installed (or already present at this version) and additivity proven;
+#       1 any failure; 3 kernel live.
 # ==============================================================================
 set -euo pipefail
 XPAND_VERSION="0.4.4"
 XPAND_URL="${XPAND_URL:-http://www2.iap.fr/users/pitrou/xPand_0.4.4.tar.gz}"
 XPAND_SHA256="${XPAND_SHA256:-26e7abcac7bb655235ec39b73850729cf4465748d0d5ea2ad03c0607aef5ceab}"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TARBALL=""; DEST=""; WAYBACK="false"; PRINT_REMOVAL="false"
 say() { printf '%s\n' "${1//$HOME/\~}"; }
 die() { say "[ERROR] $1"; exit 1; }
@@ -69,7 +74,17 @@ if [[ "$PRINT_REMOVAL" == "true" ]]; then
     exit 0
 fi
 [[ -d "$DEST" ]] || die "destination does not exist: $DEST"
-[[ -e "$DEST/xPand" ]] && die "refusing: $DEST/xPand already exists (this installer is additive only)"
+if [[ -e "$DEST/xPand" ]]; then
+    # Already provisioned: a matching version is success (so a provisioning script may re-run
+    # it), a different one is refused -- replacing a package in place is not this script's job.
+    INSTALLED_LINE="$(grep -m1 'xAct`xPand`\$Version' "$DEST/xPand/xPand.m" 2>/dev/null || true)"
+    if [[ "$INSTALLED_LINE" == *"\"$XPAND_VERSION\""* ]]; then
+        say "XPAND_ALREADY_INSTALLED=$DEST/xPand ($XPAND_VERSION)"
+        say "XPAND_INSTALL_OK"
+        exit 0
+    fi
+    die "refusing: $DEST/xPand exists and is not $XPAND_VERSION (${INSTALLED_LINE:-no version line}); remove it first"
+fi
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT INT TERM
 if [[ -n "$TARBALL" ]]; then
@@ -117,7 +132,7 @@ fi
     echo "version_line=$VERSION_LINE"
     echo "wayback=$SNAPSHOT"
     echo "installed_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "installed_by=scripts/research/perturbations/install_xpand.sh"
+    echo "installed_by=scripts/install-xpand.sh"
     echo "patch=none"
 } > "$DEST/xPand/INSTALLED_VERSION"
 say "XPAND_STAMP=$DEST/xPand/INSTALLED_VERSION"

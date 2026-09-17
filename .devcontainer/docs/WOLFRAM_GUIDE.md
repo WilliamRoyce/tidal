@@ -33,7 +33,7 @@ It is **independent of any Wolfram Cloud login** — asserted both logged in and
 
 ---
 
-## First-time setup — six steps
+## First-time setup — seven steps
 
 Roughly 30 minutes, most of it downloading. You need a free Wolfram ID
 (<https://account.wolfram.com/login/create>) and about 8 GB of disk.
@@ -98,7 +98,22 @@ dependencies it needs. **Registration is not optional**: without it PSALTer does
 completes and writes a *silently wrong* spectrum (empty source constraints, zero
 pseudo-determinants).
 
-### 6. Verify
+### 6. Install xPand — the FRW derivation engine
+
+```bash
+bash scripts/install-xpand.sh
+```
+
+Adds **only** `Applications/xAct/xPand/` (0.4.4, tarball pinned by sha256) and stamps it with an
+`INSTALLED_VERSION`. Re-running it on a machine that already has 0.4.4 is a no-op; a different
+version is refused rather than overwritten.
+
+xPand carries the 3+1 split, the scalar–vector–tensor decomposition and the CAMB-named gauges
+that the FRW derivation is built on (**D-C = O1′**, 2026-09-17; the evidence is
+`docs/cosmology/perturbation_tooling.md`). Step 7 therefore reports **degraded** without it: the
+spectrum branch still runs, FRW derivations do not.
+
+### 7. Verify
 
 ```bash
 bash scripts/verify-wolfram-setup.sh --require-psalter

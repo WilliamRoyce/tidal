@@ -11,7 +11,7 @@ production code.**
 
 | path | what it is | provenance |
 | --- | --- | --- |
-| `install_xpand.sh` | additive install of xPand 0.4.4 into `Applications/xAct/xPand/` (sha256-pinned tarball, junk stripped, `INSTALLED_VERSION` stamp, additivity asserted) | ours |
+| `install_xpand.sh` → **promoted to `scripts/install-xpand.sh`** (2026-09-17, D-C) | additive install of xPand 0.4.4 into `Applications/xAct/xPand/` (sha256-pinned tarball, junk stripped, `INSTALLED_VERSION` stamp, additivity asserted) | ours |
 | `install_xmag.sh` | additive install of xMAG and its chain (SymmetricFunctions, BrauerAlgebra, xBrauer, TraceFree) at pinned commits, `INSTALLED_COMMIT` stamps | ours |
 | `manifest.sh` | two-layer sha256 manifest of the whole userbase (must-be-identical layer / allow-listed caches / the new directories) | ours |
 | `run_lane.sh` | serial lane runner: kernel guard, offscreen front end, throwaway cwd, hard timeout, scrubbed transcript, sentinel verdict | ours |
@@ -40,7 +40,7 @@ All Wolfram steps are strictly serial (one kernel, machine-wide). Outputs go to 
 ```bash
 bash scripts/research/perturbations/manifest.sh before
 bash scripts/psalter/ensure_registered.sh            # registers, then verify --require-psalter; exit 0 required
-bash scripts/research/perturbations/install_xpand.sh # no kernel; refuses if xPand/ exists
+bash scripts/install-xpand.sh                        # no kernel; no-op if 0.4.4 is present
 bash scripts/research/perturbations/run_lane.sh probe_load
 bash scripts/research/perturbations/run_lane.sh a2
 bash scripts/research/perturbations/run_lane.sh b

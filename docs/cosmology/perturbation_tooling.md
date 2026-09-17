@@ -88,7 +88,7 @@ difference is 0) / `proved-different` / `could-not-decide`; `c` is the reported 
 | --- | --- | --- | --- |
 | gates before | `ensure_registered.sh` → `verify --require-psalter` | ~4 min | exit 0, "All checks passed", one informational xPerm-ldd warning; `gates/before_ensure_registered.txt` |
 | manifest before | two-layer sha256 of the userbase | — | 3587 files; layer 1 (must be identical) 942 files, digest `9e2c81a4…6e63fbd` |
-| install xPand | `install_xpand.sh` (sha256-pinned tarball, junk stripped, stamp) | 0 | 26 files added under `Applications/xAct/xPand/`, `INSTALLED_VERSION` (`patch=none`); Wayback snapshot refused by the container's TLS (not tested) |
+| install xPand | `install_xpand.sh` — since 2026-09-17 `scripts/install-xpand.sh` (sha256-pinned tarball, junk stripped, stamp) | 0 | 26 files added under `Applications/xAct/xPand/`, `INSTALLED_VERSION` (`patch=none`); Wayback snapshot refused by the container's TLS (not tested) |
 | `probe_load` | load, usages, geometry, the paper's minimal example (`:1350-1373`) | 8 s | no load messages; `OUT47 identical (SameQ)`, control `proved-different`; label layout and gauge rules read back |
 | A2 `repro_a2_tensor_eom` | tensor equation from `G^a_b + Λδ^a_b/κ − κT^a_b`, Λ + fluid | 13 s | mixed indices: `identical (SameQ)`, `c = 1`; controls (`2ℋ→3ℋ`, no `D²`) `proved-different`; unchanged on shell; lowered indices: `proved-equal` on shell (`c = a²`), off-shell residual `= (2Λa⁴/κ − 2a²ℋ² − 4a²ℋ′ − 2κa⁴P̄) E_ab` (the background equation × E: the #501 mechanism) |
 | B `repro_b_mb_scalars` | Ma & Bertschinger `ein-cona..d` (`:644-661`) and `ein-syna..d` (`:603-618`) | 20 s | 8/8 `proved-equal`: Newtonian `c = 2, −2, 2, 1`; synchronous `c = 2, −2, −1, 1`; 8/8 controls `proved-different`; velocity sign flipped `proved-different`; Friedmann 1 both gauges (`c = −3`); traceless parts traceless |
@@ -300,7 +300,10 @@ what the estimate rests on; "interface" is what the committed package calls unde
    Consequence (ii): xPand becomes an install requirement: promote `install_xpand.sh` to
    `scripts/install-xpand.sh`, add `xPand.m`'s `$Version` to `verify-wolfram-setup.sh`'s
    fingerprint (today it checks xCore, xPerm, xTensor, xCoba only; #580), a `WOLFRAM_GUIDE.md`
-   step, re-certification. Routed to the orchestrator (paths not owned here).
+   step, re-certification. Routed to the orchestrator (paths not owned here). **Done
+   2026-09-17** by the orchestrator: the installer is `scripts/install-xpand.sh`, `verify`
+   gained its own xPand check (DEGRADED when absent or different, watched failing), the guide is
+   a seven-step path, and the configuration was re-certified.
 2. **O3 — xMAG for the connection algebra, xPand for the split: adopt when needed, no
    longer blocked.** The follow-up removed the reason it was deferred — there is no sign
    defect to settle. What it does not buy is anything O1′ lacks for metric-compatible

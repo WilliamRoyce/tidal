@@ -61,6 +61,11 @@ EXPECTED_XACT_FINGERPRINT="${EXPECTED_XACT_FINGERPRINT:-xCore=0.6.10 xPerm=1.2.4
 # The two Function Repository resources PSALTer needs, as registered by
 # scripts/psalter/register_resources.wl with FIXED identities (evidence/tier1-20260911-pass).
 EXPECTED_RESOURCE_UUIDS="${EXPECTED_RESOURCE_UUIDS:-d40a8dd6-658c-47d2-8719-2f5fc8e1f83d 2f89f2e6-7bc8-4491-84bf-d8e13c69addb}"
+# xPand carries the FRW derivation (D-C = O1', 2026-09-17), so it is part of the certified
+# configuration: absent or different means runs are possible but not certifiable (DEGRADED).
+# It is NOT in EXPECTED_XACT_FINGERPRINT, which names the four-package xAct bundle that many
+# documents quote; this is its own check with its own expected version.
+EXPECTED_XPAND_VERSION="${EXPECTED_XPAND_VERSION:-0.4.4}"
 
 log_pass() {
     echo -e "${GREEN}[PASS]${NC} $1"
@@ -312,6 +317,29 @@ check_xact_loads() {
 }
 
 # Check 7: PSALTer installed
+check_xpand_installed() {
+    log_info "Checking xPand installation (the FRW derivation engine, D-C = O1')..."
+
+    local user_dir xpand_m ver
+    user_dir=$(wolframscript -code '$UserBaseDirectory' 2>/dev/null | tr -d '\n\r')
+    xpand_m="${user_dir}/Applications/xAct/xPand/xPand.m"
+
+    if [[ ! -f "$xpand_m" ]]; then
+        log_degraded "xPand not installed at ${user_dir}/Applications/xAct/xPand: FRW derivations cannot run"
+        log_info "  Run: ./scripts/install-xpand.sh"
+        return 0
+    fi
+    # Read the version from the package header; no kernel needed (the same tactic as xAct's
+    # fingerprint), so this check costs nothing and cannot be confused by a loaded session.
+    ver=$(grep -m1 -oE 'xAct`xPand`\$Version *= *\{"[0-9.]+"' "$xpand_m" | grep -oE '[0-9.]+' | head -1)
+    if [[ "$ver" == "$EXPECTED_XPAND_VERSION" ]]; then
+        log_pass "xPand ${ver} found (certified)"
+    else
+        log_degraded "xPand ${ver:-unreadable} is not the certified ${EXPECTED_XPAND_VERSION}: runs are possible, not certifiable"
+    fi
+    return 0
+}
+
 check_psalter_installed() {
     log_info "Checking PSALTer installation..."
 
@@ -645,6 +673,9 @@ main() {
     echo ""
     
     check_xact_loads || true
+    echo ""
+    
+    check_xpand_installed || true
     echo ""
     
     check_psalter_installed || true

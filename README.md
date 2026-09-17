@@ -270,7 +270,7 @@ Required only for `tidal derive` — deriving linearized field equations from a 
 Everything downstream of a JSON specification runs without it.
 
 **[`.devcontainer/docs/WOLFRAM_GUIDE.md`](.devcontainer/docs/WOLFRAM_GUIDE.md) is the single
-source** for this: six steps from a bare machine to the certified configuration.
+source** for this: seven steps from a bare machine to the certified configuration.
 
 ```bash
 # 1. Download WolframEngine_14.3.0_LIN.sh (~1.6 GiB, needs a free Wolfram account)
@@ -281,12 +281,13 @@ wolframscript -activate                         # 3. activate with your own Wolf
 bash scripts/install-xact-xcoba.sh              # 4. xAct 1.3.0 tensor algebra
 bash .devcontainer/scripts/build-xperm.sh       #    + the xPerm MathLink binary
 bash scripts/install-psalter.sh                 # 5. PSALTer, and register its two resources
-bash scripts/verify-wolfram-setup.sh --require-psalter   # 6. must exit 0
+bash scripts/install-xpand.sh                   # 6. xPand 0.4.4, the FRW derivation engine
+bash scripts/verify-wolfram-setup.sh --require-psalter   # 7. must exit 0
 ```
 
-Step 6 is the definition of "set up correctly": **Wolfram 14.3.0 × xAct 1.3.0 × PSALTer
-`bb45adb0` × the two Function Repository resources registered locally**, with the engine running
-from its mount rather than answering from the cloud. It is independent of any Wolfram Cloud
+Step 7 is the definition of "set up correctly": **Wolfram 14.3.0 × xAct 1.3.0 × PSALTer
+`bb45adb0` × the two Function Repository resources registered locally × xPand 0.4.4**, with the
+engine running from its mount rather than answering from the cloud. It is independent of any Wolfram Cloud
 login. `tidal doctor` performs the same diagnosis at any time.
 
 Note that a Wolfram Engine license permits **one** `wolframscript` session at a time; do not run `tidal derive` in parallel.
