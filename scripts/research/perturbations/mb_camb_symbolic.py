@@ -5,7 +5,7 @@ the seam, and the R-C reproduction of the Ma & Bertschinger equations must be tr
 into our convention and checked by machine, not by a written table. ``camb.symbolic`` carries
 the ΛCDM scalar constraint and evolution equations in covariant notation and can evaluate them
 in the Newtonian gauge, the synchronous gauge and the CDM frame. This script prints them
-verbatim (``sympy`` ``srepr`` plus a readable form) so ``wolfram/targets.wl`` can cite the
+verbatim (``sympy`` ``srepr`` plus a readable form) so ``wolfram/repro_b_mb_scalars.wls`` and ``wolfram/probe_c_signature.wls`` can cite the
 printed lines and the kernel can compare xPand's output against them.
 
 Output is deterministic for a given CAMB version; the committed copy
