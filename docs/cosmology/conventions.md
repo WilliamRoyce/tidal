@@ -19,7 +19,8 @@ commit. Legacy TIDAL at this repository's `feat/cosmology-program`.
 | quantity | owner | why |
 | --- | --- | --- |
 | metric signature | PSALTer — and CAMB agrees (§2) | the ghost verdict's parity factor is defined by it (`spectrum_design.md:320-327`) |
-| ε orientation | PSALTer — CAMB defines none (§2) | parity-odd operators in our Lagrangians flip with it |
+| ε orientation (four-index) | PSALTer — CAMB defines none (§2) | parity-odd operators in our Lagrangians flip with it |
+| ε orientation (three-index, on a slice) | PSALTer — it declares its own and installs the dictionary both ways (§2, added 2026-09-17) | every parity-odd torsion piece is written with it once a tensor has been split |
 | perturbation variables, gauge/frame names, conformal time, units | CAMB (§3) | the solver hands values to and from CAMB |
 | sampled parameter names | Cobaya (`params:`, `renames`) | users already know them |
 | Lagrangian input form and validity | PSALTer's requirements, enforced by us (§4) | PSALTer does not check most of them itself |
@@ -37,6 +38,7 @@ Every derived artifact records `conventions` and every consumer asserts it (§5)
 | **CAMB (declared)** | (+,−,−,−) | none | `camb/symbolic.py:460` (Newtonian: ds² = a²((1+2Ψ_N)dt² − (1−2Φ_N)δᵢⱼdxⁱdxʲ)); `docs/source/variables_guide.rst:223` (synchronous: ds² = a²(τ)[dτ² − (δᵢⱼ+hᵢⱼ)dxⁱdxʲ]); `docs/ScalEqs.ipynb` cell at lines 278-285; the CAMB notes (cosmologist.info/notes/CAMB.pdf) "Using the uₐuᵃ = 1 signature" |
 | **CAMB (Fortran)** | signature-agnostic | none | `fortran/equations.f90:2365, 2427, 2430-2431, 2442` are Ma–Bertschinger's synchronous-gauge equations in variables that do not change under g → −g (`:38-39` points to the notes). A grep of every `.f90`/`.py` at the tag finds no Levi-Civita convention; the notes assume a parity-symmetric ensemble (C_ℓ^TB = C_ℓ^EB = 0) |
 | Cobaya | none | none | a sampler |
+| **ε orientation, three-index (on a slice)** | — | **ε‖_abc = ε_abcd n^d**, contracted index in the **last** slot, `+1` | PSALTer's own `ToEps`/`FromEps` dictionary, `Sources/ReloadPackage/DefGeometry.m:41-46, 60-63`; derived from `ε₀₁₂₃ = +1` and the future-pointing normal. **Stated, not derivable**: R-C's `f7` found both candidate orientations `proved-different`, and squaring cannot fix the sign (`RC_F7A_SIGN_FIXABLE_BY_SQUARE=False`). ⚠ In our signature xPand's own slice epsilon is normalized with the wrong determinant sign (#589) — write the parity-odd sector in the **four-index** form until that is fixed |
 
 **Corrections to `spectrum_design.md` §4.3 (reported, not edited here):** `:301` labels CAMB
 "(−,+,+,+), Ma–Bertschinger" but cites Ma & Bertschinger, not CAMB; `:354` repeats it for the
@@ -49,6 +51,8 @@ spectrum and the solver branch.
 | source | signature | ε | where it enters |
 | --- | --- | --- | --- |
 | Ma & Bertschinger (astro-ph/9506072) | (−,+,+,+) | — | R-C validates FRW equations against it (`handoffs/R-C.md:69, 114`); `9506072.tex:295` (synchronous), `:361-363` (conformal Newtonian) |
+| Aoki et al. (2310.16007) | (−,+,+,+) `:153` | ε₀₁₂₃ = +1 `:201` | agrees with PSALTer; Probe D3's SVT torsion rules are transcribed from here |
+| Nikiforova–Damour (1804.09215) | (−,+,+,+) `:221` | ε^{0123} = +1 `:245`, i.e. **ε₀₁₂₃ = −1 — opposite** to PSALTer and to Aoki et al. | the cross-check source for D3; any formula taken from it flips in the parity-odd sector. Lowering all four indices contributes `det g = −1` in either signature, so the clash is real, not a signature artifact |
 | legacy TIDAL | (−,+,+,+) | ε₀₁₂… = −1 | M3's comparison with the frozen legacy oracle (§6); `tidal/wolfram/CommonUtilities.wl:30-34` |
 | SymBoltz.jl v1.7.0 | (−,+,+,+) | — | a survey item for R-C only (`docs/src/conventions.md:7`) |
 | Challinor & Lasenby (astro-ph/9804301) | (+,−,−,−) | η₀₁₂₃ = −√(−g), i.e. **opposite** to PSALTer | CAMB's formalism lineage; matters only if a parity-odd CMB formula (O4) is ever taken from it — none is planned (`observable_ladder.md:336-339` rotates CAMB's C_ℓ instead) |
