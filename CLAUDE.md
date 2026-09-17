@@ -40,7 +40,13 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - Pipeline: TOML config -> .wls generation -> wolframscript -> JSON spec -> Python solver
 - Solver selection: IDA (DAE/constraints), CVODE (adaptive ODE), leapfrog (symplectic), scipy (general)
 - Always check xAct symbol existence before defining: `If[!xTensorQ[M2], DefManifold[...]]`
-- Parenthesize multiline Lagrangians in .wls files
+- Parenthesize **every** multiline right-hand side in .wls files, not only Lagrangians.
+  Wolfram ends a statement at a newline as soon as the expression is complete, so
+  `f[x_] := a + b` followed by a line starting `+ c` silently defines `a + b` and parses
+  the rest as dead statements. No message, no failure — just a wrong answer. Wrap the
+  whole right-hand side in `( ... )`. Found 2026-09-17 in `f7_epsilon_and_import_map.wls`,
+  where a five-term torsion parametrization became two terms and the potential count came
+  out 8 instead of 16.
 - Use `DefConstantSymbol` for mass/coupling constants (not bare Symbol)
 - **Constant names must not contain underscores** — Mathematica parses `X_Y` as `Pattern[X, Blank[Y]]`, corrupting symbolic computation. Use `mPhi2` not `m_phi_2`, `Bpeak` not `B_peak`.
 - Cross-field decomposition requires passing `additionalFields` to `DecomposeToComponents`
