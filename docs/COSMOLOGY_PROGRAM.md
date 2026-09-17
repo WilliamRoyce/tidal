@@ -489,6 +489,13 @@ context should be able to read it and the queue, and know what to do next.
    on …` with a decision-dependency table naming which sections change under each option.
    Research memos (the `R-` series) go first, one at a time; as each returns the orchestrator
    records the decision, updates every held prompt it touches, and marks the next `READY`.
+   **Before marking a held prompt `READY`, re-resolve every `file:line` citation in it against
+   the current tree** (added 2026-09-17). A held prompt's citations rot while it waits — above
+   all when the orchestrator amends the very documents it cites. I-532 was marked READY with
+   three citations landing on the wrong passage, every one drifted by the orchestrator's own
+   amendments, and with an A8 question R-C had already half-answered; both were caught only by a
+   review the user asked for. Re-read each research memo as it stands at READY time, not as it
+   stood when it merged: a closing pass or post-merge correction can land in between.
 2. **The user dispatches** each prompt to a separate session. *This orchestrator session
    never launches them.*
 3. A delegate works in **its own git worktree** off `feat/cosmology-program`
