@@ -127,7 +127,10 @@ evolves. The new-sector perturbations then:
 - contribute **anisotropic stress** `σ`, which alters ISW **and lensing**.
   *(Notation — these are standard objects, not new fields of ours: `φ` and `ψ` are the two
   scalar gravitational potentials of the perturbed FRW metric,
-  `ds² = a²[−(1+2ψ)dη² + (1−2φ)δᵢⱼdxⁱdxʲ]`. `ψ` is the Newtonian-potential-like time-time
+  `ds² = a²[−(1+2ψ)dη² + (1−2φ)δᵢⱼdxⁱdxʲ]`. **This primer keeps the literature's mostly-plus
+  line element and its `φ`/`ψ` names for orientation; the project works in `(+,−,−,−)` and at
+  the seam in CAMB's variables, where `φ` is the **Weyl** potential — `docs/cosmology/conventions.md`
+  is canonical and this paragraph is not (#575).** `ψ` is the Newtonian-potential-like time-time
   perturbation, `φ` the spatial-curvature one. In GR with no anisotropic stress they are
   equal; a sector carrying `σ` splits them via `k²(φ − ψ) = 12πG a²(ρ̄+P̄)σ`, and that split
   is what shifts ISW/lensing.)*

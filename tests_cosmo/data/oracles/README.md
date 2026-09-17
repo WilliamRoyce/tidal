@@ -90,6 +90,20 @@ the *physics* while dropping them is correct:
    write-only dead data — nothing in `tidal/` reads it (`git grep '\["coupling"\]'` → zero) —
    and verified the loaded model byte-identical with and without it. A fresh derive omits
    it; the committed files keep it. `coupled_scalars` is the case #554 noticed.
+**A fifth class arrived with R-C (2026-09-16), and it is a *defect in the physics*, not a
+representation (#582).** Legacy's post-Riemannian rewrite
+(`_derive.py::_wls_torsion_curvature_decomposition`) uses an expression that is not a
+contortion and carries the opposite sign to xTensor's connection-difference tensor, so **every
+`R̃` torsion term it produced differs from the correct identity — the quadratic mass terms
+included.** The frozen specs derived from `examples/graviton_torsion/theory.toml`,
+`examples/torsion_dark_photon/theory.toml` and `examples/torsion_gertsenshtein/theory.toml`
+(and the FV variant where it uses `R̃`) therefore encode wrong torsion terms. **M3 must
+attribute that difference to this defect rather than report a port regression**, and must port
+the corrected identity (`stage1_engineering_plan.md` §4.3 item 2). **The user decided on
+2026-09-16 that legacy is not corrected or re-derived and that no thesis-era number is
+re-checked** — open by decision, not by oversight; evidence and the correct identity are in
+#582 and `docs/cosmology/perturbation_tooling.md` §5, §7.1.
+
 **A fourth class arrived with the #547 theories (2026-09-12), and it is a *defect in the
 reader*, not in the spec.** `de_sitter_kg` fails plain `tidal validate` on the #394
 volume-element check, which demands a **spatial** first-derivative term whenever `sqrt|g|` is

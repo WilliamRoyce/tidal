@@ -291,7 +291,10 @@ branch** — matching TorC's post-Riemannian form (and its tetrad analogue, the 
 already produces exactly this bare `h`. PSALTer itself imposes nothing — `h` is whatever field
 the quadratic Lagrangian is written in. The CAMB side has its own `h_{ij}` conventions
 (synchronous gauge, Ma–Bertschinger), and the solver branch is free to adopt them — per-branch
-native applies to field conventions too.
+native applies to field conventions too. *(Amended 2026-09-17, #575: the solver branch takes
+**CAMB's variable definitions** — `conventions.md` §3 is canonical — not Ma & Bertschinger's
+conventions, which differ from CAMB's and are attributed per §6. The §4.3 heading below keeps
+its original wording with a correction block; read `conventions.md` first.)*
 
 ### 4.3 Signature: two ecosystems, opposite conventions, one answer per branch
 
@@ -344,7 +347,9 @@ PSALTer's `CD` is the flat derivative — `CD[-m]@` **is** `∂_μ` (2406.09500 
 software"). Our Lagrangians use `CDT`, the torsionful Riemann–Cartan connection. The spectrum
 branch therefore reduces everything to `η`, `∂` and the perturbation fields: post-Riemannian
 decomposition (connection → Levi-Civita + contortion, contortion → torsion via
-`K^a{}_{bc} = ½(T^a{}_{bc} + T_b{}^a{}_c − T_{bc}{}^a)`), then quadratic expansion about
+`K^a{}_{bc} = ½(T^a{}_{bc} + T_b{}^a{}_c − T_{bc}{}^a)` — **wrong, corrected 2026-09-16: use
+`ChristoffelCDCDT → −½(T^a{}_{bc} + T_b{}^a{}_c + T_c{}^a{}_b)`; see the amendment in
+`stage1_engineering_plan.md` §4.3 item 2 and #582**), then quadratic expansion about
 `(η, T̄ = 0)`. Christoffel and torsion couplings appearing explicitly is the point, not a side
 effect. The design of this stage exists in legacy TIDAL
 (`tidal/cli/_derive.py::_wls_torsion_curvature_decomposition`, line 2088 — `ChangeCurvature[L,

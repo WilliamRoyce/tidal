@@ -523,6 +523,20 @@ geometry itself. Emit, in order:
    `K^a{}_{bc} = ½(T^a{}_{bc} + T_b{}^a{}_c − T_{bc}{}^a)`). **Ported, never imported**
    (D3), with a provenance docstring citing the legacy function; its physics comments carry
    over, its `(−,+,+,+)` sign conventions do not.
+
+   > **⚠ Corrected 2026-09-16 (R-C, #567; #582) — do NOT port that identity: it is wrong.**
+   > The legacy expression is **not a contortion** (its third term's slots are `(b, c, a)`,
+   > and xTensor's torsion is antisymmetric in its *last two* slots, so it collapses to
+   > `½T^a{}_{bc} + T_b{}^a{}_c`), and it has the **opposite sign** to xTensor's meaning of
+   > the connection-difference tensor (`CDT_b v^a − CD_b v^a = −ChristoffelCDCDT^a{}_{bs} v^s`,
+   > so `ChristoffelCDCDT = −K`). Every `R̃` torsion term it produced differs — the quadratic
+   > **mass** terms included, not only a total derivative. **Port instead**
+   > `ChristoffelCDCDT[a_, b_, c_] :> −½ (TorsionCDT[a, b, c] + TorsionCDT[b, a, c] +
+   > TorsionCDT[c, a, b])`, which gives `R̃ = R + ¼T_abc T^abc + ½T_abc T^bac + T^a{}_a{}^b
+   > T^c{}_bc − 2∇_b T^a{}_a{}^b` (vectorial-torsion check: `R − 6v² + 6∇·v`, the textbook
+   > Einstein–Cartan result). Carry R-C's two kernel checks as tests — the antisymmetric part
+   > equals the torsion, and metric compatibility — and the curvature-sign assertions of
+   > `conventions.md` §2. Evidence: `perturbation_tooling.md` §5, §7.1.
 3. Bare `h_{μν} ≡ g_{μν} − η_{μν}`, plus sign, no rescaling (H6 §4.2); derived fields
    pre-expanded (`F = dA`).
 4. Linearization: multiply the perturbation fields by a bookkeeping constant,

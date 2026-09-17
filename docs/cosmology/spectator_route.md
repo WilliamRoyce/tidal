@@ -134,7 +134,7 @@ the Friedmann equation (`ΔN_eff` as a fit parameter).
 
 | Framework | What it does | Why it isn't this |
 |---|---|---|
-| xPand / xPert / xAct (arXiv:1302.6174, 0807.0824) | symbolic cosmological perturbation equations, any theory | no numerics, no observables, no likelihood |
+| xPand / xPert / xAct (arXiv:1302.6174, 0807.0824) | symbolic cosmological perturbation equations, any theory — *corrected 2026-09-16 (#581): the authors exclude torsion ("the current exception being any gravitational theory with torsion", 1302.6174 p.15). R-C carried torsion through anyway, as rank-3 perturbed **tensor** fields with its own SVT rules, while the **connection** needs the post-Riemannian rewrite first (`perturbation_tooling.md` Part 3)* | no numerics, no observables, no likelihood |
 | CppTransport / PyTransport (arXiv:1609.00380/1) | Lagrangian → auto-generated solver → correlators | inflation only; closest in spirit — cite as precedent |
 | hi_class (arXiv:1909.01828) / EFTCAMB (arXiv:1405.3590) | covariant Lagrangian/EFT → Boltzmann → likelihood | Horndeski gravity sector, full backreaction, not general, not spectator |
 | SymBoltz.jl (arXiv:2509.24740) | symbolic-component differentiable Einstein–Boltzmann | takes equations, not actions; not spectator-specialized; possible future backend |

@@ -1,7 +1,9 @@
 # R-C — Cosmological perturbations: the equations we must produce, the methods, and the tools
 
-> **STATUS: DISPATCHED — 2026-09-15.** R-1 merged (#568); D-A is recorded, and the sections that
-> depended on it are updated below. Written 2026-09-13 at Wave-1 approval.
+> **STATUS: MERGED — 2026-09-17 (PR #574).** Memo `../perturbation_tooling.md`; planning archive
+> `../rc_planning_record.md`; probes under `scripts/research/perturbations/`. Recommends **O1′**
+> for D-C (the user decides; register row *FRW derivation tooling*). Written 2026-09-13 at
+> Wave-1 approval, dispatched 2026-09-15, follow-up lane 2026-09-16/17.
 
 | | |
 |---|---|

@@ -53,6 +53,39 @@ spectrum and the solver branch.
 | SymBoltz.jl v1.7.0 | (−,+,+,+) | — | a survey item for R-C only (`docs/src/conventions.md:7`) |
 | Challinor & Lasenby (astro-ph/9804301) | (+,−,−,−) | η₀₁₂₃ = −√(−g), i.e. **opposite** to PSALTer | CAMB's formalism lineage; matters only if a parity-odd CMB formula (O4) is ever taken from it — none is planned (`observable_ladder.md:336-339` rotates CAMB's C_ℓ instead) |
 
+### 2.1 Curvature signs, the connection's slots, and the contortion family
+
+Added 2026-09-16 from R-C (#567), which found that **nothing in the project stated a curvature
+convention**: this file fixed the signature and `ε` only, PSALTer defines no curvature and sets
+none of xTensor's sign globals, and CAMB carries the Einstein equations in a fixed form with no
+Riemann tensor. Adopted, in R-C's words:
+
+> Curvature signs are xTensor's defaults, `$RiemannSign = $RicciSign = $TorsionSign =
+> $epsilonSign = +1` (`xTensor.m:287-289`, defaults at `:1837-1843`), with the derivative
+> index in the middle slot of the connection and of the contortion. They are asserted at the
+> start of every kernel, re-asserted after every `Needs` and after any induced decomposition,
+> and printed into every artifact header. xPand needs no adjustment; **xMAG sets
+> `$RiemannSign = −1` when it loads** (`xMAG.m:110`, undocumented) and
+> `$ExtrinsicKSign = $AccelerationSign = −1` inside `StartInducedDecomposition`
+> (`xMAG.m:1792`), so a kernel that uses xMAG resets them.
+
+**The contortion, in xTensor's slot meaning** (`perturbation_tooling.md` §7.1, sentinels
+`RC_T1_A6_…` in run `t1/`): `K^a{}_{bc} = ½(T^a{}_{bc} + T_b{}^a{}_c + T_c{}^a{}_b)`, which is
+`identical` to xMAG's `Contorsion`, has `K^a{}_{bc} − K^a{}_{cb} = T^a{}_{bc}` and
+`K_abc + K_cba = 0`, and enters the rewrite as `ChristoffelCDCDT → −K` because
+`CDT_b v^a − CD_b v^a = −ChristoffelCDCDT^a{}_{bs} v^s`. Einstein–Cartan check:
+`R̃ = R − 6v² + 6∇·v` for `T^a{}_{bc} = δ^a_c v_b − δ^a_b v_c`. **Legacy's identity fails both
+tests (#582)** — see `tests_cosmo/data/oracles/README.md` for which frozen specs carry it.
+
+**Import map for "family A" sources** — papers whose connection carries the derivative index in
+a different slot (Aoki et al. 2310.16007, Nikiforova–Damour 1804.09215, Shapiro
+hep-th/0103093). Applied **once, at import, with the source cited and a test** (§1): their
+torsion tensor is **minus** xTensor's `TorsionCDT`, their Riemann slot order is remapped, and
+their contortion is re-expressed by the identity above. This applies to the SVT parametrization
+R-C transcribed from Aoki et al.: the map flips the sign of its 24 potentials, which leaves the
+counting and representability untouched but must travel into M3's rule set
+(`perturbation_tooling.md` §7.2).
+
 ## 3. CAMB perturbation variables — adopt verbatim at the CAMB seam
 
 CAMB exposes two naming families: **covariant** (`eta`, `hdot`, `sigma`, `z`) and
@@ -119,8 +152,27 @@ therefore records, per term, a sign factor with three sources:
    (`examples/torsion_gertsenshtein/theory_parity_odd.toml`) are where this appears.
 
 The per-term table is derived and checked against the oracle **by M3**; this file states the
-rule and its sources only. Today `tests_cosmo/data/oracles/README.md:80-110` lists no convention
-drift class — M3 adds one.
+rule and its sources only. `tests_cosmo/data/oracles/README.md` carries the drift classes,
+including the one added 2026-09-16: legacy's contortion identity is wrong, so the frozen torsion
+specs encode wrong `R̃` terms and M3 attributes that difference rather than reporting a
+regression (#582).
+
+### 6.1 Running xPand in `(+,−,−,−)` — the measured rule (#586)
+
+R-C ran xPand natively in our signature; the rule, from Probe C (`c/20260916T114552Z`):
+
+- `SetSlicing[g, n, +1, h, cd, {…}, "FLFlat"]` — the normal's norm is `+1`; accepted with no
+  messages, `n·n = 1`.
+- The map from the mostly-plus literature has **exactly three sites**: the lapse flip, the
+  Laplacian term, and the determinant sign. Dropping the Laplacian site leaves the residual
+  `4εD²φ + 8εD²ψ`; dropping the lapse flip is `proved-different` (both controls run).
+- **Two package sites hard-code `−1`** and are done by hand: `ExtractComponents`' Time
+  projection (it returns `−V0`; by hand `+V0`) and the built-in `ToxPand` fluid path (use
+  `SplitMatter[…, +1, …]`).
+- Confirmation that this is CAMB-compatible: xPand's `00` constraint equals `camb.symbolic`'s
+  own text in both gauges, `proved-equal` with `c = 1`.
+
+A kernel that loads xMAG must re-assert the curvature globals afterwards (§2.1).
 
 ## 7. Open items
 
