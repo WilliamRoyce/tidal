@@ -421,9 +421,9 @@ seam (the dictionary of B and C).
 | L6 | four defects in our own harness made earlier probes misreport; the protocol that prevents a repeat is in `scripts/research/perturbations/README.md` (§8) | fixed in this lane; no issue |
 | L4 | xPand under `(+,−,−,−)`: the three-site map and the two by-hand sites — the rule `conventions.md` §6 should carry | #586 |
 | L7 | **xBrauer** (an xMAG dependency) is what stops xPand simplifying the transverse and traceless sectors, not xMAG: measured in one kernel in three states, with the mechanism, the `Master` discriminator and two excluded rivals; a second regression in `SeparateMetric`/`IndicesDown`; and a one-character defect at `xBrauer.m:1958` | #585 (extended); draft `xbrauer_upstream_issue.md` |
-| L8 | **xPand hard-codes the slice determinant sign** (`xPand.m:1754`, `DefMetric[1, h, …]` whatever `normu` is), so in the project's mostly-minus convention `epsilonh` squares to `+6` where `ε_abcd n^d` gives `−6`. Affects the parity-odd sector only; the work-around is to write that sector in the four-index form | to file; draft `xpand_upstream_issue.md` §2 |
-| L9 | the **slice-epsilon convention** is PSALTer's and was already in its code (`DefGeometry.m:60-63`); adopted, tested, and the slot-order and Nikiforova–Damour traps recorded (§7) | #586 (extended); `conventions.md` rows below |
-| L10 | the **family-A import map** is now run rather than asserted, with an odd-in-torsion control and two stated limits (§7.2) | #586 |
+| L8 | **xPand hard-codes the slice determinant sign** (`xPand.m:1754`, `DefMetric[1, h, …]` whatever `normu` is), so in the project's mostly-minus convention `epsilonh` squares to `+6` where `ε_abcd n^d` gives `−6`. Affects the parity-odd sector only; the work-around is to write that sector in the four-index form | **#589**; draft `xpand_upstream_issue.md` §2 |
+| L9 | the **slice-epsilon convention** is PSALTer's and was already in its code (`DefGeometry.m:60-63`); adopted, tested, and the slot-order and Nikiforova–Damour traps recorded (§7) | **#590**; `conventions.md` rows in §7.5 |
+| L10 | the **family-A import map** is now run rather than asserted, with an odd-in-torsion control and two stated limits (§7.2) | **#590** |
 
 ## 6. Evidence index
 
@@ -643,7 +643,8 @@ it is that **a kernel asserts the ones it depends on**, at start and after every
 ### 7.5 Rows for `conventions.md`, ready to paste (the orchestrator's, not ours)
 
 `conventions.md` is a design document and is not edited from this lane. The two blockquotes in
-§7 are the text to quote; these are the table rows that go with them.
+§7 are the text to quote; these are the table rows that go with them. Filed as **#590**; the
+xPand caveat above is **#589**.
 
 For §2's **own-conventions** table, one new line under the ε entry:
 
