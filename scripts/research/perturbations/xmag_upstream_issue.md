@@ -86,17 +86,30 @@ connection never defines; the result is `Null` with `Validate::inhom`. The two-a
 dispatches correctly (`:1664` → `BreakContorsion`) and gives the right answer. Suggested: a
 `NonMetricityQ` guard on the three-argument definition, or a note in the usage.
 
-## 4. Loading xMAG disables other packages' automatic simplifications
+## 4. Loading xMAG disables other packages' automatic simplifications — but the cause is xBrauer, not xMAG
 
-In a kernel with xPand's FRW slicing, the elementary checks
-`h^{ab}∇_b E^{(V)}_a`, `h^{ab}∇_b E^{(T)}_{ac}` and `h^{ab}E^{(T)}_{ab}` all canonicalize to
-`0` (the fields are declared transverse and traceless). After `Needs["xAct`xMAG`"]`, with
-nothing else changed, none of them simplifies. Splits then carry terms that are zero by those
-properties. We suspect the deletion of xTensor's generic definitions in
-`deflistablexTensorxMAGCovDs` (`xMAG.m:1134-1177`, which does
-`function[expr_, covd_Symbol?CovDQ] =.` before redefining) or the `UndefCovD` replacement,
-but we did not isolate it. Suggested: keep the generic definitions and add the new cases, so
-that packages loaded earlier keep working.
+**Moved to its own draft, `xbrauer_upstream_issue.md`, and re-attributed.** The symptom stands:
+in a kernel with xPand's FRW slicing the elementary checks `h^{ab}∇_b E^{(V)}_a`,
+`h^{ab}∇_b E^{(T)}_{ac}` and `h^{ab}E^{(T)}_{ab}` all canonicalize to `0`, and after
+`Needs["xAct`xMAG`"]`, with nothing else changed, none of them simplifies. The first draft
+suspected the deletion of xTensor's generic definitions in `deflistablexTensorxMAGCovDs`
+(`xMAG.m:1134-1177`) and said so without isolating it. A three-state measurement
+(`f8_contractmetric.wls`, run `f8/20260917T114838Z`) has now isolated it, and **xMAG is not
+the cause**:
+
+- `Needs["xAct`xBrauer`"]` **alone** reproduces the loss in full
+  (`F8_VERDICT_REGRESSION_REPRODUCED_BY_XBRAUER_ALONE=True`). xBrauer arrives through xMAG's
+  own `BeginPackage`, which is the only reason the symptom appeared when xMAG was loaded.
+- loading xMAG on top changes **nothing** about metric contraction: `SubValues[ContractMetric1]`
+  has the identical count and hash in the two states, and every probe agrees expression by
+  expression (`F8_XMAG_ADDS_NOTHING_TO_CONTRACTMETRIC1=True`,
+  `F8_XMAG_PROBES_MATCH_XBRAUER={True, True, True, True}`).
+- the first draft's suspect does fire, but on a different function: `EinsteinToRicci` gains two
+  `DownValues` and a new hash only after xMAG loads, and its `DownValues` are byte-identical
+  before and after xBrauer. That replacement is not what breaks the simplifications.
+
+The mechanism, the reproduction and the suggested one-line widening of the guard are in the
+xBrauer draft. Both drafts are addressed to the same author and can be sent together.
 
 ## 5. Small things found by reading
 
