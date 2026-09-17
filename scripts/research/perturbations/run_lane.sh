@@ -18,8 +18,8 @@ HERE="$REPO_ROOT/scripts/research/perturbations"
 STEP="${1:-}"; shift || true
 declare -A SCRIPT=( [probe_load]=probe_load.wls [a2]=repro_a2_tensor_eom.wls [a1]=repro_a1_tensor_action.wls
   [b]=repro_b_mb_scalars.wls [c]=probe_c_signature.wls [d]=probe_d_torsion.wls [dl]=probe_d_limits.wls [e]=probe_e_xmag.wls [e2]=probe_e2_xmag_induced.wls
-  [t1]=tier1_xmag.wls [f2]=f2_hazards.wls [f3]=f3_changecurvature.wls [f5]=f5_sign_audit.wls )
-declare -A TMO=( [probe_load]=15m [a2]=30m [a1]=45m [b]=45m [c]=30m [d]=90m [dl]=30m [e]=45m [e2]=15m [t1]=20m [f2]=20m [f3]=15m [f5]=15m )
+  [t1]=tier1_xmag.wls [f2]=f2_hazards.wls [f3]=f3_changecurvature.wls [f5]=f5_sign_audit.wls [f6]=f6_psalter_signs.wls )
+declare -A TMO=( [probe_load]=15m [a2]=30m [a1]=45m [b]=45m [c]=30m [d]=90m [dl]=30m [e]=45m [e2]=15m [t1]=20m [f2]=20m [f3]=15m [f5]=15m [f6]=15m )
 [[ -n "$STEP" && -n "${SCRIPT[$STEP]:-}" ]] || { echo "usage: $0 <${!SCRIPT[*]}> [key=value ...]"; exit 2; }
 if pgrep -x wolframscript >/dev/null || pgrep -x WolframKernel >/dev/null; then
     echo "RC_LANE_BUSY=a Wolfram kernel is live; refusing (single license)"; exit 3
