@@ -134,7 +134,7 @@ travels into the build.
 | Wayback snapshot of the xPand tarball | archive.org refuses the container's TLS handshake (`tlsv1 alert access denied`) | the stamp records the failure; the snapshot is still missing | **the user**, from an unrestricted machine |
 | the three upstream drafts (`xpand_`, `xmag_`, `xbrauer_upstream_issue.md`) | the user decided at planning that anything found in a third-party package is drafted, never filed or sent, without their agreement | three real defects are unreported upstream; we carry caller-side workarounds | **the user** |
 | xPand's slice determinant sign in mostly minus (`xPand.m:1754`) | found in the closing pass; a package fix is outside the Q3/Q4 fence | M3 writes the parity-odd sector in the `ε_abcd n^d` form (§7 caveat) | orchestrator to file; **M3** to apply |
-| the family-A import map with `T̄ ≠ 0` | a background rule for `Tor` in the rule list makes every order-1 piece vanish, so the half-applied map could not be exercised | the invariance claim is stated for `T̄ = 0` and for the map applied to the whole torsion; a background torsion needs its own check | **M3**, if a background torsion mode is ever switched on |
+| the family-A import map with `T̄ ≠ 0` | a background rule for `Tor` in the rule list makes every order-1 piece vanish, so the half-applied map could not be exercised *(Corrected 2026-09-17, #591: too generous — the call usually **fails** (`$Failed`), and the empty first order appears only for some surrounding rule lists. It is a tooling gap — no demonstrated way to give xPand a nonzero background for a user-declared perturbed tensor through the rule list — not a physics or sign-convention result; both contortion families behave identically.)* | the invariance claim is stated for `T̄ = 0` and for the map applied to the whole torsion; a background torsion needs its own check | **M3**, if a background torsion mode is ever switched on |
 | xPand's four-index projection rule (`xPand.m:1809`) | it is in the source but absent from both rule stores in our sessions and does not fire (`RC_F7A_XPAND_1809_RULE_FIRES=False`, `RC_F7A_ANY_EPSG_RULE_MENTIONS_H=0`); we did not diagnose why | an imported four-dimensional parity-odd formula must be projected onto the slice explicitly | **M3** |
 | the anisotropic-stress step (`Π_ab`, MB's `ein-cond` with `σ ≠ 0`) | outside the planned Part-1 lines; the scalar and tensor reproductions did not need it | the one Einstein equation M3 has no reproduction for | **M3** |
 | the CAMB traceless-equation transcription | projection kept vectors and tensors; MB's `ein-cond` covers the same equation in mostly plus | none | **M3** |
@@ -606,7 +606,9 @@ vacuous: a Lagrangian **odd** in the torsion is `proved-different` between the f
 than glossed:** the invariance holds for a Lagrangian even in the torsion with the map applied
 to the **whole** torsion; and the `T̄ ≠ 0` case could not be exercised, because supplying a
 background rule for `Tor` alongside the perturbation rule makes every order-1 piece vanish for
-each invariant tried (§1.2).
+each invariant tried (§1.2). *(Corrected 2026-09-17, #591: that wording is too generous — the call
+usually **fails** outright, and the empty first order appears only for some surrounding rule
+lists. It is a tooling gap, not a result about the map.)*
 
 ### 7.3 Every convention this lane touched, and where it now stands
 
@@ -618,7 +620,7 @@ each invariant tried (§1.2).
 | that the slice-epsilon sign is a convention, not a derivation | yes, stated | `RC_F7A_SIGN_FIXABLE_BY_SQUARE=False`; F7 A8 |
 | xPand's slice determinant sign in mostly minus | **open, and it is xPand's** (`xPand.m:1754`) | §7 caveat; §1.2; `xpand_upstream_issue.md` |
 | the family-A import map, for a **vanishing** background torsion | yes, by run | §7.2; F7 Part B |
-| the family-A import map with `T̄ ≠ 0` | **not exercised** — a background rule for `Tor` in the list makes every order-1 piece vanish | §1.2 |
+| the family-A import map with `T̄ ≠ 0` | **not exercised** — a background rule for `Tor` in the list makes every order-1 piece vanish *(corrected: it usually fails outright — a tooling gap, #591)* | §1.2 |
 | Riemann sign, Ricci contraction, Ricci scalar sign | **adopted here** | the blockquote above; F5, F6 |
 | torsion sign, the connection's derivative slot, the contortion family, the family-A import map | **adopted here** | §7.1, §7.2; T1 A5, A6, A8 |
 | extrinsic curvature and acceleration signs in the 3+1 split | recorded: xPand `+1`, xMAG's induced decomposition sets both to `−1` | F5, T1 C2 |
