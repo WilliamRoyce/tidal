@@ -1,8 +1,15 @@
 # FRW perturbation tooling memo — requirements, methods, tools, recommendation (R-C, #567)
 
-<!-- cspell:words xPand xPert xTras xCoba xTensor xPerm xCore xMAG xIST COPPER HiGGS Hamilcar xPPN FieldsX bimEX xCPS xTerior TexAct xBrauer TraceFree Pitrou Umeh Brizuela Marugán Bahamonde Gigante Valcarcel Gorji Hohmann Heisenberg Kuhn Golovnev Koivisto Nikiforova Damour Chee Toporensky Tretyakov Odintsov Obukhov Bertschinger Sletmoen SymBoltz Cadabra Zumalacárregui Bellini Sawicki EFTCAMB Gubitosi Gleyzes Langlois Piazza Vernizzi Noller Helpin PSALTer Barker Cembranos Seljak Zaldarriaga Challinor Lasenby Lewis Nicosia Gakis Kiorpelidi Saridakis Mukhanov Feldman Brandenberger Peeters Seery Mulryne Ronayne Fröb WXF wolframscript ToxPand ToxPandFromRules SetSlicing DefMetricFields DefMatterFields DefProjectedTensor SplitPerturbations SplitMetric SplitMatter ExtractComponents ExtractOrder DefCovD DefTensorPerturbation DefMetricPerturbation DefConnectionPerturbation ToDistortion BreakDistortion BreakContorsion StartInducedDecomposition ChangeCurvature ChangeCovD ChristoffelCDCDT RicciScalarCDT TorsionCDT ContorsionCDT VarD CommuteCDSafe InducedFrom DefChart Detg normu tadpole eikonal contortion Weitzenböck teleparallel cspell adotoa dgrho hdot Kleg Kstd NOLAP ONSHELL OFFSHELL onshell offshell RCEL RCSort RCTry RCVerdict RCNormalize RCDigest ldd Einstein–Cartan Riemann–Cartan Shapiro Hehl SymManipulator Invar Spinors xPrint AVF SpinFrames EFTofPNG SymSpin TInvar SpaceSpinors xIdeal Harmonics BRST Ferreira Skordis Złośnik cona dcaabbea hersle nonproj recid regenerable syna tlsv xenos -->
+<!-- cspell:words xPand xPert xTras xCoba xTensor xPerm xCore xMAG xIST COPPER HiGGS Hamilcar xPPN FieldsX bimEX xCPS xTerior TexAct xBrauer TraceFree Pitrou Umeh Brizuela Marugán Bahamonde Gigante Valcarcel Gorji Hohmann Heisenberg Kuhn Golovnev Koivisto Nikiforova Damour Chee Toporensky Tretyakov Odintsov Obukhov Bertschinger Sletmoen SymBoltz Cadabra Zumalacárregui Bellini Sawicki EFTCAMB Gubitosi Gleyzes Langlois Piazza Vernizzi Noller Helpin PSALTer Barker Cembranos Seljak Zaldarriaga Challinor Lasenby Lewis Nicosia Gakis Kiorpelidi Saridakis Mukhanov Feldman Brandenberger Peeters Seery Mulryne Ronayne Fröb WXF wolframscript ToxPand ToxPandFromRules SetSlicing DefMetricFields DefMatterFields DefProjectedTensor SplitPerturbations SplitMetric SplitMatter ExtractComponents ExtractOrder DefCovD DefTensorPerturbation DefMetricPerturbation DefConnectionPerturbation ToDistortion BreakDistortion BreakContorsion StartInducedDecomposition ChangeCurvature ChangeCovD ChristoffelCDCDT RicciScalarCDT TorsionCDT ContorsionCDT VarD CommuteCDSafe InducedFrom DefChart Detg normu tadpole eikonal contortion Weitzenböck teleparallel cspell adotoa dgrho hdot Kleg Kstd NOLAP ONSHELL OFFSHELL onshell offshell RCEL RCSort RCTry RCVerdict RCNormalize RCDigest ldd Einstein–Cartan Riemann–Cartan Shapiro Hehl SymManipulator Invar Spinors xPrint AVF SpinFrames EFTofPNG SymSpin TInvar SpaceSpinors xIdeal Harmonics BRST Ferreira Skordis Złośnik cona dcaabbea hersle nonproj recid regenerable syna tlsv xenos CDCDL KLEGACY RICCISIGN Torsioncd epsilonh kilj unsimplified RIEMANNSIGN TORSIONSIGN MAGChristoffelQ TorsionToDistortion FrozenMetricQ MasterOf EinsteinToRicci UndefChart UndefCovD PDBc Kstd RCSigns RCSetSigns RCNewMessages RCStackOn -->
 
-> **Status: EVIDENCE COMPLETE, RECOMMENDATION FOR D-C — 2026-09-16.** Written by research lane
+> **Status: EVIDENCE COMPLETE, RECOMMENDATION FOR D-C — 2026-09-16, corrected 2026-09-17.**
+> The follow-up lane of 2026-09-17 re-examined every negative xMAG finding against the
+> author's own documented calls and stored outputs: four were this lane's calling forms or
+> its connection declaration, one was an undocumented convention, and the package
+> reproduces its documentation on this bundle (§1.1 T1, §3.3). The recommendation is
+> unchanged (O1′) and now carries xMAG as an oracle test; §7 adds the curvature conventions
+> the project had never stated, and §8 the amendments and the harness defects behind them.
+> Original status line: **Status: EVIDENCE COMPLETE, RECOMMENDATION FOR D-C — 2026-09-16.** Written by research lane
 > R-C for the orchestrator, who records D-C after merge; nothing here is a decision. Every
 > "works"/"does not work" below is a kernel run judged by sentinel lines (§1.1) with the
 > script committed under `scripts/research/perturbations/`; every citation is a TeX line
@@ -38,12 +45,21 @@ order, first-order state form, eikonal amplitude form for the photon channel).
   split all run; the connection itself must be rewritten first (the authors' stated exception,
   observed: xPand leaves `ChristoffelCDCDT` unsplit). Two session hazards were found and
   bounded (§3.2).
-- **xMAG** (the one xAct package built for torsionful connections) loads and defines the
-  Riemann–Cartan connection; its contortion is right; but its `ToDistortion` returns the
-  torsion part of `R̃` with the **opposite sign** to xTensor's own `ChangeCurvature` and to
-  the textbook, its induced decomposition does not run on this bundle, and its connections
-  break xPand's split in the same session. It is not a component for M3 until its author
-  settles the sign (draft report, not filed: `xmag_upstream_issue.md`).
+- **xMAG works as documented, in its own curvature convention.** The follow-up lane
+  (2026-09-17) replayed the targeted cells of the author's own `DefCovD_xMAG.nb` against his
+  stored outputs: 13 `identical`, 2 `proved-equal` (dummy names), 0 other. Its contortion is
+  the standard one, its `ToDistortion` route and the by-hand xTensor identity agree under
+  either curvature convention, and the vectorial-torsion textbook check passes in general
+  dimension and at four. What R-C reported as an "opposite sign" was a comparison across two
+  kernels with different values of the global `$RiemannSign`, which **xMAG sets to −1 at
+  load, silently** (`xMAG.m:110`; xTensor's default is +1): under the project's convention
+  the two routes are `proved-equal`, and the cross-convention comparison reproduces R-C's
+  result exactly. Three of R-C's other four xMAG items were our calling forms (§3.3); the
+  package-side findings are the undocumented load-time sign, the loss of xPand's
+  transverse/traceless simplification in a shared kernel, and the collapse of xMAG's own
+  machinery when a connection is declared without `Master` (§3.2). It is an **independent
+  oracle for the rewrite now, and the component the moment non-metricity or connection
+  variations enter** (Part 4).
 - **Legacy's post-Riemannian rewrite is wrong** (`_derive.py:2164-2181`): its "contortion"
   is not a contortion (wrong slot order) and carries the wrong sign relative to xTensor's
   `ChristoffelCDCDT`; every `R̃` torsion term it produced differs from the correct identity
@@ -55,7 +71,9 @@ post-Riemannian rewrite with the kernel-verified identity, the lane's SVT rule s
 rank-3 torsion, and the lane's η-space Euler–Lagrange operator; build-own only the exports
 (solver forms, eikonal, line-of-sight sources), which no tool provides. xPand becomes an
 install requirement (installer promotion, fingerprint, guide); the xMAG chain stays a research
-install. Estimated M3 tooling cost on this route: **≈ 6 engineer-days** (Part 4 table).
+install, used as the **oracle test** of our rewrite (an independent implementation of the same
+identity, compared in a test, never called by the pipeline). Estimated M3 tooling cost on this
+route: **≈ 6 engineer-days** (Part 4 table), unchanged by the follow-up.
 
 ## 1. What was verified here, and what was not
 
@@ -80,6 +98,10 @@ difference is 0) / `proved-different` / `could-not-decide`; `c` is the reported 
 | DL `probe_d_limits` (fresh kernel) | rank map; hand check; connection; the three rewrites; the hazard | 57 s | splits run for rank 0, 1, 2, 3, 4 of the torsion field with a pure-metric sanity split intact between them; `n^d n_a n^b h^c_e ∇_d T^a_bc = a (δT^0_{0i})′` `proved-equal` (`c = a`, no friction); `RicciScalarCDT` splits only to unsplit `ChristoffelCDCDT`/`Perturbation[ChristoffelCDCDT]` objects; xTensor: `CDT_b v^a − CD_b v^a = −ChristoffelCDCDT^a_bs v^s`; standard `K` is a contortion (`True`), legacy's is not (`False`); correct `R̃ = R + ¼T_abc T^abc + ½T_abc T^bac + T^a_a^b T^c_bc − 2∇_b T^a_a^b` (vector torsion: `R − 6v² + 6∇·v`); legacy's rewrite `proved-different`; xMAG's rewrite (imported WXF) `proved-different` from both signs of the standard substitution: torsion part negated; `δR̃ − δR = (18ℋ TS3 + 6TS3′ + 2D²TS1 + 6ℋD²TS4 + 2D²TS4′ + 4D²TS8)/a` (total derivatives: no tadpole at `T̄ = 0`); after `DefChart` the sanity split is `BROKEN` (`InducedFrom::unknown`) |
 | install xMAG chain | `install_xmag.sh` (three pinned commits) | 0 | 38 files in five new directories, `INSTALLED_COMMIT` stamps, additivity asserted |
 | E `probe_e_xmag`, E2 `probe_e2_xmag_induced` | xMAG beside xPand | 10–16 s, 8 s | loads (2 s, no messages), versions satisfied; xPand's `DefProjectedTensor` and split still work after loading and after xMAG's `DefCovD`; Riemann–Cartan connection defined with `ContorsionCDT`, `PerturbationChristoffelCDT`; `BreakContorsion` = standard `K` (`c = 1`); `ChristoffelCDCDT = −ContorsionCDT`; `ToDistortion` 0.03 s, free of `CDT` objects after `BreakContorsion`; `BreakDistortion` → `Null` on this connection; a second torsion connection → `ToDistortion` `Null`; `DefConnectionPerturbation` coexists with `dg` (`True`) but `Perturbation[TorsionCDT]` stays unexpanded; `ChangeCurvature` on a plain connection returns its input; `StartInducedDecomposition` fails on both connection types, with and without xPand's slicing (`DefCovD::invalid`, `TorsionQ::unknown`); xPand's split stays `ok` after loading xMAG, after xMAG's `DefCovD` and after `ToDistortion` + `BreakContorsion`, and is `BROKEN` (`InducedFrom::unknown`) from the moment a second connection is defined (`E_XPAND_SPLIT_AFTER_SECOND_CONNECTION_CDL=BROKEN`, run `e/20260916T114954Z`); the end-to-end split of xMAG's rewrite was therefore done in the clean kernel (DL, WXF hand-over) |
+| **T1** `tier1_xmag` (follow-up) | xMAG loaded first, the author's own cells replayed against his stored outputs; then the sign experiment and the three calls R-C got wrong | 20 s | Tier-1: **13 `identical`, 2 `proved-equal`** (dummy names; canonical difference 0), 0 other; `SIGNS_AFTER_XMAG_LOAD={-1,1,1,1,1}`; A1/A2: xMAG's route and the by-hand identity `proved-equal` under **both** conventions; A3: cross-convention `proved-different` with the torsion part exactly negated (`proved-equal`); A4: vectorial torsion `R̃ − R = s_R(−(d−1)(d−2)v² + 2(d−1)∇·v)` `proved-equal` in general `d` and at `d = 4`, both signs; A5: the scalar commutator equals `−s_T T^c{}_{ab}∇_c f` (`proved-equal`), wrong-sign control `proved-different`; A6: `K_std` `identical` to `BreakContorsion`, both defining properties `0`; A7: recomputed under +1, the author's stored Riemann cell differs exactly by the negated torsion part; A8: torsion antisymmetric in its last two slots, contortion in its outer pair (family B); C1: two-argument `BreakDistortion` `identical` to `BreakContorsion`, three-argument form fails; C2: `StartInducedDecomposition` **runs** on the general connection with one-character symbols and silently sets `$ExtrinsicKSign = $AccelerationSign = −1`; C3: both `VarD` connection variations run |
+| **F2** `f2_hazards` (follow-up) | the two "xPand breaks" cases, the twin control, the caller-side wrapper, the shared-kernel control | 21 s | chart case: split `BROKEN`, guarded split `ok` and `identical` to the reference, wrong-guard control `BROKEN`, `UndefChart` restores; xCoba count `24` with the sorted-pair dedupe (48 without); `Master`-less connection: split `BROKEN`, one-argument `EinsteinToRicci` `BROKEN` and the two-argument form `ok`, the `Master -> g` twin leaves everything intact, the strict guard recovers it, `UndefCovD` restores; **shared kernel: loading xMAG turns the transverse/traceless probe from `{0,0,0}` into three unsimplified expressions**, so the scalar sector still agrees `identical` and the residual is confined to vector/tensor terms |
+| **F3** `f3_changecurvature` (follow-up) | `ChangeCurvature` on a `Master`-less torsion connection, plain vs xMAG | 8 s | plain xTensor expands it (`{ChristoffelCDCDL, g, RicciCD}`); with xMAG loaded it returns its input for any `Master`-less connection, and the one-argument `TorsionToDistortion` and `MAGChristoffelQ` are inert on it; with such a connection in the session even the healthy `Master -> g` twin fails, and `UndefCovD` restores it |
+| **F5/F6** `f5_sign_audit`, `f6_psalter_signs` (follow-up) | the five sign globals per package | 8 s, 7 s | plain xTensor `{1,1,1,1,1}`; unchanged by xPand and by `SetSlicing` (`$ExtrinsicKSign = 1`); unchanged by PSALTer, which defines no curvature at all (`$Metrics = {G}`); xMAG flips `$RiemannSign` to −1 at load; `RCSetSigns` restores |
 | gates after | `verify --require-psalter` | ~2 min | exit 0, "All checks passed"; `gates/after_verify.txt` |
 | manifest after + diff | | — | layer 1 **identical** (942 files, `9e2c81a4…6e63fbd`); layer 2: 4 paclet-manager files changed (allowed list); new: 64 files in exactly the six directories (`xPand 26, SymmetricFunctions 7, BrauerAlgebra 9, xBrauer 9, TraceFree 5, xMAG 8`) |
 
@@ -93,7 +115,7 @@ payloads of every reported expression sit beside them.
 | Wayback snapshot of the xPand tarball | archive.org refuses the container's TLS handshake (`tlsv1 alert access denied`) | the stamp records the failure; request from an unrestricted machine (orchestrator) |
 | D5, a homogeneous background torsion mode | optional and outside the planned scope (planning record, Terms; round 4) | Part 4 gives no cost for O4-iso; the gate covers the mode without representing it (#579) |
 | curved FRW (`"FLCurved"`), Bianchi | flat ΛCDM is the program's background | none for M3 |
-| xMAG's induced decomposition as a 3+1 route (O4) | does not run on this bundle (E, E2) | O4 withdrawn |
+| xMAG's induced decomposition **as an FRW 3+1 engine** (O4) | it runs when called as documented (T1 C2); exercising it as an alternative to xPand's slicing was outside the time box | O4 is no longer withdrawn, only untested as an engine, with a cost line in Part 4 |
 | the CAMB traceless-equation transcription | projection kept vectors/tensors; MB's `ein-cond` covers the same equation in mostly plus | none |
 | xPand + PSALTer in one kernel | the two branches run in separate kernels by design (D-A) | none |
 | scalar and vector torsion Euler–Lagrange equations | the TT sector is the O2 channel; the scalar sector's symbols were checked present (D6) | M3 work, same operator |
@@ -146,7 +168,7 @@ compatibility (14.3.0 × xAct 1.3.0 × xPert 1.0.6) · Part-1 lines covered · t
 | **xPert 1.0.6** | metric perturbation theory to any order | 264 cites (recid 790000) | GPL | 2018-02-28 | installed, in xPand's chain | 1, 3 | a second perturbed tensor (`DefTensorPerturbation` beside `dg`) works (D1, E) |
 | xTensor 1.3.0 / xCore / xPerm 1.2.4 / xCoba 0.8.6 | abstract tensors, canonicalization, components | everywhere | GPL | 2025-12-29 | certified (fingerprinted four) | all | `DefCovD[…, Torsion -> True]` is the torsionful connection; `ChangeCurvature` + the standard contortion is the correct rewrite (DL) |
 | xTras 1.4.2 | invariants, `VarD` helpers | xMAG dependency | GPL | 2014-10-30 | installed | 5 | — |
-| **xMAG 0.1.0** (Helpin) + xBrauer 1.1.0 + TraceFree 0.1.0 + SymmetricFunctions 1.0.0 + BrauerAlgebra 1.1.0 | independent connection with torsion and non-metricity, distortion/contortion decomposition, connection perturbations, induced decomposition | no paper; thesis 2407.18019 for the Brauer packages | GPL-2+ (headers; no LICENSE files) | commits 2026-01-10 / 2013-11-12, no tags | loads; two functions do not run or return `Null` on this bundle; alters `ChangeCurvature` | 3 (rewrite) — **not adopted** | contortion right; `ToDistortion` torsion part with the opposite sign to xTensor and the textbook; induced decomposition fails; breaks xPand's split in-session (E, DL; draft report) |
+| **xMAG 0.1.0** (Helpin) + xBrauer 1.1.0 + TraceFree 0.1.0 + SymmetricFunctions 1.0.0 + BrauerAlgebra 1.1.0 | independent connection with torsion and non-metricity, distortion/contortion decomposition, connection perturbations and variations, induced decomposition | no paper; thesis 2407.18019 for the Brauer packages; two documentation notebooks with stored outputs | GPL-2+ (headers; no LICENSE files) | commits 2026-01-10 / 2013-11-12, no tags | **reproduces its own documentation on this bundle** (T1: 13 `identical`, 2 `proved-equal`); needs `Master -> g`; sets `$RiemannSign = −1` at load and two more signs inside `StartInducedDecomposition`; must not share xPand's kernel | 3 (rewrite) and the connection variation | **representable and correct**: contortion standard, `ToDistortion` equal to the by-hand xTensor identity under either convention; **adopted as the oracle test** of our rewrite, and as the component when non-metricity or connection variations enter (Part 4) |
 | xIST 0.7.3 / COPPER 0.8.3 (Noller et al.) | most general quadratic action on FRW from symmetry | 1604.01396, 79 cites | GPL-3 | 2016 | untested (Mathematica 9/10 era) | — | *documented only*: end-user tool, not a component |
 | xPPN (Hohmann) | post-Newtonian 3+1 about Minkowski, tetrad + Weitzenböck | 2012.14984, 11 cites | no license line | `xenos1984/xPPN@dcaabbea`, 2022-10-01 | untested | — | *documented only*: backgrounds hard-wired flat; not FRW |
 | FieldsX 3 (Fröb) | fermions, gauge fields, BRST, frame fields | 2008.12422, 29 cites | GPL-2 | — | untested | — | *documented only*: theory-building aid |
@@ -180,18 +202,49 @@ compatibility (14.3.0 × xAct 1.3.0 × xPert 1.0.6) · Part-1 lines covered · t
   (`dEta`) plus `VarD` for the spatial part: `EL = P₀ − dEta[P₁] + dEta[dEta[P₂]]` (A1, D6).
 - `ToCanonical::noident` on the perturbation parameter is benign; `Check` must ignore it.
 
-### 3.2 Two session hazards, bounded
+### 3.2 The session hazards, located
 
-1. **Some `DefCovD` calls break every later split** (`InducedFrom::unknown`, result `Null`):
-   xCoba's `DefChart` (its metric-less `PDBc`) does it in a plain kernel; with xMAG loaded, a
-   second torsion connection does it (`E_XPAND_SPLIT_AFTER_SECOND_CONNECTION_CDL=BROKEN`),
-   while a plain xTensor `DefCovD[…, Torsion -> True]` alone does not (DL). Bounded: component
-   counting last or in another kernel; xMAG never in xPand's kernel (#583, #585; draft
-   `xpand_upstream_issue.md` §1).
-2. **xMAG rewrites xTensor behavior** (`DefCovD` options, curvature relations): with xMAG
-   loaded, `ChangeCurvature` on a plain torsion connection returns its input, and a second
-   torsion connection makes `ToDistortion` return `Null`. Bounded: if xMAG is ever used, one
-   connection per kernel, and WXF hand-over to the xPand kernel.
+1. **xPand's own** (#583): a covariant derivative with **no metric at all**
+   (`MetricOfCovD[cd] === Null` — xCoba's chart derivative `PDBc`, or an affine connection
+   declared without `FromMetric`) makes every later split throw `InducedFrom::unknown` and
+   return `Null`. The line is `xPand.m:2566` in `ToMetric`, reached from every
+   `ToxPandFromRules` through `Conformal` (`:2619`): it selects over `Rest@$CovDs` and asks
+   `InducedFrom[MetricOfCovD[#]]`, where xTensor guards the same pattern in its own code
+   (`xTensor.m:8951`). Measured workarounds (F2): the caller-side wrapper
+   `Block[{$CovDs = Select[$CovDs, # === PD || MetricOfCovD[#] =!= Null &]}, …]` recovers a
+   split `identical` to the clean-kernel reference, a wrong-guard control stays broken, and
+   `UndefChart` also restores it. **For M3:** count components in another kernel, or use the
+   five-line wrapper; the one-line upstream fix is drafted in `xpand_upstream_issue.md`.
+2. **Ours** (reported inside #583/#585): a torsionful connection declared **without
+   `Master`** breaks the split at a different site — xMAG's replacement of
+   `EinsteinToRicci` (`xMAG.m:1154`) tests `FrozenMetricQ[MasterOf[#]]`, and
+   `FrozenMetricQ[Null]` (`:1130`) reaches the same `InducedFrom[Null]` fallback
+   (`xTensor.m:8302`) from `ToMetric` (`xPand.m:2569`). The twin declared `Master -> g`
+   leaves the split, `ToDistortion` and `ChangeCurvature` intact (F2, F3); with the
+   `Master`-less one present even the healthy twin fails, and `UndefCovD` restores it.
+   xMAG's own `?Master` text makes `Master -> g` the documented declaration. **For M3:**
+   every connection gets `Master -> g`.
+3. **xMAG in xPand's kernel: no** (the decisive control, F2 §III). Loading xMAG turns the
+   elementary transverse/traceless probe from `{0, 0, 0}` into three unsimplified
+   expressions, so xPand's simplification of the vector and tensor sectors stops working;
+   the scalar sector still comes out `identical` and the residual is confined to those
+   terms. Separately, xMAG flips `$RiemannSign` at load, so a split in that kernel is in the
+   other curvature convention. **For M3:** one package per kernel with WXF hand-over, which
+   is what D-A's committed-package-plus-driver design already implies.
+
+### 3.3 xMAG, used correctly (what this lane had wrong, and what the author documents)
+
+| R-C's call | what it did | the documented call | source |
+| --- | --- | --- | --- |
+| `BreakDistortion[expr, CDT, g]` | `Null` + `Validate::inhom`: the three-argument body expects non-metricity objects, which a metric-compatible connection never defines | `BreakDistortion[expr, CDT]` — the two-argument dispatcher routes a torsion-only connection to `BreakContorsion`; `identical` to calling it directly (T1 C1) | `xMAG.m:1476` vs `:1664` |
+| `StartInducedDecomposition[g, CDT, {{";h", …}, …}, …]` | `DefCovD::invalid: ;h is not a valid Postfix symbol for a derivative`, then a cascade of consequences | one-character postfix symbols, on the **general** connection: `StartInducedDecomposition[g, CD, {{"~","Dh"},{"^","DGh"}}, {nv, hh}]` runs (T1 C2) | `xTensor.m:6591`; the usage says "works only for … GL(dim) independent connection"; the author's `In[175]` uses one-character symbols |
+| a second `DefConnectionPerturbation`, then `Perturbation[TorsionCDT]` | the tensor exists, the torsion perturbation never does | it already ran inside `DefCovD`; vary with `VarD[ChristoffelCDT[-a,b,c], cd][L]` as the author does, and build the torsion perturbation as `δΓ − δΓᵀ` | `xMAG.m:425-426, 1079, 1367-1441`; Tutorial `In[300]` |
+| a connection without `Master` | §3.2 item 2 | `DefCovD[CDT[-a], {"#","DT"}, Torsion -> True, FromMetric -> g, Master -> g, ConnectionRelations -> True]` | `?Master`; the author's `In[10]` |
+
+Two more facts to carry: **load xMAG before defining anything, then re-assert the sign
+globals** (`$RiemannSign = 1`); and **`StartInducedDecomposition` silently sets
+`$ExtrinsicKSign = $AccelerationSign = −1`** (`xMAG.m:1792`), so print the signs again after
+calling it.
 
 ## Part 4 — recommendation per requirement, decision table, D-C options, license
 
@@ -224,8 +277,10 @@ what the estimate rests on; "interface" is what the committed package calls unde
 | C signature (5.8) | split native; two hand-done sites | O1 native | "signature transcription": 0.5 d |
 | D torsion, xPand route (5.9) | representable with the precedent work (SVT rules); rank 0–4 split; connection objects need the rewrite first | O1 or O3 | "torsion SVT rules": 1 d |
 | D action route (D6) | tadpole 0 at `T̄ = 0`; TT equations for both modes; scalar sector present | action route lives for torsion | "action route for torsion": 0 extra (same operator) |
-| DL rewrite | correct identity established in pure xTensor; legacy's wrong (#582); xMAG's sign opposite | **O1′** (pure xTensor rewrite) | "connection → LC + torsion": 0.5 d + the legacy/Stage-1 correction |
-| E xMAG (5.10) | loads; contortion right; `ToDistortion` sign disagrees; induced decomposition fails; session hazards | O3 deferred, O4 withdrawn | "xMAG convention audit": blocked on the author |
+| DL rewrite | correct identity established in pure xTensor; legacy's wrong (#582) | **O1′** (pure xTensor rewrite) | "connection → LC + torsion": 0.5 d + the Stage-1 correction |
+| E xMAG (5.10) | loads; contortion right; four of its six negative items turned out to be our calling forms | superseded by T1 | — |
+| **T1 xMAG called as documented** | reproduces the author's stored outputs; agrees with the by-hand identity under either convention; the sign difference was the undocumented load-time global | **O1′ with xMAG as the oracle**; O3 becomes a later adoption rather than a blocked one | "xMAG convention audit": 0, done; "oracle test": 0.25 d |
+| **F2/F3 hazards** | one xPand robustness defect with a wrapper that recovers the split identically; one configuration error of ours; xMAG must not share xPand's kernel | O1′ unchanged; the wrapper is five lines in our package | "xPand `$CovDs` wrapper": 0.25 d |
 
 ### 4.3 D-C options, in the order the evidence ranks them
 
@@ -239,15 +294,20 @@ what the estimate rests on; "interface" is what the committed package calls unde
    `scripts/install-xpand.sh`, add `xPand.m`'s `$Version` to `verify-wolfram-setup.sh`'s
    fingerprint (today it checks xCore, xPerm, xTensor, xCoba only; #580), a `WOLFRAM_GUIDE.md`
    step, re-certification. Routed to the orchestrator (paths not owned here).
-2. **O3 — xMAG for the rewrite, xPand for the split (deferred).** Only after the author
-   settles the `ToDistortion` sign (draft `xmag_upstream_issue.md` §1) and with the two
-   hazards respected (separate kernels, one connection). Gains nothing over O1′ for
-   metric-compatible torsion; would matter for non-metricity later. Cost if resumed: 1 d +
-   a five-package install requirement.
+2. **O3 — xMAG for the connection algebra, xPand for the split: adopt when needed, no
+   longer blocked.** The follow-up removed the reason it was deferred — there is no sign
+   defect to settle. What it does not buy is anything O1′ lacks for metric-compatible
+   torsion, so the recommendation stays O1′ **with xMAG as the oracle test** (0.25 d), and
+   O3 is adopted the moment **non-metricity** (`∇g ≠ 0`) or a **Palatini-style variation
+   with respect to the independent connection** enters: 1 d plus promoting the five-package
+   install, one package per kernel, WXF hand-over.
 3. **O2 — xPert only, own 3+1/SVT.** Not needed: xPand's engine passed every probe. Cost
    would be 10–15 d (a rewrite of what xPand does), kept as the fallback if upstream xPand
    ever breaks against a future xTensor (the version gate cannot warn).
-4. **O4 — xMAG's induced decomposition as the 3+1 engine.** Withdrawn: does not run (E, E2).
+4. **O4 — xMAG's induced decomposition as the 3+1 engine.** No longer withdrawn: it runs
+   when called as documented (T1 C2). Untested as an FRW engine and not recommended —
+   xPand's slicing passed every reproduction — but evaluating it would cost a day, not be
+   impossible.
 5. **O5 — port legacy's decomposer.** Rejected on design grounds and now on correctness
    (#582).
 6. **O6 — fork xPand for torsion.** Not needed: no shim, no patch; torsion enters through
@@ -282,7 +342,9 @@ seam (the dictionary of B and C).
 | F15 | the xPand paper's Appendix A prints `−2D²φ` and `E′ℋ` where 0.4.4 prints `D²ψ` and `2ℋE′` | #584 |
 | L1 | legacy's contortion identity is not a contortion and has the wrong sign; Stage 1 ports it | **#582** (priority high) |
 | L2 | xPand: a metric-less `CovD` in the session breaks every later split | #583; draft `xpand_upstream_issue.md` |
-| L3 | xMAG on the certified bundle: what works, what returns `Null`, the `ToDistortion` sign | #585; draft `xmag_upstream_issue.md` |
+| L3 | xMAG on the certified bundle. **Corrected by the follow-up:** four of the six reported items were our calling forms or our connection declaration; the package-side findings are the undocumented load-time `$RiemannSign = −1`, the loss of xPand's transverse/traceless simplification in a shared kernel, the `Master`-less collapse, and the three-argument `BreakDistortion` precondition | #585 (rewritten); draft `xmag_upstream_issue.md` |
+| L5 | the project had **no stated curvature convention**; adopted here as xTensor's defaults, with the import map for family-A sources (§7) | #586 (extended); `conventions.md` §2 at merge |
+| L6 | four defects in our own harness made earlier probes misreport; the protocol that prevents a repeat is in `scripts/research/perturbations/README.md` (§8) | fixed in this lane; no issue |
 | L4 | xPand under `(+,−,−,−)`: the three-site map and the two by-hand sites — the rule `conventions.md` §6 should carry | #586 |
 
 ## 6. Evidence index
@@ -299,11 +361,12 @@ seam (the dictionary of B and C).
 - **Gates.** `gates/before_ensure_registered.txt` (exit 0, end `2026-09-16T10:36:21Z`),
   `gates/after_verify.txt` (exit 0). Both show "All checks passed!" and the one
   informational warning R-1 saw.
-- **Manifest.** `manifest/{before,after}.{all,layer1,layer2,new}.sha256`, `manifest/diff.txt`:
+- **Manifest.** `manifest/{before,after}.{all,layer1,layer2,new}.sha256`, `manifest/diff.txt` and, after the follow-up lane, `manifest/diff_followup.txt`:
   `MANIFEST_LAYER1=identical` (942 files, `9e2c81a485c218355a53f81f424553bf24bbd77b30c0cf18f545f9ecf6e63fbd`
   before and after), `MANIFEST_LAYER2_CHANGED_FILES=4` (`Paclets/Configuration/*` and
   `Paclets/…` manager data, on the allowed list), `MANIFEST_NEW_AFTER_FILES=64` in the six
-  listed directories only.
+  listed directories only — identically before and after the follow-up lane, which added
+  no file to the userbase.
 - **Digests** (SHA256 of the canonical form after `ScreenDollarIndices`; fingerprints, not
   verdicts): Out[47] `e446cd3c…`; A2 mixed `b5ee18a0…`, lowered on shell `13924a59…`; MB
   Newtonian a–d `aeca68da…`, `0083bf07…`, `62431812…`, `4bfe054d…`; synchronous a–d
@@ -318,7 +381,10 @@ seam (the dictionary of B and C).
   `run_lane.sh`, `wolfram/RCSetup.wl`, `wolfram/probe_load.wls`, `wolfram/repro_a2_tensor_eom.wls`,
   `wolfram/repro_b_mb_scalars.wls`, `wolfram/repro_a1_tensor_action.wls`,
   `wolfram/probe_c_signature.wls`, `wolfram/probe_d_torsion.wls`, `wolfram/probe_d_limits.wls`,
-  `wolfram/probe_e_xmag.wls`, `wolfram/probe_e2_xmag_induced.wls`, `mb_camb_symbolic.py`,
+  `wolfram/probe_e_xmag.wls`, `wolfram/probe_e2_xmag_induced.wls`, and from the follow-up
+  lane `wolfram/RCSetupCore.wl`, `wolfram/tier1_xmag.wls`, `wolfram/f2_hazards.wls`,
+  `wolfram/f3_changecurvature.wls`, `wolfram/f5_sign_audit.wls`,
+  `wolfram/f6_psalter_signs.wls`; plus `mb_camb_symbolic.py`,
   `xpand_upstream_issue.md`, `xmag_upstream_issue.md`.
 - **Literature fetched into the worktree's `literature/`** (31 ids; the orchestrator copies
   them into the main checkout and regenerates `literature/README.md`, Q2): 1302.6174,
@@ -327,3 +393,98 @@ seam (the dictionary of B and C).
   1210.0201, 1304.4840, 1404.3713, 1605.06102, 1909.01828, 1312.5742, 1405.3590, 1609.00380,
   1609.00381, astro-ph/9911177, astro-ph/9702170, hep-th/0701238, 2011.02491, 1808.05565,
   2203.01856, 2110.12332. Curated rows: `docs/references.md` § "FRW perturbation tooling".
+
+## 7. Curvature conventions: what each source uses, what the project adopts
+
+Nothing in the project stated a curvature convention before this lane: `conventions.md` fixes
+the signature and the ε orientation only, PSALTer defines no curvature at all and sets none of
+xTensor's sign globals (F6), and CAMB carries the Einstein equations in a fixed form with no
+Riemann tensor. xPand follows xTensor's defaults (its paper `:312, :337`); xMAG changes one of
+them at load. **Adopted, and to be quoted into `conventions.md` §2 by the orchestrator:**
+
+> Curvature signs are xTensor's defaults, `$RiemannSign = $RicciSign = $TorsionSign =
+> $epsilonSign = +1` (`xTensor.m:287-289`, defaults at `:1837-1843`), with the derivative
+> index in the middle slot of the connection and of the contortion. They are asserted at the
+> start of every kernel, re-asserted after every `Needs` and after any induced decomposition,
+> and printed into every artifact header. xPand needs no adjustment; **xMAG sets
+> `$RiemannSign = −1` when it loads** (`xMAG.m:110`, undocumented) and
+> `$ExtrinsicKSign = $AccelerationSign = −1` inside `StartInducedDecomposition`
+> (`xMAG.m:1792`), so a kernel that uses xMAG resets them.
+
+### 7.1 The statements, as the kernel printed them
+
+Each line is grep-able in the named run directory under `third_party/perturbations_runs/`.
+
+| statement | sentinel and value | run |
+| --- | --- | --- |
+| xTensor's own definitions | `RC_F5_RIEMANNSIGN_USAGE`: "Riemann[-a,-b,-c,d] = $RiemannSign * ( PD[-b][Christoffel[d,-a,-c] + …)"; `RC_F5_RICCISIGN_USAGE`: "Ricci[-a,-b] = $RicciSign * Riemann[-a,-c,-b,c]"; `RC_F5_TORSIONSIGN_USAGE`: "cd[-a]@cd[-b]@f[] - cd[-b]@cd[-a]@f[] = - $TorsionSign Torsioncd[c,-a,-b] cd[-c]@f[]" | `f5/` |
+| the five globals, per package | `RC_SIGNS_PLAIN_XTENSOR={1, 1, 1, 1, 1}`; `RC_SIGNS_AFTER_XPAND={1, 1, 1, 1, 1}`; `RC_SIGNS_AFTER_XPAND_SETSLICING={1, 1, 1, 1, 1}`; `RC_SIGNS_AFTER_PSALTER={1, 1, 1, 1, 1}`; `RC_SIGNS_AFTER_XMAG_LOAD={-1, 1, 1, 1, 1}`; after `StartInducedDecomposition`, `{1, 1, 1, -1, -1}` | `f5/`, `f6/`, `t1/` |
+| the connection difference | `RC_DL_CDT_MINUS_CD_ON_A_VECTOR=-(ChristoffelCDCDT[ia, -ib, is]*vv[-is])` with `RC_DL_CHRISTOFFELCDCDT_IS_MINUS_K=True`; with xMAG loaded, `RC_T1_CHRISTOFFELCDCDT_AUTORULE=-ContorsionCDT[i1, -i2, -i3]` | `dl/20260916T114120Z`, `t1/` |
+| the contortion identity | `RC_T1_A6_KSTD_IDENTITY_INPUTFORM=HoldForm[Kstd[a, b, c]] -> (TorsionCDT[a, b, c] + TorsionCDT[b, a, c] + TorsionCDT[c, a, b])/2`; `RC_T1_A6_KSTD_EQUALS_XMAG_CONTORSION=identical (SameQ)`; `RC_T1_A6_KSTD_ANTISYM_MINUS_T=0`; `RC_T1_A6_KSTD_METRICITY=0`; legacy's expression `RC_DL_KLEGACY_IS_A_CONTORTION=False` | `t1/`, `dl/20260916T114120Z` |
+| the Einstein–Cartan check | `RC_T1_A4_VECTOR_TORSION_VS_TEXTBOOK_PLUS1=proved-equal` and `RC_T1_A4_AT_DIM4_PLUS1=proved-equal` for `R̃ − R = s_R(−(d−1)(d−2) v·v + 2(d−1)∇·v)`, i.e. `R − 6v² + 6∇·v` at `d = 4`; the same under `−1` with the sign carried | `t1/` |
+| the torsion sign | `RC_T1_A5_SCALAR_COMMUTATOR=-(TorsionCDT[-is, -i1, -i2]*CDT[is][ff[]])` with `…_VS_MINUS_T_GRAD_F=proved-equal` and the control `…_PLUS_T_GRAD_F=proved-different` | `t1/` |
+| the slot family | `RC_T1_A8_TORSION_IS_ANTISYM_IN_LAST_TWO=identical (SameQ)`; `RC_T1_A8_CONTORSION_ANTISYM_PAIR={identical (SameQ), proved-different}` — the outer pair, not the first two | `t1/` |
+| the `(+,−,−,−)` map and the two by-hand sites | `RC_C_OUT47_VS_SIGNATURE_MAP=proved-equal`; without the Laplacian site `proved-different` with residual `4εD²φ + 8εD²ψ`; the control without the lapse flip `proved-different`; `RC_C_TIME_PROJECTION_OF_V0_n=-V0` against `RC_C_TIME_PROJECTION_BY_HAND_OK=True`; `RC_C_SPLITMATTER_WITH_NORMU_RAN=True`; `RC_C_CAMB_NEWTON_00_VS_XPAND=proved-equal up to c=1`; `RC_C_CAMB_SYNC_00_VS_XPAND=proved-equal up to c=1` | `c/20260916T114552Z` |
+
+### 7.2 The dictionary, and the import map for family-A sources
+
+Two families of contortion appear in the literature, differing in which slot of the connection
+carries the derivative index. Both are correct; no software we use is in family A.
+
+| source | signature | Riemann / Ricci vs xTensor | torsion / contortion | displays `R̃ = R + …`? |
+| --- | --- | --- | --- | --- |
+| xPand paper 1302.6174 | (−,+,+,+) `:369, :680` | same slot order and sign `:312`; Ricci "second and fourth" `:337` | not stated | no |
+| Ma & Bertschinger | (−,+,+,+) `:295, :361` | not stated | not stated | no |
+| Aoki et al. 2310.16007 | (−,+,+,+) `:153`; ε₀₁₂₃ = +1 `:201` | other slot order `:181`; `R̃_{μν} = R̃^λ{}_{μλν}` `:185` | `T = 2Γ̃_{[μν]}` `:160`; **family A** `:168` | no |
+| Nikiforova–Damour 1804.09215 | (−,+,+,+) `:221`; ε^{0123} = +1 `:245` | frame form `:286`; `R_{ij} = η^{kl}R_{kilj}` `:296` | **family A** `:344`, `K_{ijk} = −K_{jik}` `:341` | in words `:256-260` |
+| Heisenberg–Hohmann–Kuhn 2311.05495 | not stated (mostly plus) | other slot order `:23`; `R_{μν} = R^λ{}_{μλν}` `:36` | derivative slot stated via `Q` `:14`; **family B** `:18` | **yes** `:38, :46` |
+| Shapiro hep-th/0103093 | not stated | other slot order `:659`; `R̃_{τβ} = R̃^α{}_{ταβ}` `:687` | **family A** `:623`, `K_{αβγ} = −K_{βαγ}` `:633` | **yes** `:695, :736` |
+| Barker 2206.00658 | (+,−,−,−) `:265` | other slot order `:130` | derivative slot last `:219`; **family B** `:226` | no |
+| PSALTer code and paper | (+,−,−,−) `PSALTer.m:101`, `2406.09500:102` | flat, no curvature; sets no sign global (F6) | the user's field strengths | no |
+| xTensor 1.3.0, hence xPand and xMAG | — | the reference (the blockquote above) | **family B**: `T^a{}_{bc} = s_T(Γ^a{}_{bc} − Γ^a{}_{cb})`, `K` antisymmetric in its outer pair | through `ChangeCurvature` |
+
+**Import map, applied once at import with the source cited and a test** (as
+`conventions.md:27-29` already requires): a torsion tensor read from a family-A source is
+**minus** xTensor's `TorsionCDT`, its Riemann slot order is remapped, and its contortion is
+re-expressed as `K^a{}_{bc} = ½(T^a{}_{bc} + T_b{}^a{}_c + T_c{}^a{}_b)`. This applies to
+Probe D3's SVT parametrization, transcribed from Aoki et al.: the map flips the sign of its 24
+potentials, which leaves representability and the counting untouched but must travel into M3's
+rule set.
+
+### 7.3 Every convention this lane touched, and where it now stands
+
+| convention | settled | where |
+| --- | --- | --- |
+| signature `(+,−,−,−)`, and how it enters xPand (`normu = +1`, determinant sign −1) | yes | `conventions.md` §2; Probe C; §7.1 |
+| ε orientation `ε₀₁₂₃ = +1` (`$epsilonSign`) | yes | `conventions.md` §2; F5 |
+| xPand's slice tensor `epsilonh` relative to `ε` and to `n` | **not checked** | §1.2; needed before Probe D3's parity-odd rules are used in anger |
+| Riemann sign, Ricci contraction, Ricci scalar sign | **adopted here** | the blockquote above; F5, F6 |
+| torsion sign, the connection's derivative slot, the contortion family, the family-A import map | **adopted here** | §7.1, §7.2; T1 A5, A6, A8 |
+| extrinsic curvature and acceleration signs in the 3+1 split | recorded: xPand `+1`, xMAG's induced decomposition sets both to `−1` | F5, T1 C2 |
+| perturbation definition, xPand's projected variables, the MB dictionary | yes, by run | Probe B, `probe_load` |
+| conformal time, `a(η)`, `ℋ`, CAMB names and gauges | yes | `conventions.md` §3; Probe C |
+| Fourier convention (`k² ↔ −∇²`, `θ`, the velocity sign) | yes, by run | Probe B's velocity-sign control; Probe C |
+| units `κ = 8πG`, `c = 1` | yes | Part 1 |
+
+## 8. Amendments to the plan, and the harness defects behind them
+
+- **Targets were typed inline** in each comparing script with the TeX line in a comment; the
+  planned separate `targets.wl` was never written, and `mb_camb_symbolic.py` now points at
+  the two scripts that cite its printout. The planned `compare.wls` was not written either:
+  `RCVerdict` in `RCSetupCore.wl` implements the verdict rule, and the dangling `compare`
+  step has been removed from `run_lane.sh`.
+- **A1's pre-split `VarD` cross-check was dropped**: the on-shell action route already
+  reproduces the field-equation route, which is what the cross-check was for.
+- **Four defects in this lane's own harness** made the first xMAG probes misreport, and are
+  fixed in `RCSetupCore.wl`: `RCTry` used `Check`, so any message — including the benign
+  `DefMetric::old` that the author's own run prints — became a failure; `$MessageList = {}`
+  is a no-op on a protected symbol, so every message list printed was cumulative rather than
+  per-call (`RCNewMessages` takes the tail instead); the harness file was read before any
+  xAct package, so its short names created shadowing `Global` symbols and every verdict in
+  one run was computed by inert functions; and a comment containing `*)` closed early,
+  truncating the file silently. Two more were in the probes: `CommuteCovDs` was called with
+  its index pair reversed (`xTensor.m:6218` matches outer, then inner), and one comparison
+  ran against an unexpanded symbol. **The protocol that prevents a repeat is in
+  `scripts/research/perturbations/README.md`, "Working with a third-party xAct package".**
+- **The xCoba component count** of the rank-3 torsion is 24, not the 48 first reported: the
+  dedupe must key on the sorted antisymmetric pair (F2).

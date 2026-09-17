@@ -1,6 +1,6 @@
 # Draft upstream report for xPand 0.4.4 — NOT FILED
 
-<!-- cspell:words xPand xCoba xMAG SplitPerturbations ToxPandFromRules DefChart ExtractComponents ToxPand SplitMatter normu Pitrou -->
+<!-- cspell:words xPand xCoba xMAG SplitPerturbations ToxPandFromRules DefChart ExtractComponents ToxPand SplitMatter normu Pitrou changetoinducedmetric MetricCovDQ FrozenMetricQ MasterOf EinsteinToRicci -->
 
 Drafted by research lane R-C (#567) on 2026-09-16 under the same rule as
 `docs/cosmology/psalter_543_upstream_issue.md`: written for the maintainers, kept in the
@@ -20,19 +20,46 @@ parallel derivative `PDBc` with `MetricOfCovD[PDBc] === Null`. The same split no
 
 **Observed.** `$CovDs = {PD, CD, cd, CDah2, CDT, PDBc}`,
 `MetricOfCovD /@ $CovDs = {Null, g, h, gah2, g, Null}`; every later split fails the same
-way. The same symptom appears with connections defined through the xMAG package.
+way. (A superficially similar symptom from another package is a different site; see the
+note below.)
 
 **Expected.** The split should ignore covariant derivatives that do not appear in the
 expression, or report which derivative it could not handle.
 
-**Where to look.** The rule construction iterates over derivatives and calls `InducedFrom`
-on their metrics (`SplitPerturbations`, `xPand.m` around line 2891 and the
-`RulesCovDsOfTensor` helper); a guard `MetricOfCovD[cd] =!= Null` (or restricting to the
-derivatives present in `expr`) would avoid it.
+**Where to look.** `ToMetric` (`xPand.m:2563`) is reached from every `ToxPandFromRules`
+through `Conformal` (`:2619`, `:2657`), and at `:2566` it builds
 
-**Reproduction script.** `scripts/research/perturbations/wolfram/probe_d_limits.wls` in
-this repository (sentinels `DL_SANITY_METRIC_SPLIT_7_BEFORE_CHART=ok`,
-`DL_SANITY_METRIC_SPLIT_8_AFTER_CHART=BROKEN`).
+```
+$CovDsNotInduced = Select[Rest@$CovDs, InducedFrom[MetricOfCovD[#]] === Null &]
+```
+
+`MetricOfCovD` returns `Null` for a derivative defined without `FromMetric`, and
+`InducedFrom[Null]` falls through to `xTensor.m:8302`, which throws. xTensor guards the same
+pattern in its own code at `xTensor.m:8951`
+(`changetoinducedmetric[covd_, metric_, Null] := metric`). The one-line fix would be
+
+```
+$CovDsNotInduced = Select[Rest@$CovDs, MetricOfCovD[#] =!= Null && InducedFrom[MetricOfCovD[#]] === Null &]
+```
+
+(`MetricCovDQ` at `xTensor.m:6723` is the same test). A caller-side wrapper that filters
+`$CovDs` for the duration of the split recovers a result `identical` to the clean-kernel one,
+which is how we work around it meanwhile; a wrong-guard control stays broken, so the
+attribution is the guard and not the wrapper.
+
+**A different site, same fallback.** A second symptom we first reported here turned out to
+come from another package: with xMAG loaded, its replacement of `EinsteinToRicci`
+(`xMAG.m:1154`) tests `FrozenMetricQ[MasterOf[#]]`, and for a connection declared without
+`Master` that reaches the same `InducedFrom[Null]` fallback from `ToMetric`'s
+`preexpression` line (`xPand.m:2569`). That one is xMAG's (and our declaration's), not
+xPand's; it is mentioned only so the two are not confused.
+
+**Reproduction scripts.** `scripts/research/perturbations/wolfram/probe_d_limits.wls`
+(sentinels `DL_SANITY_METRIC_SPLIT_7_BEFORE_CHART=ok`,
+`DL_SANITY_METRIC_SPLIT_8_AFTER_CHART=BROKEN`) and
+`scripts/research/perturbations/wolfram/f2_hazards.wls`, which adds the workaround and its
+controls (`F2_I_SPLIT_AFTER_CHART=BROKEN`, `F2_I_GUARDED_SPLIT_AFTER_CHART=ok`,
+`F2_I_GUARDED_SPLIT_EQUALS_REFERENCE=identical`, `F2_I_CONTROL_WRONG_GUARD=BROKEN`).
 
 ## 2. Two places hard-code the normal's norm `n.n = -1`
 

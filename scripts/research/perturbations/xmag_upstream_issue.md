@@ -1,90 +1,114 @@
 # Draft report for the xMAG author — NOT FILED
 
-<!-- cspell:words xMAG xBrauer TraceFree xPand xTras xPert Helpin ToDistortion BreakDistortion BreakContorsion ToContorsion DefConnectionPerturbation StartInducedDecomposition contortion DefCovD ChangeCurvature Riemann-Cartan Accelerationn CDCDL Tetrahh epsilonhh -->
+<!-- cspell:words xMAG xBrauer TraceFree xPand xTras xPert Helpin ToDistortion BreakDistortion BreakContorsion ToContorsion DefConnectionPerturbation StartInducedDecomposition contortion DefCovD ChangeCurvature Riemann-Cartan Accelerationn CDCDL Tetrahh epsilonhh changeRiemann TorsionToDistortion MAGChristoffelQ EinsteinToRicci FrozenMetricQ MasterOf ConnectionRelations chriscdmetcovd Distorsi StringLength xTensor ExtrinsicKSign AccelerationSign RiemannSign Tensorx chriscovdmetcovd -->
 
-Drafted by research lane R-C (#567) on 2026-09-16. The user decided at planning that
-defects found in xMAG are drafted as upstream issues and filed, or sent to the author, only
-with the user's agreement (planning record §8, Q4 and round 4 comment 11). Everything below
-was observed with `THelpin/xMAG@88026e47` (0.1.0, 2023-05-18), `THelpin/xBrauer_Bundle@48be67e1`
-(xBrauer 1.1.0), `xAct-contrib/TraceFree@4e53ab39` (0.1.0), on Wolfram 14.3.0 and xAct 1.3.0
-(xTensor 1.3.0, xTras 1.4.2, xPert 1.0.6), unmodified; script
-`scripts/research/perturbations/wolfram/probe_e_xmag.wls` and the cross-check
-`probe_d_limits.wls` (run directories under `third_party/perturbations_runs/e/` and `dl/`).
+Drafted by research lane R-C (#567) on 2026-09-16 and **rewritten on 2026-09-17** after a
+Tier-1 replay showed that most of the first draft's items were the lane's own calling forms.
+The user decided at planning that anything found in xMAG is drafted here and filed or sent to
+the author only with their agreement (planning record §8, Q4). Everything below is from
+`THelpin/xMAG@88026e47` (0.1.0, 2023-05-18) with `THelpin/xBrauer_Bundle@48be67e1` and
+`xAct-contrib/TraceFree@4e53ab39`, on Wolfram 14.3.0 and xAct 1.3.0 (xTensor 1.3.0,
+xTras 1.4.2, xPert 1.0.6), unmodified. Scripts:
+`scripts/research/perturbations/wolfram/{tier1_xmag,f2_hazards,f3_changecurvature}.wls`;
+transcripts under `third_party/perturbations_runs/{t1,f2,f3}/`.
 
-## What worked
+## What was verified working
 
-- Loads cleanly beside xPand (2 s, no messages); the version gates on xTensor 1.2.0 and
-  xTras 1.0.6 are satisfied by 1.3.0 and 1.4.2.
-- `DefCovD[CDT[-a], {"#","DT"}, Torsion -> True, FromMetric -> g, Master -> g,
-  ConnectionRelations -> True]` defines the Riemann-Cartan connection with
-  `ContorsionCDT`, `TorsionVectorCDT`, `TFContorsionCDT`, `TFTorsionCDT`,
-  `PerturbationChristoffelCDT`, `ChristoffelCDCDT` and the automatic relation
-  `ChristoffelCDCDT = -ContorsionCDT`.
-- `BreakContorsion[ContorsionCDT[a,-b,-c], CDT]` gives
-  `½ (T^a_bc + T_b^a_c + T_c^a_b)`, the standard contortion (checked: its antisymmetric part
-  is the torsion and it is metric-compatible).
-- `ToDistortion[RicciScalarCDT[], CDT, g]` runs in 0.03 s and returns Levi-Civita
-  curvature plus contortion terms; `BreakContorsion` of that result is free of every
-  `CDT` object.
-- `DefConnectionPerturbation[ChristoffelCDT, dGam, eps]` coexists with xPert's
-  `DefMetricPerturbation[g, dg, eps]`: both `dGam[LI[1], a, -b, -c]` and `dg[LI[1], -a, -b]`
-  are available afterwards.
+The targeted cells of `Documentation/DefCovD_xMAG.nb` were replayed in the author's order,
+with his names, and compared with the outputs stored in the notebook: **13 `identical`, 2
+`proved-equal`** (dummy-index names only, canonical difference 0), nothing else. That covers
+`DefCovD` for all three geometries, `ChristoffelCDT → BreakChristoffel → ToContorsion →
+BreakContorsion`, `ToContorsion` of `RiemannCDT`, `ToDistortion` of `ChristoffelCD`, the
+two-argument `BreakDistortion`, and `ToDistortion` of `RiemannCD`. In addition:
 
-## 1. The torsion part of `ToDistortion[RicciScalarCDT[]]` has the opposite sign to xTensor's `ChangeCurvature`
+- `BreakContorsion[ContorsionCDT[a,-b,-c], CDT]` gives `½(T^a_bc + T_b{}^a{}_c + T_c{}^a{}_b)`,
+  which is a contortion (its antisymmetric part is the torsion, and it is metric-compatible —
+  both checked to `0`).
+- `ToDistortion` + `BreakContorsion` of `RicciScalarCDT[]` equals the same rewrite done by
+  hand with xTensor's `ChangeCurvature` and that contortion, **under either value of
+  `$RiemannSign`** (`proved-equal` in both cases).
+- The vectorial-torsion check `R̃ − R = s_R(−(d−1)(d−2)v·v + 2(d−1)∇·v)` passes in general
+  dimension and at `d = 4`.
+- `StartInducedDecomposition` runs on a general connection with one-character postfix
+  derivative symbols, and `VarD[ChristoffelCDT[-a,b,c], cd][L]` varies with respect to the
+  connection as the tutorial shows.
 
-xMAG (after `BreakContorsion`, canonical form):
+So the report below is about documentation and robustness, not about wrong results.
 
-```
-R̃ = R − ¼ T_abc T^abc − ½ T_abc T^bac − T^a_a^b T^c_bc + 2 ∇_b T^a_a^b
-```
+## 1. `$RiemannSign` is set globally at load, and nothing says so
 
-xTensor alone, `ChangeCurvature[RicciScalarCDT[], CDT, CD]` followed by the substitution
-`ChristoffelCDCDT -> −K` with `K^a_bc = ½ (T^a_bc + T_b^a_c + T_c^a_b)` — the sign fixed by
-xTensor's own `ChangeCovD[CDT[-b]@v[a], CDT, CD] − CD[-b]@v[a] = −ChristoffelCDCDT^a_bs v^s`
-(the relation xMAG also asserts):
+`xMAG.m:110-111` sets `$RiemannSign = -1` and `$RicciSign = 1` at load. `$RiemannSign` is
+xTensor's session-wide global, whose default is `+1` (`xTensor.m:1837`), and it is read at
+call time by `changeRiemann` (xTensor's at `:6194`, xMAG's replacement at `xMAG.m:1258`),
+`CommuteCovDs` and the curvature relations. Nothing in the README, the usage strings or the
+two documentation notebooks mentions it; a `grep` for `RiemannSign` across them returns
+nothing.
 
-```
-R̃ = R + ¼ T_abc T^abc + ½ T_abc T^bac + T^a_a^b T^c_bc − 2 ∇_b T^a_a^b
-```
+The consequence for a user: every result xMAG produces, and every result **any other xAct
+package produces in the same session**, is in the opposite curvature convention to the one
+that session had before `Needs["xAct`xMAG`"]`. Comparing a result computed with xMAG loaded
+against one computed without it silently differs by the sign of the torsion part of `R̃` —
+which is exactly the mistake this lane made and then attributed to xMAG.
 
-The two differ by the sign of every torsion term (`RC_DL_XMAG_MINUS_CORRECT`). For the
-vectorial torsion `T^a_bc = δ^a_c v_b − δ^a_b v_c` the second form gives
-`R̃ = R − 6 v² + 6 ∇·v`, the textbook Einstein-Cartan result (`R − (2/3) T_μ T^μ + 2 ∇_μ T^μ`
-with `T_μ = 3 v_μ`); the first gives `R + 6 v² − 6 ∇·v`. Either xMAG uses a Riemann sign
-convention for independent connections that differs from xTensor's default for the same
-symbol `RicciScalarCDT`, or there is a sign slip in `ToDistortion`'s curvature rule; the
-package's documentation does not say which. A one-line statement of the convention in
-`ToDistortion::usage`, or a test against `ChangeCurvature` for the metric-compatible case,
-would settle it for users.
+Suggested: one line in `ToDistortion::usage` and in the README stating the convention, or a
+`Print` at load like the other variable changes xAct packages announce
+("** Variable $CovDFormat changed from Prefix to Postfix"), or — best — localizing the
+choice so that it is not a session-wide side effect. `StartInducedDecomposition` likewise
+sets `$ExtrinsicKSign = $AccelerationSign = -1` (`xMAG.m:1792`) without announcing it.
 
-## 2. `BreakDistortion` returns `Null` for a metric-compatible connection
+## 2. A connection declared without `Master` silently disables the package
 
-With `CDT` as above (torsion, no non-metricity), `BreakDistortion[ToDistortion[RicciScalarCDT[], CDT, g], CDT, g]`
-returns `Null` (with `Validate::inhom`), while `BreakContorsion[…, CDT]` works. The usage text
-of `BreakDistortion` does not exclude that case; either dispatching to `BreakContorsion` when
-`NonMetricityQ[CDT]` is `False`, or a message, would help.
+`?Master` says `Master -> met` is what "triggers the definitions and relations appropriate"
+for each geometry, and every notebook example passes it. When it is omitted, however, the
+failure is silent and contagious:
 
-## 3. A second torsion connection breaks `ToDistortion` on the first
+- `ChangeCurvature[RicciScalarCDL[], CDL, CD]` returns its input unchanged and prints
+  nothing, where plain xTensor (same connection, xMAG not loaded) expands it into
+  `{ChristoffelCDCDL, g, RicciCD}`.
+- `TorsionToDistortion[TorsionCDL[a,-b,-c]]` and `MAGChristoffelQ[CDL, g]` stay unevaluated:
+  the one-argument dispatcher `xMAG.m:1705-1707` folds over `$CovDs` and calls
+  `TorsionToDistortion[expr, CDL, MasterOf[CDL]]`, and no definition matches a `Null` master
+  (`:1615` requires `metric_?MetricQ`).
+- Worse, that inert call is produced **inside** xMAG's `changeRiemann` replacement, so a
+  `Master`-less connection anywhere in the session breaks `ToDistortion` on a perfectly
+  healthy `Master -> g` connection as well (`Validate::inhom`); `UndefCovD` on the offender
+  restores it.
 
-After a further plain `DefCovD[CDL[-a], {"&","DL"}, FromMetric -> g, Torsion -> True]`,
-`ToDistortion[RicciScalarCDT[], CDT, g]` returns `Null` with two `Validate::inhom`
-messages (`RC_E_TODISTORTION_AFTER_SECOND_TORSION_CONNECTION`). One torsion connection per
-session appears to be an undocumented assumption.
+Suggested: a definition of `TorsionToDistortion[expr, covd_, Null]` (and its siblings) that
+returns `expr`, or a message from `DefCovD` when a torsionful connection is defined without
+`Master`.
 
-## 4. `StartInducedDecomposition` does not run on this bundle
+## 3. The three-argument `BreakDistortion` has an unstated precondition
 
-`StartInducedDecomposition[g, CDG, {{";h","Dh"},{"%h","DGh"}}, {nn, hh}]` on a general
-connection (`FromMetric -> Null, Master -> g, Torsion -> True`), in a kernel with or without
-xPand's slicing, stops with `DefCovD::invalid`, `TorsionQ::unknown`, `MakeRule::inhom` after
-defining `nn`, `hh`, `epsilonhh`, `Tetrahh`, `ExtrinsicKh`, `Accelerationn`
-(`probe_e2_xmag_induced.wls`, `RC_E2_STARTINDUCED_ON_GENERAL_CONNECTION_OK=False`); the same on
-the Riemann-Cartan connection. It may be an API drift against xTensor 1.3.0 (the package
-expects 1.2.0); the tutorial notebook's call form was used.
+For a metric-compatible connection, `BreakDistortion[expr, CDT, g]` matches the body at
+`xMAG.m:1476`, which builds a rule out of `Distortion` and `NonMetricity` tensors that such a
+connection never defines; the result is `Null` with `Validate::inhom`. The two-argument form
+dispatches correctly (`:1664` → `BreakContorsion`) and gives the right answer. Suggested: a
+`NonMetricityQ` guard on the three-argument definition, or a note in the usage.
 
-## 5. `ChangeCurvature` on a plain torsion connection returns its input with xMAG loaded
+## 4. Loading xMAG disables other packages' automatic simplifications
 
-With xMAG loaded, `ChangeCurvature[RicciScalarCDL[], CDL, CD]` for a connection defined
-without `Master` returns `RicciScalarCDL[]` unchanged, whereas the same call in a kernel
-without xMAG expands into `RicciCD`, `ChristoffelCDCDL` and `g` terms. xMAG's overrides of
-the curvature-relation functions for torsionful connections (`xMAG.m:1138-1162`) seem to
-catch that case.
+In a kernel with xPand's FRW slicing, the elementary checks
+`h^{ab}∇_b E^{(V)}_a`, `h^{ab}∇_b E^{(T)}_{ac}` and `h^{ab}E^{(T)}_{ab}` all canonicalize to
+`0` (the fields are declared transverse and traceless). After `Needs["xAct`xMAG`"]`, with
+nothing else changed, none of them simplifies. Splits then carry terms that are zero by those
+properties. We suspect the deletion of xTensor's generic definitions in
+`deflistablexTensorxMAGCovDs` (`xMAG.m:1134-1177`, which does
+`function[expr_, covd_Symbol?CovDQ] =.` before redefining) or the `UndefCovD` replacement,
+but we did not isolate it. Suggested: keep the generic definitions and add the new cases, so
+that packages loaded earlier keep working.
+
+## 5. Small things found by reading
+
+- `xMAG.m:1044` passes `ConnectionRelations[covd, Distorsi]` (a typo for `Distortion`), so
+  the contortion-trace relation `K^a{}_{ab} = -T_b` at `:1038` is never installed for a
+  metric-compatible torsionful connection.
+- `xMAG.m:1349` and `:1356` clear `chriscdmetcovd`, which is undefined; the intended symbol
+  is `chriscovdmetcovd`.
+- `xMAG.m:1283, :1297, :1310` choose which of `Christoffel[cd1,cd2]`/`Christoffel[cd2,cd1]`
+  gets the automatic conversion by comparing `StringLength` of the two derivative names,
+  while xTensor stores the pair sorted by symbol order; for some naming choices (a
+  three-character metric derivative and a two-character connection) the two disagree and the
+  conversion silently never fires.
+- `xMAG.m:1764`: the generic `ToContorsion` has an `If` with no else branch, so it can
+  return `Null` for a torsionful non-metric connection reached through that definition.
