@@ -455,7 +455,7 @@ seam (the dictionary of B and C).
   `scripts/research/perturbations/camb_symbolic_newtonian_2.0.4.txt` (regenerable by
   `mb_camb_symbolic.py`; camb 2.0.4); the SVT parametrization `literature/2310.16007` `:768-878`.
 - **Scripts** (all under `scripts/research/perturbations/`, README has the provenance table
-  and the reproduction block): `install_xpand.sh`, `install_xmag.sh`, `manifest.sh`,
+  and the reproduction block): `install_xmag.sh`, `manifest.sh`,
   `run_lane.sh`, `wolfram/RCSetup.wl`, `wolfram/probe_load.wls`, `wolfram/repro_a2_tensor_eom.wls`,
   `wolfram/repro_b_mb_scalars.wls`, `wolfram/repro_a1_tensor_action.wls`,
   `wolfram/probe_c_signature.wls`, `wolfram/probe_d_torsion.wls`, `wolfram/probe_d_limits.wls`,
@@ -465,7 +465,7 @@ seam (the dictionary of B and C).
   `wolfram/f6_psalter_signs.wls`, and from the closing pass
   `wolfram/f7_epsilon_and_import_map.wls`, `wolfram/f8_contractmetric.wls`; plus
   `mb_camb_symbolic.py`, `xpand_upstream_issue.md`, `xmag_upstream_issue.md`,
-  `xbrauer_upstream_issue.md`. The runs cited in §7.1 are
+  `xbrauer_upstream_issue.md`. The xPand installer is no longer in this directory: it was promoted to `scripts/install-xpand.sh` on 2026-09-17. The runs cited in §7.1 are
   `f7/20260917T115539Z` (`normu = -1`), `f7/20260917T115737Z` (`normu = +1`) and
   `f8/20260917T114838Z`; earlier `f7`/`f8` directories from the same day are superseded
   iterations of the same scripts and are kept only for continuity.
