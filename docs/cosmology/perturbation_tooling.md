@@ -232,6 +232,13 @@ compatibility (14.3.0 × xAct 1.3.0 × xPert 1.0.6) · Part-1 lines covered · t
    other curvature convention. **For M3:** one package per kernel with WXF hand-over, which
    is what D-A's committed-package-plus-driver design already implies.
 
+   > **Attribution corrected 2026-09-17 (post-merge exploration, relayed through the
+   > orchestrator; #585):** the lost simplification is **xBrauer's**, not xMAG's — xMAG merely
+   > pulls xBrauer in as a dependency. The operational rule is unchanged (one package per
+   > kernel, WXF hand-over), but the cause names the right package: anything loading the
+   > xBrauer chain inherits it, and xMAG alone is not what breaks xPand's transverse and
+   > traceless simplifications.
+
 ### 3.3 xMAG, used correctly (what this lane had wrong, and what the author documents)
 
 | R-C's call | what it did | the documented call | source |
