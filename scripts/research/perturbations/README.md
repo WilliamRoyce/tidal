@@ -30,6 +30,8 @@ production code.**
 | `wolfram/f2_hazards.wls` | the two "xPand breaks" cases separated (chart derivative vs a `Master`-less connection), the `Master -> g` twin control, the caller-side `$CovDs` wrapper with a wrong-guard control, the xCoba count, and the shared-kernel control | ours |
 | `wolfram/f3_changecurvature.wls` | `ChangeCurvature` on a `Master`-less torsion connection: plain xTensor (control) vs xMAG loaded, with the inert `TorsionToDistortion` witness | ours |
 | `wolfram/f5_sign_audit.wls`, `wolfram/f6_psalter_signs.wls` | the five xTensor sign globals in each state: plain, xPand, after `SetSlicing`, xMAG, PSALTer — the lines `conventions.md` quotes | ours |
+| `wolfram/f7_epsilon_and_import_map.wls` | the slice epsilon: what xTensor fixes by itself, the positive assertion that no package relates it to the four-index one, PSALTer's dictionary transcribed and tested, the slot-order trap, and Probe D3's rule set rebuilt in both contortion families with an odd-in-torsion control | ours |
+| `wolfram/f8_contractmetric.wls` | one kernel in three states (xPand, xBrauer, xMAG) to attribute the lost transverse and traceless simplification, with the `Master` discriminator and the driver and rule-ordering rivals excluded | ours |
 | `mb_camb_symbolic.py`, `camb_symbolic_newtonian_2.0.4.txt` | CAMB's own scalar equations printed from `camb.symbolic` (camb 2.0.4) — the machine check of the MB → our-convention transcription | ours; equations are CAMB's |
 
 ## How to reproduce
@@ -56,6 +58,9 @@ bash scripts/research/perturbations/run_lane.sh f2   # the two session hazards, 
 bash scripts/research/perturbations/run_lane.sh f3   # ChangeCurvature on a Master-less connection
 bash scripts/research/perturbations/run_lane.sh f5   # sign globals: plain, xPand, xMAG
 bash scripts/research/perturbations/run_lane.sh f6   # sign globals: PSALTer (own kernel)
+bash scripts/research/perturbations/run_lane.sh f8   # which package loses the simplifications
+bash scripts/research/perturbations/run_lane.sh f7 normu=-1 kin=1   # slice epsilon + import map, mostly plus
+bash scripts/research/perturbations/run_lane.sh f7 normu=1 kin=1    # the same in the project's mostly minus
 bash scripts/verify-wolfram-setup.sh --require-psalter
 bash scripts/research/perturbations/manifest.sh after && bash scripts/research/perturbations/manifest.sh diff
 uv run python scripts/research/perturbations/mb_camb_symbolic.py scripts/research/perturbations/camb_symbolic_newtonian_2.0.4.txt
@@ -92,6 +97,14 @@ pattern). Before any claim about a third-party package, in this order:
    run, which is why `RCTry` no longer uses `Check`).
 7. **Reduce to the author's names and the smallest session** before writing anything up, and
    read the package's known issues first (`COSMOLOGY_PROGRAM.md:591`).
+8. **Parenthesize every multi-line definition, not just Lagrangians.** Wolfram ends a
+   statement at a newline as soon as the expression is syntactically complete, so a rule or
+   helper written as `f[x_] := termA + termB` on one line and `+ termC` on the next silently
+   becomes `termA + termB`, and the continuation lines are parsed as separate statements that
+   do nothing. `f7`'s first run defined its parametrization as the first two of five terms
+   that way and counted 8 potentials instead of 16 — with no message and no failure. Wrap the
+   whole right-hand side in `( ... )`, or keep it on one line as `probe_d_torsion.wls` does.
+   A count that disagrees with the source you transcribed from is the symptom to watch for.
 
 ## Rules this directory follows
 

@@ -1,6 +1,6 @@
 # Draft upstream report for xPand 0.4.4 — NOT FILED
 
-<!-- cspell:words xPand xCoba xMAG SplitPerturbations ToxPandFromRules DefChart ExtractComponents ToxPand SplitMatter normu Pitrou changetoinducedmetric MetricCovDQ FrozenMetricQ MasterOf EinsteinToRicci -->
+<!-- cspell:words xPand xCoba xMAG SplitPerturbations ToxPandFromRules DefChart ExtractComponents ToxPand SplitMatter normu Pitrou changetoinducedmetric MetricCovDQ FrozenMetricQ MasterOf EinsteinToRicci epsilong cdpost cdpre -->
 
 Drafted by research lane R-C (#567) on 2026-09-16 under the same rule as
 `docs/cosmology/psalter_543_upstream_issue.md`: written for the maintainers, kept in the
@@ -52,7 +52,13 @@ come from another package: with xMAG loaded, its replacement of `EinsteinToRicci
 (`xMAG.m:1154`) tests `FrozenMetricQ[MasterOf[#]]`, and for a connection declared without
 `Master` that reaches the same `InducedFrom[Null]` fallback from `ToMetric`'s
 `preexpression` line (`xPand.m:2569`). That one is xMAG's (and our declaration's), not
-xPand's; it is mentioned only so the two are not confused.
+xPand's; it is mentioned only so the two are not confused. A three-state measurement has
+since confirmed that attribution: `EinsteinToRicci` gains `DownValues` and a new hash only
+when xMAG loads, and is byte-identical before and after xBrauer
+(`f8_contractmetric.wls`, run `f8/20260917T114838Z`). A **third**, unrelated symptom in the
+same area — `ContractMetric` refusing to contract xPand's induced metric into its own
+projected fields — is xBrauer's and is reported separately in `xbrauer_upstream_issue.md`.
+Nothing in that one is xPand's either.
 
 **Reproduction scripts.** `scripts/research/perturbations/wolfram/probe_d_limits.wls`
 (sentinels `DL_SANITY_METRIC_SPLIT_7_BEFORE_CHART=ok`,
@@ -61,7 +67,50 @@ xPand's; it is mentioned only so the two are not confused.
 controls (`F2_I_SPLIT_AFTER_CHART=BROKEN`, `F2_I_GUARDED_SPLIT_AFTER_CHART=ok`,
 `F2_I_GUARDED_SPLIT_EQUALS_REFERENCE=identical`, `F2_I_CONTROL_WRONG_GUARD=BROKEN`).
 
-## 2. Two places hard-code the normal's norm `n.n = -1`
+## 2. `SetSlicing` hard-codes the slice determinant sign, so `epsilon[h]` is wrong in `(+,-,-,-)`
+
+**Where.** `xPand.m:1754` declares the induced metric as
+
+```
+DefMetric[1, h[-ind1,-ind2], cd, {cdpost, cdpre}, InducedFrom -> {g, u}, PrintAs -> ...]
+```
+
+The first argument of `DefMetric` is the sign of the metric's determinant, and it is the
+literal `1` regardless of `normu`. With `normu = -1` (mostly plus) that is right: the induced
+metric is positive definite. With `normu = +1`, which `SetSlicing` accepts and which is the
+setting a mostly-minus project uses, the induced metric is `h_ab = g_ab - n_a n_b`, negative
+definite, and the true determinant sign is `-1`.
+
+**Consequence.** `SignDetOfMetric[h]` feeds xTensor's product rule for the epsilon of an
+induced metric (`xTensor.m:8134-8137`), so `epsilon[h]` is normalized with the wrong sign, and
+it disagrees with the four-index epsilon contracted with the normal. Measured in both
+settings, in a kernel that does nothing but slice:
+
+| | `normu = -1` | `normu = +1` |
+| --- | --- | --- |
+| `n[a] n[-a]` | `-1` | `+1` |
+| `SignDetOfMetric[h]`, as declared | `1` | `1` |
+| the true sign of `det h` | `1` | `-1` |
+| `epsilon[h][-a,-b,-c] epsilon[h][a,b,c]` | `6` | `6` |
+| `epsilon[g][-a,-b,-c,-d] n[d] epsilon[g][a,b,c,e] n[-e]` | `6` | `-6` |
+
+Everything else in the mostly-minus session behaves: `n.n` comes out `+1`, the slice trace is
+`3`, the epsilon is orthogonal to `n` on every slot and totally antisymmetric, and the
+four-index epsilon squares to `-24` in both settings. Only the slice epsilon's normalization
+moves, and only by the sign the hard-code gets wrong. Nothing else in our work is affected,
+because the parity-even sector never uses `epsilon[h]`.
+
+**Suggested fix.** Pass the computed sign instead of the literal, for example
+`DefMetric[If[normu === 1, -1, 1], h[-ind1,-ind2], cd, ...]`, or more generally
+`-SignDetOfMetric[g] normu`. A one-line change; the alternative, for a caller, is to work with
+`epsilon[g][-a,-b,-c,-d] n[d]` throughout, which is what we do.
+
+**Reproduction.** `scripts/research/perturbations/wolfram/f7_epsilon_and_import_map.wls`,
+sentinels `F7A_SIGNDET_H_DECLARED_VS_TRUE`, `F7A_RHS_SQUARE`, `F7A_SQUARE_CONSISTENT`,
+`F7A_XPAND_1754_DETERMINANT_HARDCODE_BITES`; runs `f7/20260917T115539Z` (`normu = -1`) and
+`f7/20260917T115737Z` (`normu = +1`).
+
+## 3. Two places hard-code the normal's norm `n.n = -1`
 
 Not a defect for the package's stated conventions, recorded because users of the
 `(+,-,-,-)` signature will meet it:
@@ -80,7 +129,7 @@ and the Newtonian-gauge Einstein equations under `n.n = +1` reproduce the `n.n =
 results under the map `R -> -R`, `phi -> -phi` for the same textual gauge rule, and
 `D_a D^a -> -D_a D^a`).
 
-## 3. Two misprints in the paper's Appendix A (arXiv:1302.6174)
+## 4. Two misprints in the paper's Appendix A (arXiv:1302.6174)
 
 `:1789` prints `-2 D_a D^a phi` where the package (and the textbook) give the Laplacian of
 the curvature potential `psi`; `:1809` prints the tensor friction as `E' H` where the

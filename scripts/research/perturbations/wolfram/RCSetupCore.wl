@@ -133,4 +133,27 @@ RCReport[name_String, expr_, target_, control_: None] := Module[{v, vc = "n/a", 
   Export[FileNameJoin[{RCOutDir, name <> ".txt"}], ToString[RCCanon[expr], InputForm], "Text"];
   v];
 
+(* RCSplitGuarded[expr]: the caller-side workaround for the xPand session hazard, and the
+   wrapper M3 should lift. ToMetric (xPand.m:2566, reached from every ToxPandFromRules through
+   Conformal at :2619) selects over Rest@$CovDs and asks InducedFrom[MetricOfCovD[#]], which
+   throws for a derivative that has no metric at all -- xCoba's chart derivative after
+   DefChart, for instance. xTensor guards the same pattern at xTensor.m:8951. $CovDs is an
+   ordinary global (xTensor.m:830), so dropping the metric-less derivatives for the duration
+   of the call recovers the split identically, with xPand unmodified. Established by
+   f2_hazards.wls: F2_I_GUARDED_SPLIT_EQUALS_REFERENCE, with F2_I_CONTROL_WRONG_GUARD as the
+   control that must still fail.
+   RCSplitGuardedStrict also drops Master-less derivatives, which covers the second hazard:
+   a connection declared without Master reaches the same InducedFrom[Null] fallback through
+   xMAG's predicates. Declaring the connection with Master -> g, as xMAG documents, is the
+   real fix; the strict wrapper is for a session that cannot redeclare it. *)
+SetAttributes[RCSplitGuarded, HoldAll];
+RCSplitGuarded[expr_] := Block[
+  {xAct`xTensor`$CovDs = Select[xAct`xTensor`$CovDs, # === PD || MetricOfCovD[#] =!= Null &]},
+  expr];
+SetAttributes[RCSplitGuardedStrict, HoldAll];
+RCSplitGuardedStrict[expr_] := Block[
+  {xAct`xTensor`$CovDs = Select[xAct`xTensor`$CovDs,
+     # === PD || (MetricOfCovD[#] =!= Null && MasterOf[#] =!= Null) &]},
+  expr];
+
 RCDone[step_String] := Print["RC_", ToUpperCase[step], "_DONE"];
