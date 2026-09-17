@@ -65,11 +65,13 @@ order, first-order state form, eikonal amplitude form for the photon channel).
   load, silently** (`xMAG.m:110`; xTensor's default is +1): under the project's convention
   the two routes are `proved-equal`, and the cross-convention comparison reproduces R-C's
   result exactly. Three of R-C's other four xMAG items were our calling forms (§3.3); the
-  package-side findings are the undocumented load-time sign, the loss of xPand's
-  transverse/traceless simplification in a shared kernel, and the collapse of xMAG's own
-  machinery when a connection is declared without `Master` (§3.2). It is an **independent
-  oracle for the rewrite now, and the component the moment non-metricity or connection
-  variations enter** (Part 4).
+  package-side findings are the undocumented load-time sign and the collapse of xMAG's own
+  machinery when a connection is declared without `Master` (§3.2). The loss of xPand's
+  transverse and traceless simplification in a shared kernel is **not xMAG's**: the closing
+  pass measured it to be **xBrauer's**, which xMAG pulls in as a dependency, and xMAG adds
+  nothing to it (§3.2 item 3, F8). xMAG is an **independent oracle for the rewrite now, and
+  the component the moment non-metricity or connection variations enter** (Part 4, which now
+  answers "why not xMAG" in one place).
 - **Legacy's post-Riemannian rewrite is wrong** (`_derive.py:2164-2181`): its "contortion"
   is not a contortion (wrong slot order) and carries the wrong sign relative to xTensor's
   `ChristoffelCDCDT`; every `R̃` torsion term it produced differs from the correct identity
