@@ -50,20 +50,18 @@ RCSay["F2_I_METRIC_OF_EACH_COVD_AFTER_CHART", MetricOfCovD /@ $CovDs];
 rChart = RCNewMessages["split_after_chart", split[]];
 RCSayPlain["F2_I_SPLIT_AFTER_CHART", splitOK[rChart]];
 (* the guarded caller: drop the metric-less derivatives for the duration of the split.
-   $CovDs is an ordinary global (xTensor.m:830), and this is exactly the one-line guard
-   xPand.m:2566 is missing -- emulated on our side, with xPand unmodified. *)
-RCSplitGuarded[] := Block[{$CovDs = Select[$CovDs, # === PD || MetricOfCovD[#] =!= Null &]},
-  RCTry[RCSort[ExtractOrder[ToxPandFromRules[RicciScalarCD[], rulesMetric, h, 1], 1]]]];
-(* the stricter variant: xMAG's own predicates need a Master as well as a metric, so a
-   wrapper that also drops Master-less derivatives covers both hazards at once *)
-RCSplitGuardedStrict[] := Block[{$CovDs = Select[$CovDs,
-    # === PD || (MetricOfCovD[#] =!= Null && MasterOf[#] =!= Null) &]},
-  RCTry[RCSort[ExtractOrder[ToxPandFromRules[RicciScalarCD[], rulesMetric, h, 1], 1]]]];
-rGuard = RCNewMessages["guarded_split_chart", RCSplitGuarded[]];
+   RCSplitGuarded and RCSplitGuardedStrict now live in RCSetupCore.wl, with the reasoning and
+   the xPand line numbers in their docstring there, because they are what M3 lifts rather
+   than a detail of this probe. Both take the whole call, held. *)
+guardedSplit[] := RCTry[RCSplitGuarded[
+  RCSort[ExtractOrder[ToxPandFromRules[RicciScalarCD[], rulesMetric, h, 1], 1]]]];
+strictSplit[] := RCTry[RCSplitGuardedStrict[
+  RCSort[ExtractOrder[ToxPandFromRules[RicciScalarCD[], rulesMetric, h, 1], 1]]]];
+rGuard = RCNewMessages["guarded_split_chart", guardedSplit[]];
 RCSayPlain["F2_I_GUARDED_SPLIT_AFTER_CHART", splitOK[rGuard]];
 RCSayPlain["F2_I_GUARDED_SPLIT_EQUALS_REFERENCE", If[rGuard === $Failed || rGuard === Null, "n/a", RCTry[RCVerdict[rGuard, R0]]]];
 (* negative control: dropping an UNRELATED derivative must not fix it *)
-RCSplitWrongGuard[] := Block[{$CovDs = DeleteCases[$CovDs, CDah2]},
+RCSplitWrongGuard[] := Block[{xAct`xTensor`$CovDs = DeleteCases[xAct`xTensor`$CovDs, CDah2]},
   RCTry[RCSort[ExtractOrder[ToxPandFromRules[RicciScalarCD[], rulesMetric, h, 1], 1]]]];
 RCSayPlain["F2_I_CONTROL_WRONG_GUARD", splitOK[RCNewMessages["wrong_guard", RCSplitWrongGuard[]]]];
 (* the xCoba component count of a rank-3 antisymmetric torsion, deduped properly:
@@ -119,9 +117,9 @@ rL = RCNewMessages["split_without_master", split[]];
 RCSayPlain["F2_II_SPLIT_WITH_MASTERLESS_CONNECTION", splitOK[rL]];
 RCSayPlain["F2_II_TODISTORTION_ON_CDM_AFTER_CDL", RCTry[
   If[FreeQ[BreakContorsion[ToDistortion[RicciScalarCDM[], CDM, g], CDM], $Failed], "ran", "failed"]]];
-rLG = RCNewMessages["guarded_split_masterless", RCSplitGuarded[]];
+rLG = RCNewMessages["guarded_split_masterless", guardedSplit[]];
 RCSayPlain["F2_II_GUARDED_SPLIT_WITH_MASTERLESS", splitOK[rLG]];
-rLGS = RCNewMessages["strict_guard_masterless", RCSplitGuardedStrict[]];
+rLGS = RCNewMessages["strict_guard_masterless", strictSplit[]];
 RCSayPlain["F2_II_STRICT_GUARDED_SPLIT_WITH_MASTERLESS", splitOK[rLGS]];
 RCSayPlain["F2_II_STRICT_GUARD_EQUALS_REFERENCE", If[rLGS === $Failed || rLGS === Null, "n/a", RCTry[RCVerdict[rLGS, R0]]]];
 RCSayPlain["F2_II_UNDEFCOVD_CDL_RAN", RCTry[(UndefCovD[CDL]; True)] === True];
