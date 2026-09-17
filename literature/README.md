@@ -12,6 +12,12 @@ The sources themselves are git-ignored (`.gitignore` → `literature/*`); this R
 single tracked file in the directory, so the inventory travels with the repo while the
 tarballs do not.
 
+> **Stale since 2026-09-17 (#587).** Thirty papers fetched by research lane R-C are on disk but
+> missing from the table below: regenerating it needs one arXiv metadata call per new id, and
+> export.arxiv.org is answering this container with HTTP 406 (throttling — the same single-id
+> request succeeded minutes earlier). The sources are present and readable; only this inventory
+> is behind. Re-run `uv run python -m scripts.bibaudit.index_literature` when arXiv is willing.
+
 ## Papers
 
 The table is **generated from the directories on disk — do not hand-edit it.** It drifted
