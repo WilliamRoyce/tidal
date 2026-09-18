@@ -6,7 +6,7 @@
    the package, not assumed. R-C (#567). *)
 Get[FileNameJoin[{DirectoryName[$InputFileName], "RCSetup.wl"}]];
 RCLoad[];
-Do[Print["RC_USAGE ", f, " :: ", RCUsage[f]],
+Do[Print["RC_USAGE ", f, " :: ", RCUsage["xAct`xPand`", f]],
    {f, {"SetSlicing", "DefMetricFields", "DefMatterFields", "DefProjectedTensor", "SplitMetric", "SplitMatter",
         "ToxPand", "ToxPandFromRules", "SplitPerturbations", "ExtractComponents", "ExtractOrder",
         "Conformal", "ConformalWeight", "DefConformalMetric", "$ConformalTime"}}];

@@ -17,7 +17,6 @@
    D7 the derivative split (no residual CD; primes and D only), one hand-checkable piece;
    D8 the torsionful connection DefCovD[..., Torsion -> True] (legacy's declaration): what
       xPand does with RicciScalarCDT, then legacy's ChangeCurvature + contortion identity;
-   D5 (optional, key d5=1) the FRW-symmetric background torsion mode.
    Every xPand call goes through RCTry so a Throw is reported, not fatal (the first run,
    20260916T110641Z, died at D6 on an uncaught Throw inside Quiet@Check).
    Verdicts: representable / representable with work (named) / not representable. *)
@@ -195,19 +194,10 @@ If[d8 === True,
 ];
 reached["D8"];
 
-(* ---------------- D5 (optional): the FRW-symmetric background torsion mode ---------------- *)
-If[Lookup[RCArgs, "d5", "0"] === "1",
-  DefProjectedTensor[T1b[], h, SpaceTimesOfDefinition -> {"Background"}];
-  DefProjectedTensor[T2b[], h, SpaceTimesOfDefinition -> {"Background"}];
-  bgTorsion = {Tor[ia_, ib_, ic_] :> (n[ib] h[ia, ic] - n[ic] h[ia, ib]) T1b[] + epsilonh[ib, ic, ia] T2b[]};
-  r5 = RCTry[RCCanon[ExtractOrder[ToxPandFromRules[c1 Tor[ia, -ib, -ic] Tor[-ia, ib, ic], Join[rulesMetric, {torsionRule}, bgTorsion], h, 1], 1]]];
-  RCSayPlain["D5_SPLIT_RAN", r5 =!= $Failed];
-  RCSay["D5_ORDER1_WITH_BACKGROUND_TORSION", r5];
-  RCSayPlain["D5_ORDER1_HAS_T1_T2", !FreeQ[r5, T1b | T2b]];
-  r5b = RCTry[RCCanon[ExtractOrder[ToxPandFromRules[c1 Tor[ia, -ib, -ic] Tor[-ia, ib, ic], Join[rulesMetric, {torsionRule}, bgTorsion], h, 1], 0]]];
-  RCSay["D5_ORDER0_WITH_BACKGROUND_TORSION", r5b];
-  reached["D5"];
-];
+(* The optional D5 step (key d5=1), an FRW-symmetric background torsion mode, was removed on
+   2026-09-18: it was never run, it is out of scope (the programme expands about zero
+   background torsion, exactly), and its background rule has the shape xPand cannot prepare
+   (a sum of terms along the normal for a rank-3 field; GH #591). *)
 (* ---------------- D2: 24-component count (last, see the note above) ---------------- *)
 Needs["xAct`xCoba`"];   (* its own statement: DefChart must be parsed after xCoba is on the context path *)
 d2 = RCTry[(DefChart[Bc, M4, {0, 1, 2, 3}, {tt[], xx[], yy[], zz[]}];

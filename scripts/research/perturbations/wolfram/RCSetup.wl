@@ -26,7 +26,7 @@ RCLoad[] := (
   RCSayPlain["LOAD_FAILED", $RCLoadFailed];
   RCSayPlain["LOAD_WALL_S", Round[$RCLoadWall, 0.1]];
   RCSay["LOAD_MESSAGES", $RCLoadMessages];
-  RCSay["WOLFRAM_VERSION", $Version];
+  RCSay["WOLFRAM_VERSION", System`$Version];
   RCSay["XTENSOR_VERSION", xAct`xTensor`$Version];
   RCSay["XPERT_VERSION", xAct`xPert`$Version];
   RCSay["XPAND_VERSION", xAct`xPand`$Version];

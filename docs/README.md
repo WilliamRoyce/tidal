@@ -47,7 +47,7 @@ Two directories outside `docs/cosmology/` belong to the programme as well:
 
 | Directory | Content |
 | ---- | ------- |
-| `meetings/` | Supervisor meeting records, including `2026-09-11_supervisor.md` — the meeting the #543 decision is routed to |
+| `meetings/` | Supervisor meeting records, including `2026-09-18_supervisor.md` (moved from 11 September, when the meeting did not take place) — the meeting the #543 decision is routed to |
 | `talks/` | Presentation material |
 
 ## LaTeX Documentation (`docs/tex/`)

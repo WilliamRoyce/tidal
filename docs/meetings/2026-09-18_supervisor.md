@@ -1,8 +1,10 @@
-# Supervisor Meeting — 11 September 2026 (DRAFT, in preparation)
+# Supervisor Meeting — 18 September 2026 (DRAFT, in preparation)
 
-**Period**: 29 August (programme pivot) to 11 September 2026.
+**Period**: 29 August (programme pivot) to 18 September 2026.
 **Status of this file**: living draft. Points are added as they arise rather than
 reconstructed on the day; anything unresolved by the meeting stays here as an open item.
+Moved from 11 September, when the meeting did not take place; §1.1 was added on 18 September.
+The Headline and §5 still describe the period to 11 September.
 
 ---
 
@@ -68,6 +70,43 @@ cleaner scope? And is anyone aware of work extending the Minkowski argument to F
 **Where it bites first:** O4a (isotropic birefringence) *requires* a homogeneous torsion
 mode `S₀(η) ≠ 0`, i.e. `T̄ ≠ 0` by construction — so it is the one rung guaranteed outside
 the safe class.
+
+### 1.1 Added 18 September — a scope decision I would like you to confirm
+
+**The decision (provisional, 17 September).** We expand about a background with **exactly
+zero torsion**. The new fields and couplings are assumed to change only the perturbations, on
+the same ΛCDM background evolution — which is what "spectator" means for us. We do not need a
+background torsion for the effects we are after: the operators we consider couple the
+perturbations directly, and that is where parity mixing and the conversion channels come from.
+
+**What it removes.** Any calculation with a nonzero background torsion. In particular,
+isotropic birefringence from a homogeneous torsion mode (O4a above) is no longer a planned
+rung — on 13 September we had already moved birefringence to parity-odd couplings among the
+perturbations, which need no background of any kind. It also removes an earlier allowance for
+"a small nonvanishing background torsion that stays below the tolerance".
+
+**What it keeps.** Every perturbation-level channel, including the parity-mixing ones and the
+Gertsenshtein-type conversion; and the in-pipeline background check of point 2 above, which
+now asks a sharper question: does the theory allow zero torsion on the ΛCDM background? A theory
+whose equations drive a background torsion is out of scope, rather than handled approximately.
+
+**The honest tension.** This decision leans on the question at the top of this section. From
+`2003.02690`, zero torsion is exact only in some classes (`σ₃ = 0`, or Einstein–Cartan); the
+tracking class is excluded by construction. If the theories we care about turn out not to allow
+zero background torsion on FRW, the decision has to be revisited — that is the stated condition
+for reopening it.
+
+(Separately, and not the reason for the decision: the perturbation tool we use, xPand, cannot
+at present take a nonzero background for a field shaped like the torsion. We have diagnosed
+why and drafted a report for its author.)
+
+**Questions:**
+
+1. For first results, is it right to restrict to theories that allow exactly zero background
+   torsion on FRW, accepting that this excludes the tracking class and isotropic birefringence?
+2. For the couplings we are most interested in — parity-odd couplings between the torsion and
+   photon perturbations — do you expect a torsion-free FRW background to be allowed, or should
+   we plan the extension now rather than on demand?
 
 ---
 

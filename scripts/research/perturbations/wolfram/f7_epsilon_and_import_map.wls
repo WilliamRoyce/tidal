@@ -43,7 +43,8 @@
    probe_d's recorded projections, the 3+3+9+9 = 24 accounting is established block by block,
    the parity-odd half is identified, and both order-2 actions are compared -- with a
    Lagrangian ODD in the torsion as the control that must flip, so the invariance verdict is
-   not vacuous. B8 then names the two cases where the sign IS observable.
+   not vacuous. (A former section B8, for a nonzero background torsion, was removed: see the
+   note at the end of Part B.)
 
    Usage: run_lane.sh f7 [normu=1|-1] [kin=1] . normu=+1 is the programme's mostly-minus
    convention and PSALTer's (V.V = +1); normu=-1 is the mostly-plus setting Probe D3 and f2
@@ -338,34 +339,11 @@ If[LoddB =!= $Failed && LoddA =!= $Failed,
   RCSay["F7B_ODD_CONTROL_ORDER1", O1B];
 ];
 
-(* ---- B8: where the sign IS observable -- a background torsion with a half-applied map ---- *)
-DefProjectedTensor[T1b[], h, SpaceTimesOfDefinition -> {"Background"}];
-DefProjectedTensor[T2b[], h, SpaceTimesOfDefinition -> {"Background"}];
-bgTorsion = {Tor[ia_, ib_, ic_] :> (n[ib] h[ia, ic] - n[ic] h[ia, ib]) T1b[] + epsilonh[ib, ic, ia] T2b[]};
-bgMinus = bgTorsion /. {T1b[x___] :> -T1b[x], T2b[x___] :> -T2b[x]};
-tp = RCTry[RCCanon[ExtractOrder[splitTo[LTalg, Join[rulesMetric, {ruleB}, bgTorsion], h, 1], 1]]];
-RCSayPlain["F7B_BG_SPLIT_RAN", tp =!= $Failed && tp =!= Null];
-If[tp =!= $Failed && tp =!= Null,
-  tpP = RCTry[RCCanon[ExtractOrder[splitTo[LTalg, Join[rulesMetric, {ruleA}, bgTorsion], h, 1], 1]]];
-  tpF = RCTry[RCCanon[ExtractOrder[splitTo[LTalg, Join[rulesMetric, {ruleA}, bgMinus], h, 1], 1]]];
-  RCSayPlain["F7B_BG_TADPOLE_NONZERO", tp =!= 0];
-  RCSay["F7B_BG_ORDER1", tp];
-  RCSayPlain["F7B_BG_FLIP_PERTURBATION_ONLY", RCTry[Last@RCNormalize[tpP, tp, {1, -1}]]];
-  RCSayPlain["F7B_BG_FLIP_BOTH", RCTry[Last@RCNormalize[tpF, tp, {1, -1}]]];
-  (* if the order-1 cross term vanishes for this background and this invariant the two
-     verdicts above are vacuous, so try each coupling on its own and say which one carries it *)
-  Do[With[{cc = cpl},
-     RCSay["F7B_BG_ORDER1_" <> ToString[cc],
-       RCTry[RCCanon[ExtractOrder[splitTo[
-         Sqrt[-Detg[]] cc (Tor[ia, -ib, -ic] Tor[-ia, ib, ic]),
-         Join[rulesMetric, {ruleB}, bgTorsion], h, 1], 1]]]]],
-    {cpl, {c1}}];
-  RCSay["F7B_BG_ORDER1_TRACE_INVARIANT",
-    RCTry[RCCanon[ExtractOrder[splitTo[
-      Sqrt[-Detg[]] c3 (Tor[ia, -ib, -ia] Tor[ic, ib, -ic]),
-      Join[rulesMetric, {ruleB}, bgTorsion], h, 1], 1]]]];
-  RCSay["F7B_BG_ORDER1_ODD_LAGRANGIAN",
-    RCTry[RCCanon[ExtractOrder[splitTo[LTodd, Join[rulesMetric, {ruleB}, bgTorsion], h, 1], 1]]]];
-];
+(* Section B8 -- the import map with a NONZERO background torsion -- was removed on
+   2026-09-18. It is out of scope (the programme expands about zero background torsion,
+   exactly; GH #591), and its results were never real: its helper takes three arguments and
+   every B8 call passed four, so each call stayed unevaluated and ExtractOrder of an unevaluated
+   expression is 0. That zero was reported as "the empty first order" and is retracted.
+   wl_lint.py now refuses a file with that defect before a kernel starts. *)
 RCSigns["f7_end"];
 RCDone["f7"];

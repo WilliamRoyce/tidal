@@ -1,6 +1,13 @@
-# Draft report for the xMAG author — NOT FILED
+# Report for the xMAG author — filed as xMAG #2 (2026-09-18)
 
 <!-- cspell:words xMAG xBrauer TraceFree xPand xTras xPert Helpin ToDistortion BreakDistortion BreakContorsion ToContorsion DefConnectionPerturbation StartInducedDecomposition contortion DefCovD ChangeCurvature Riemann-Cartan Accelerationn CDCDL Tetrahh epsilonhh changeRiemann TorsionToDistortion MAGChristoffelQ EinsteinToRicci FrozenMetricQ MasterOf ConnectionRelations chriscdmetcovd Distorsi StringLength xTensor ExtrinsicKSign AccelerationSign RiemannSign Tensorx chriscovdmetcovd -->
+
+**Status 2026-09-18.** The user filed [xMAG #2](https://github.com/THelpin/xMAG/issues/2) from a
+shorter text. Re-running it afterwards found three errors in it (a snippet that reads a name on
+the same line as its `Needs`; the missing relation key is `Contorsion`, not `Distortion`, and
+`xMAG.m:556` has it too; a "Related" line pointing at an issue not yet filed). The correction
+comment is `upstream/xmag_issue2_followup.md`, and `upstream/claims.md` lists every claim with
+its check. What goes upstream now lives in `upstream/`; this file stays as the evidence record.
 
 Drafted by research lane R-C (#567) on 2026-09-16 and **rewritten on 2026-09-17** after a
 Tier-1 replay showed that most of the first draft's items were the lane's own calling forms.

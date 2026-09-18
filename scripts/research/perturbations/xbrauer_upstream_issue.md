@@ -1,6 +1,14 @@
-# Draft report for the xBrauer author — NOT FILED
+# Report for the xBrauer author — partly filed (2026-09-18)
 
 <!-- cspell:words xBrauer xMAG xPand TraceFree xTras xPert xTensor Helpin ContractMetric ContractMetric1 SeparateMetric SeparateMetric1 SeparateMetric2 MetricOfTensor MasterOf FirstMetricQ InducedMetricQ FrozenMetricQ NormalVectorOf DefProjectedTensor SetSlicing IndicesDown ScalarsOfProduct SubValues UpValues DownValues epsilonh normu SetSlicing ToxPandFromRules Riemann-Cartan Unsets upvalue epsilong -->
+
+**Status 2026-09-18.** The user filed the label-slot and bracket findings as
+[xBrauer_Bundle #2](https://github.com/THelpin/xBrauer_Bundle/issues/2), correct as filed. The
+contraction and separation regressions below are filed as [xBrauer_Bundle #3](https://github.com/THelpin/xBrauer_Bundle/issues/3), from
+`upstream/xbrauer_issue_contraction.md`, reproduced there with xTensor alone. The contraction
+mechanism below is **confirmed** one variable at a time by `wolfram/f10_xbrauer_mechanism.wls`;
+the plan for the 2026-09-18 follow-up had withdrawn it (in the plan only; never committed or
+filed) on a tensor that also carried `ProjectedWith`, which contracts through its own rule. This file stays as the evidence record.
 
 Drafted by research lane R-C (#567) on 2026-09-17. xBrauer arrived in this project only as a
 dependency of xMAG, so the companion draft `xmag_upstream_issue.md` is addressed to the same
