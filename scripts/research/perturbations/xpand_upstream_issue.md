@@ -1,4 +1,4 @@
-# Draft upstream report for xPand 0.4.4 — not yet sent
+# Report for the xPand 0.4.4 author — sent by email (2026-09-18)
 
 <!-- cspell:words xPand xCoba xMAG SplitPerturbations ToxPandFromRules DefChart ExtractComponents ToxPand SplitMatter normu Pitrou changetoinducedmetric MetricCovDQ FrozenMetricQ MasterOf EinsteinToRicci epsilong cdpost cdpre -->
 
@@ -7,7 +7,8 @@ text to send is `upstream/xpand_email.txt`, with one script per item
 (`upstream/xpand_item{1,2,3,4}_*.wls`), checked claim by claim in `upstream/claims.md`. It adds
 one item not in this draft — a background rule whose value is a sum of terms along the normal
 breaks the preparation of split rules (#591, `wolfram/f9_background_rules.wls`) — and a third
-misprint in the paper's Appendix A. This file stays as the evidence record.
+misprint in the paper's Appendix A. The user sent it on 2026-09-18. The sent copy is not kept in the
+repository; `upstream/xpand_email.txt` is the text as checked. This file stays as the evidence record.
 
 Drafted by research lane R-C (#567) on 2026-09-16 under the same rule as
 `docs/cosmology/psalter_543_upstream_issue.md`: written for the maintainers, kept in the

@@ -57,7 +57,7 @@ Where a row cites a lane step (`f7`, `f8`, `f9`, `f10`, `a2`, `b`), the script i
 | Not related to #2 (head form vs indexed form) | source; `f10` head-form values | verified |
 | The suggested fix | — | **not tested**, and the text says so |
 
-## xPand email — `xpand_email.txt` with four attachments, not yet sent
+## xPand email — `xpand_email.txt` with four attachments, sent on 2026-09-18 (as the user reports)
 
 | claim | how checked | result |
 | --- | --- | --- |
