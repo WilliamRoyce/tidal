@@ -1210,3 +1210,29 @@ had silently truncated the lane's own parametrization — amended at the instruc
 non-vanishing background torsion. Supplying a background rule for `Tor` alongside the
 perturbation rule makes every order-1 piece vanish for each invariant tried, so the
 half-applied map was never exercised. Memo §1.2 carries it with an owner.
+*(Retracted 2026-09-18: the vanishing was never xPand's. The section that made those calls
+passed four arguments to a three-argument helper; Mathematica left each call unevaluated, and
+`ExtractOrder` of an unevaluated call is `0`. See Pass 3.)*
+
+**Pass 3, the #591 follow-up (2026-09-18).** Asked for after #591 was routed to M3 as a tooling
+gap that "usually fails and sometimes silently empties the first order": *find out what really
+happens when xPand is given a nonzero background value, and how to resolve it*; move the
+supervisor agenda to 18 September; build guards so that mistakes of the kinds above stop
+recurring; and check every claim in the upstream reports before anything is sent. The user
+fixed the scope at planning: **zero background torsion, exactly** — the new sector modifies
+the perturbations only, on the unchanged ΛCDM background — to be raised at the supervisor
+meeting. Outcome:
+
+| item | outcome |
+| --- | --- |
+| what xPand does with a background value | a value that is a sum of terms along the normal (the rank-3 torsion shape) is filed as a projected background and used while the split rules are prepared, where it fails, and the messages point elsewhere; zero, and one-term vector and rank-2 backgrounds, work (F9) |
+| the "silently empty first order" | ours — a four-argument call to a three-argument helper; retracted in #591, the memo and here |
+| background torsion | out of scope by the user's decision (2026-09-17); #591 closed with the condition that reopens it: a theory of interest that does not admit zero background torsion on FRW |
+| the xBrauer mechanism, withdrawn in this pass's own plan | confirmed one variable at a time (F10); the withdrawal — in the plan only, never committed or filed — rested on a comparison that changed two things |
+| the reports already filed | xBrauer_Bundle #2 correct; xMAG #2 has three errors, with a correction comment drafted; every other report checked claim by claim, its snippets run as a reader would |
+| guards | `wl_lint.py` before every kernel and in CI, `RCOrder`, `PACKAGE_FACTS.md`, protocol rules 9–10 and the snippet checker, each seen to fail first |
+
+**Tension with round 4 of this record, left to the orchestrator:** the Terms section above
+("Spectator", lines 113-121) accepts "a small nonvanishing background torsion that stays below the
+tolerance". The Pass 3 scope is zero, exactly. The archived text is not edited; the decision
+and its reopening condition are in the memo §1.2 and on #591.
