@@ -77,7 +77,7 @@ RCStackHandler[Hold[Message[name_, ___], True]] := If[MemberQ[$RCStackMsgs, Hold
 RCStackHandler[___] := Null;
 
 RCVersions[] := (
-  RCSay["WOLFRAM_VERSION", $Version];
+  RCSay["WOLFRAM_VERSION", System`$Version];
   RCSay["XTENSOR_VERSION", xAct`xTensor`$Version];
   RCSigns["at_load"];
 );
@@ -114,10 +114,31 @@ SetAttributes[RCTry, HoldAll];
    working call look broken in the t1 runs of 2026-09-17. Only an uncaught Throw is a failure --
    xPand and xMAG both use the Throw@Message idiom (xPand.m:1789, xTensor.m:8302), which
    throws Null, so a Null result from Catch is reported as $Failed. Messages stay visible
-   and are attributed per call by RCNewMessages. *)
+   and are attributed per call by RCNewMessages.
+   WARNING: RCTry quiets ToCanonical::noident. That message is usually noise, but in GH #591 it
+   was the first sign of the real failure and hiding it sent the diagnosis elsewhere. When
+   diagnosing, call the expression without RCTry (f9_background_rules.wls does). *)
 RCTry[expr_] := Module[{r},
   r = Catch[Quiet[expr, {ToCanonical::noident, General::stop}]];
   If[r === Null, $Failed, r]];
+
+(* RCOrder[split, n]: the order-n piece of a split, or $Failed -- loudly -- when the split was
+   never computed. ExtractOrder of anything free of the perturbation parameter is 0, so a split
+   that failed, returned Null, or was never evaluated at all (a helper called with the wrong
+   number of arguments stays unevaluated) otherwise reads as a genuine "the order-n piece
+   vanishes". That is exactly how f7's section B8 produced a retracted claim (GH #591). The test
+   uses $PerturbationParameter -- xPand's own name for it, which is \[Epsilon] whatever symbol
+   was passed to DefMetricPerturbation -- never the caller's symbol: a check against the wrong
+   symbol is the same mistake again. A split that legitimately carries no perturbation must be
+   asked for with "AllowNoPerturbation" -> True. *)
+Options[RCOrder] = {"AllowNoPerturbation" -> False};
+RCOrder[split_, n_Integer, OptionsPattern[]] := Which[
+  split === $Failed || split === Null,
+    RCSayPlain["ORDER_REFUSED", "the split failed or returned Null; order " <> ToString[n] <> " not taken"]; $Failed,
+  FreeQ[split, $PerturbationParameter] && !OptionValue["AllowNoPerturbation"],
+    RCSayPlain["ORDER_REFUSED", "no " <> ToString[$PerturbationParameter, InputForm] <>
+      " in the input: the split never ran, or produced no perturbation; order " <> ToString[n] <> " not taken"]; $Failed,
+  True, ExtractOrder[split, n]];
 
 RCReport[name_String, expr_, target_, control_: None] := Module[{v, vc = "n/a", assoc},
   v = RCVerdict[expr, target];
