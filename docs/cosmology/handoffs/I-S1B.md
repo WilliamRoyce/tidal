@@ -64,6 +64,16 @@
   (#561, Python side) still covers the exit-0-no-output case.
 - `verify --require-psalter` exit 0 after; `CI <run-id>: success`; pyright; boundary test.
 
+## Guards for xAct work (added 2026-09-18, from R-C's follow-up)
+
+Most of R-C's own mistakes were **silent** Mathematica failures, not package defects: a
+mis-called function returns unevaluated, and a later step turns it into a plausible answer (the
+retracted "empty first order" of #591 was a four-argument call to a three-argument helper). So this
+prompt will require: `scripts/research/perturbations/wl_lint.py` on every `.wl`/`.wls` before any
+kernel; `RCOrder`-style refusal to take an order from a calculation that never ran;
+`scripts/research/perturbations/PACKAGE_FACTS.md` read before writing code against PSALTer or any
+xAct package; and every multiline right-hand side parenthesized (`CLAUDE.md`).
+
 ## Scope fence — provisional
 
 No Stage-2 evaluator. No FRW branch (M3). No change to the PSALTer pin. Nothing under
