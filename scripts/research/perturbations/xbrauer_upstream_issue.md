@@ -4,7 +4,7 @@
 
 **Status 2026-09-18.** The user filed the label-slot and bracket findings as
 [xBrauer_Bundle #2](https://github.com/THelpin/xBrauer_Bundle/issues/2), correct as filed. The
-contraction and separation regressions below are drafted for filing as
+contraction and separation regressions below are filed as [xBrauer_Bundle #3](https://github.com/THelpin/xBrauer_Bundle/issues/3), from
 `upstream/xbrauer_issue_contraction.md`, reproduced there with xTensor alone. The contraction
 mechanism below is **confirmed** one variable at a time by `wolfram/f10_xbrauer_mechanism.wls`;
 the plan for the 2026-09-18 follow-up had withdrawn it (in the plan only; never committed or

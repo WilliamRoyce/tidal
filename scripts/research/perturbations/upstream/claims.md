@@ -42,7 +42,7 @@ Where a row cites a lane step (`f7`, `f8`, `f9`, `f10`, `a2`, `b`), the script i
 | No downstream failure traced in the minimal case | kernel: contraction with `g` into `dT` still works | verified as stated |
 | `:1958` has the guard inside `ScalarsOfProduct[…]`; the three siblings do not | source; kernel reads the four sites: `{"]", "&", "]", "]"}` | verified |
 
-## xBrauer contraction issue — `xbrauer_issue_contraction.md`, not yet filed
+## xBrauer contraction issue — `xbrauer_issue_contraction.md`, filed as [xBrauer_Bundle #3](https://github.com/THelpin/xBrauer_Bundle/issues/3) on 2026-09-18 (identical to this draft)
 
 | claim | how checked | result |
 | --- | --- | --- |

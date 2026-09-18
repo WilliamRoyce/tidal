@@ -1229,7 +1229,7 @@ meeting. Outcome:
 | the "silently empty first order" | ours — a four-argument call to a three-argument helper; retracted in #591, the memo and here |
 | background torsion | out of scope by the user's decision (2026-09-17); #591 closed with the condition that reopens it: a theory of interest that does not admit zero background torsion on FRW |
 | the xBrauer mechanism, withdrawn in this pass's own plan | confirmed one variable at a time (F10); the withdrawal — in the plan only, never committed or filed — rested on a comparison that changed two things |
-| the reports already filed | xBrauer_Bundle #2 correct; xMAG #2 has three errors, with a correction comment drafted; every other report checked claim by claim, its snippets run as a reader would |
+| the reports already filed | xBrauer_Bundle #2 correct; xMAG #2 has three errors, corrected by a follow-up comment; the contraction issue filed as [xBrauer_Bundle #3](https://github.com/THelpin/xBrauer_Bundle/issues/3); every other report checked claim by claim, its snippets run as a reader would |
 | guards | `wl_lint.py` before every kernel and in CI, `RCOrder`, `PACKAGE_FACTS.md`, protocol rules 9–10 and the snippet checker, each seen to fail first |
 
 **Tension with round 4 of this record, left to the orchestrator:** the Terms section above

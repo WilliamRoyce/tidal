@@ -9,14 +9,15 @@ behind each report stays in `../xpand_upstream_issue.md`, `../xmag_upstream_issu
 
 | file | what it is | destination | state |
 | --- | --- | --- | --- |
-| `xmag_issue2_followup.md` | a follow-up comment correcting three errors in the filed issue | [xMAG #2](https://github.com/THelpin/xMAG/issues/2) | ready; post **after** the contraction issue, with its link filled in |
-| `xbrauer_issue_contraction.md` | a new issue: the contraction and separation regressions | `github.com/THelpin/xBrauer_Bundle/issues/new` | ready |
+| `xmag_issue2_followup.md` | a follow-up comment correcting three errors in the filed issue | [xMAG #2](https://github.com/THelpin/xMAG/issues/2) | **posted 2026-09-18**, in the wording from before the contraction issue existed; a one-line comment linking xBrauer_Bundle #3 is still to post |
+| `xbrauer_issue_contraction.md` | a new issue: the contraction and separation regressions | [xBrauer_Bundle #3](https://github.com/THelpin/xBrauer_Bundle/issues/3) | **filed 2026-09-18**, identical to this draft |
 | `xpand_email.txt` | plain-text email body (Outlook-safe: no markdown) | `pitrou@iap.fr` — xPand has no issue tracker | ready |
 | `xpand_item{1,2,3,4}_*.wls` | the email's attachments, one per item | attached to that email | ready |
 | `claims.md` | every claim in every report, how it was checked, the result | for the user, not sent | — |
 | `check_snippets.py` | runs every snippet as a reader would and compares its outputs | — | — |
 
-Already filed, checked after the fact (see `claims.md`):
+Filed by the user on 2026-09-18: [xBrauer_Bundle #3](https://github.com/THelpin/xBrauer_Bundle/issues/3) (from `xbrauer_issue_contraction.md`, checked before filing), the
+follow-up comment on xMAG #2, and, checked after the fact (see `claims.md`):
 [xMAG #2](https://github.com/THelpin/xMAG/issues/2) (three errors, corrected by the follow-up) and
 [xBrauer_Bundle #2](https://github.com/THelpin/xBrauer_Bundle/issues/2) (correct as filed).
 
