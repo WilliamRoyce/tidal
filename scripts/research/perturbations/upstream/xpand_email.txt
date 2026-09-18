@@ -1,0 +1,69 @@
+Subject: xPand 0.4.4 - three robustness issues and two small notes, with reproductions
+
+Dear Dr Pitrou,
+
+We are evaluating xPand 0.4.4 as the engine for a project on cosmological
+perturbations of theories with torsion. So far we have used it to reproduce
+standard results - Ma and Bertschinger's scalar perturbation equations in both
+of their gauges, which match up to each equation's overall normalization, and
+the tensor-mode equation, which matches exactly - and to check that a torsion
+field can be declared and split with it. We have not yet derived torsion
+perturbation equations with it. Along the way we ran into a few problems that
+we think are worth reporting. Each of items 1 to 4 has a short script attached
+that you can run as it is; each check in it prints "reproduced" for the
+behavior described here, or "ok" for a comparison that should and does work.
+Nothing in xPand was modified.
+
+Environment: Wolfram Engine 14.3.0; xAct 1.3.0 (xTensor 1.3.0, xPerm 1.2.4,
+xPert 1.0.6); xPand 0.4.4 from your web page, unmodified.
+
+1. Every split returns Null once a covariant derivative without a metric
+   exists. (Attached: xpand_item1_chart.wls.)
+   After defining an xCoba chart, ToxPandFromRules prints
+   "InducedFrom::unknown" and returns Null, and so does every later split. The
+   chart's derivative has no metric, and ToMetric (xPand.m line 2566) asks
+   InducedFrom[MetricOfCovD[#]] for every derivative in $CovDs, which fails for
+   Null. xTensor guards the same pattern at xTensor.m line 8951. A one-line fix
+   would select only derivatives that have a metric.
+
+2. The slice determinant sign is fixed at +1, so epsilon[h] is mis-normalized
+   when n.n = +1. (Attached: xpand_item2_slice_sign.wls.)
+   SetSlicing accepts n.n = +1, and then the induced metric is negative
+   definite, but xPand.m line 1754 always declares it with DefMetric[1, h, ...].
+   The contraction of epsilon[h] with itself then gives +6, while the
+   four-index epsilon contracted with the normal, contracted with itself, gives
+   -6. Passing the computed sign instead of the literal 1 would fix it.
+
+3. A background rule whose value is a sum of terms along the normal breaks the
+   preparation of split rules, and the messages point elsewhere. (Attached:
+   xpand_item3_background_rule.wls.)
+   For a rank-3 field with the background (n_b h_ac - n_c h_ab) times a
+   constant, the split fails with ToCanonical::noident, Part::partw and
+   TranslatePerm::invalid, then ReplaceAll::reps and Validate::inhom, and
+   returns nothing. The same call with a zero background works, as does a
+   single-term background along the normal for a vector field. As far as we can
+   tell, ProjectionAndBackgroundRuleQ (line 2881) accepts the rule because the
+   projector annihilates it; RulesCovDsOfTensor (line 2867) substitutes it into
+   the field's induced decomposition, leaving an unexpanded sum inside
+   Projectorh; ToCanonical cannot handle that; and the resulting error is caught
+   at line 2840, so a Null enters the rule list and causes the later messages.
+   Expanding inside the projector first, as line 2907 already does, or reporting
+   the failure at the rule, would help.
+
+4. Small: two places assume n.n = -1. (Attached: xpand_item4_time_projection.wls.)
+   The "Time" projection in ExtractComponents (line 3042) multiplies an upper
+   index by -1, so with n.n = +1 the time component of W0 n^a comes out as -W0
+   rather than W0. ToxPand likewise passes -1 as the fluid norm to SplitMatter
+   (line 3014). Reading the norm from the slicing at both sites would fix it.
+
+5. Small: three printed outputs in the paper's Appendix A (arXiv:1302.6174)
+   differ from what the package gives, and from the stored outputs of your
+   "8 Implementation Of Paper" example notebook: the first-order Time-Time
+   equation prints -2 D_a D^a phi where the package gives -2 D_a D^a psi; and the
+   first-order Space-Space equation prints the tensor friction as E' H where the
+   package gives 2 H E', and a term 4 H' phi' where the package gives 4 H' phi.
+
+Thank you for xPand. We are happy to send anything else that would help.
+
+Best wishes,
+[your name, affiliation]
