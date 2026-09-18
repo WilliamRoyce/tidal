@@ -5,8 +5,8 @@
 # Usage: run_lane.sh <step> [key=value ...]
 # Steps (script, timeout): probe_load (15m) · a2 (30m) · a1 (45m) · b (45m) ·
 #   c (30m) · d (90m) · dl (30m) · e (45m) · e2 (15m) · t1 (20m) · f2 (20m) ·
-#   f3 (15m) · f5 (15m) · f6 (15m) · f7 (45m) · f8 (20m)
-# Discipline: refuses if a kernel is live (the lane hook cannot see a bare .wls);
+#   f3 (15m) · f5 (15m) · f6 (15m) · f7 (45m) · f8 (20m) · f9 (20m) · f10 (20m) · f11 (15m)
+# Discipline: refuses a script wl_lint.py finds defective; refuses if a kernel is live (the lane hook cannot see a bare .wls);
 # QT_QPA_PLATFORM=offscreen; runs from a throwaway cwd; hard timeout; the
 # transcript is scrubbed of the home directory and repo path at print time and
 # saved under third_party/perturbations_runs/<step>/<utc>/; success is read from
@@ -19,9 +19,17 @@ STEP="${1:-}"; shift || true
 declare -A SCRIPT=( [probe_load]=probe_load.wls [a2]=repro_a2_tensor_eom.wls [a1]=repro_a1_tensor_action.wls
   [b]=repro_b_mb_scalars.wls [c]=probe_c_signature.wls [d]=probe_d_torsion.wls [dl]=probe_d_limits.wls [e]=probe_e_xmag.wls [e2]=probe_e2_xmag_induced.wls
   [t1]=tier1_xmag.wls [f2]=f2_hazards.wls [f3]=f3_changecurvature.wls [f5]=f5_sign_audit.wls [f6]=f6_psalter_signs.wls
-  [f7]=f7_epsilon_and_import_map.wls [f8]=f8_contractmetric.wls )
-declare -A TMO=( [probe_load]=15m [a2]=30m [a1]=45m [b]=45m [c]=30m [d]=90m [dl]=30m [e]=45m [e2]=15m [t1]=20m [f2]=20m [f3]=15m [f5]=15m [f6]=15m [f7]=45m [f8]=20m )
+  [f7]=f7_epsilon_and_import_map.wls [f8]=f8_contractmetric.wls [f9]=f9_background_rules.wls
+  [f10]=f10_xbrauer_mechanism.wls [f11]=f11_shadowed_names.wls )
+declare -A TMO=( [probe_load]=15m [a2]=30m [a1]=45m [b]=45m [c]=30m [d]=90m [dl]=30m [e]=45m [e2]=15m [t1]=20m [f2]=20m [f3]=15m [f5]=15m [f6]=15m [f7]=45m [f8]=20m [f9]=20m [f10]=20m [f11]=15m )
 [[ -n "$STEP" && -n "${SCRIPT[$STEP]:-}" ]] || { echo "usage: $0 <${!SCRIPT[*]}> [key=value ...]"; exit 2; }
+# Pre-flight: refuse a script the lint finds defective, before any kernel starts. Mathematica
+# returns a wrong call unevaluated rather than failing, so these defects otherwise surface as
+# plausible wrong answers (GH #591; wl_lint.py's docstring lists what is checked).
+if ! LINT_OUT="$(python3 "$HERE/wl_lint.py" "$HERE/wolfram/${SCRIPT[$STEP]}" "$HERE/wolfram/RCSetup.wl" "$HERE/wolfram/RCSetupCore.wl")"; then
+    printf '%s\n' "$LINT_OUT"
+    echo "RC_LANE_LINT=failed; refusing to start a kernel"; exit 4
+fi
 if pgrep -x wolframscript >/dev/null || pgrep -x WolframKernel >/dev/null; then
     echo "RC_LANE_BUSY=a Wolfram kernel is live; refusing (single license)"; exit 3
 fi
