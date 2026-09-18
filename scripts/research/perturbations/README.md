@@ -1,8 +1,8 @@
 # `perturbations/` — research artifacts behind the R-C perturbation-tooling memo
 
-<!-- cspell:words xPand xMAG xBrauer TraceFree Pitrou Umeh Helpin Bertschinger xPert normu Weitzenböck Gorji Valcarcel -->
+<!-- cspell:words xPand xMAG xBrauer TraceFree Pitrou Umeh Helpin Bertschinger xPert normu Weitzenböck Gorji Valcarcel RCOrder ExtractOrder -->
 
-**Status: lane in progress (dispatched 2026-09-15; started 2026-09-16).** Results are written up in
+**Status: merged 2026-09-17 (#588); follow-up on #591 and the upstream reports 2026-09-18.** Results are written up in
 `docs/cosmology/perturbation_tooling.md` (R-C, #567); the planning trail is archived verbatim in
 `docs/cosmology/rc_planning_record.md`. Nothing here runs in the pipeline. **Research code, not
 production code.**
@@ -32,6 +32,12 @@ production code.**
 | `wolfram/f5_sign_audit.wls`, `wolfram/f6_psalter_signs.wls` | the five xTensor sign globals in each state: plain, xPand, after `SetSlicing`, xMAG, PSALTer — the lines `conventions.md` quotes | ours |
 | `wolfram/f7_epsilon_and_import_map.wls` | the slice epsilon: what xTensor fixes by itself, the positive assertion that no package relates it to the four-index one, PSALTer's dictionary transcribed and tested, the slot-order trap, and Probe D3's rule set rebuilt in both contortion families with an odd-in-torsion control | ours |
 | `wolfram/f8_contractmetric.wls` | one kernel in three states (xPand, xBrauer, xMAG) to attribute the lost transverse and traceless simplification, with the `Master` discriminator and the driver and rule-ordering rivals excluded | ours |
+| `wolfram/f9_background_rules.wls` | GH #591: what xPand does with a nonzero background value — which rule shapes it files as projected backgrounds, where the failure starts, which shapes work (vector and rank-2 checked by hand), the zero-background references, the four-argument call that produced the retracted "empty first order", and that a failure leaves the session unharmed | ours |
+| `wolfram/f10_xbrauer_mechanism.wls` | xBrauer's `ContractMetric` guard, one tensor property changed at a time (no `Master`; `ProjectedWith`; `Master -> h`; xPand's `DefProjectedTensor`), before and after xBrauer, with the guard's value computed for each | ours |
+| `wolfram/f11_shadowed_names.wls` | which bare names resolve to a package's symbol after xPand and after xMAG (`$Version` among them), and that the harness now prints the kernel's version | ours |
+| `wl_lint.py` | pre-flight check run by `run_lane.sh` before any kernel (and by `tests/test_research_wolfram_lint.py`): helper argument counts, balance, dropped multi-line continuations, a `Needs` sharing its line, a bare `$Version` | ours |
+| `PACKAGE_FACTS.md` | what each package does, as the kernel showed it, with the run or source line — read before writing code against a package | ours |
+| `upstream/` | the reports for package authors (drafts, never filed from here), their claim-by-claim checks, and `check_snippets.py`, which runs every snippet the way a reader would | ours; see `upstream/README.md` |
 | `mb_camb_symbolic.py`, `camb_symbolic_newtonian_2.0.4.txt` | CAMB's own scalar equations printed from `camb.symbolic` (camb 2.0.4) — the machine check of the MB → our-convention transcription | ours; equations are CAMB's |
 
 ## How to reproduce
@@ -61,6 +67,10 @@ bash scripts/research/perturbations/run_lane.sh f6   # sign globals: PSALTer (ow
 bash scripts/research/perturbations/run_lane.sh f8   # which package loses the simplifications
 bash scripts/research/perturbations/run_lane.sh f7 normu=-1 kin=1   # slice epsilon + import map, mostly plus
 bash scripts/research/perturbations/run_lane.sh f7 normu=1 kin=1    # the same in the project's mostly minus
+bash scripts/research/perturbations/run_lane.sh f9   # background values in xPand (#591)
+bash scripts/research/perturbations/run_lane.sh f10  # xBrauer's contraction guard, one variable at a time
+bash scripts/research/perturbations/run_lane.sh f11  # names a package load redefines
+python3 scripts/research/perturbations/upstream/check_snippets.py   # every upstream snippet and attachment
 bash scripts/verify-wolfram-setup.sh --require-psalter
 bash scripts/research/perturbations/manifest.sh after && bash scripts/research/perturbations/manifest.sh diff
 uv run python scripts/research/perturbations/mb_camb_symbolic.py scripts/research/perturbations/camb_symbolic_newtonian_2.0.4.txt
@@ -70,7 +80,13 @@ uv run python scripts/research/perturbations/mb_camb_symbolic.py scripts/researc
 
 Three of this lane's "the package is broken" findings were its own calling forms, and one was
 a convention the package sets silently (memo §3.3, §8; the PSALTer #543 precedent is the same
-pattern). Before any claim about a third-party package, in this order:
+pattern). By 2026-09-18 our mistakes fell into three kinds: Mathematica failing without a
+message (a wrong call returned unevaluated, a definition cut at a line break, a comment closed
+early, a name read before its package loaded, a bare name meaning a package's symbol); an
+assumption about how a package behaves; and a check that could not have failed. Rules 9 and 10
+and `wl_lint.py` are the guards for those; **`PACKAGE_FACTS.md` is what we know, with the run
+behind each fact — read it first.** Before any claim about a third-party package, in this
+order:
 
 1. **Read its documentation where it actually lives.** The usage strings — `?Symbol` in a
    kernel, and the `::usage` block at the top of the `.m` file (`xPand.m:127-668`,
@@ -105,6 +121,21 @@ pattern). Before any claim about a third-party package, in this order:
    that way and counted 8 potentials instead of 16 — with no message and no failure. Wrap the
    whole right-hand side in `( ... )`, or keep it on one line as `probe_d_torsion.wls` does.
    A count that disagrees with the source you transcribed from is the symptom to watch for.
+9. **Nothing is read off a result until it has proved it was computed.** A call that matches
+   no definition comes back unevaluated, and `ExtractOrder` of that is `0` — the "empty first
+   order" of #591 was our own helper called with four arguments instead of three. Take orders
+   with `RCOrder`, which refuses `$Failed`, `Null` and anything without the perturbation
+   parameter; test "did it run" on the package's own name for that parameter
+   (`$PerturbationParameter`), never on the one you passed; and **print any value the package
+   chooses rather than assuming it**. `run_lane.sh` runs `wl_lint.py` first and refuses a
+   script it flags.
+10. **Anything that leaves the lab — an issue, an email, a memo claim — is checked claim by
+    claim first.** Change one thing at a time, with a control that was seen to fail (`f10`
+    replaced a comparison that changed two things at once); list every claim with how it was
+    checked (`upstream/claims.md`); and run every code snippet the way a reader would, in a
+    fresh kernel, line by line, with each `(* expected *)` comment compared automatically
+    (`upstream/check_snippets.py`). A snippet filed without that step (xMAG #2, item 1) printed
+    a different answer from the one its comment gave.
 
 ## Rules this directory follows
 
