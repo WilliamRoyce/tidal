@@ -654,7 +654,7 @@ random coupling points, with the non-generic-point failure mode documented.
 > criterion (§5) already follows. **A literature search is therefore a deliverable of the
 > Stage-2 handoff, and precedes implementation.** This lowers L4's assessed risk
 > accordingly; ask Barker for the specific references he has in mind (agenda item,
-> `docs/meetings/2026-09-11_supervisor.md`).
+> `docs/meetings/2026-09-18_supervisor.md`).
 
 
 The paper's license for skipping it (arXiv:2606.30785 §implementation ¶"Mass spectra"): the
